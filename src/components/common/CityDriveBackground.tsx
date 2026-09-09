@@ -9,484 +9,434 @@ interface CityDriveBackgroundProps {
 }
 
 /**
- * Single modular repeating block of the outline City Skyline & Trees
- * Exactly inspired by the reference image with line-art skyscrapers,
- * window grids, stepped rooftops, antennas, and roadside trees.
+ * Distant Skyline Parallax Segment (Atmospheric Far Layer)
+ * Soft-toned communication spires, suspension bridge towers & cables, and distant landmarks
+ * moving at a slower speed (60s) to create authentic 3D parallax depth.
  */
-const SkylineSegment: React.FC = () => {
+const DistantSkylineSegment: React.FC = () => {
   return (
     <svg
-      viewBox="0 0 1600 160"
+      viewBox="0 0 1600 180"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="w-[1600px] h-[160px] flex-shrink-0"
+      className="w-[1600px] h-[180px] flex-shrink-0 pointer-events-none select-none"
       preserveAspectRatio="none"
     >
       <defs>
-        {/* Subtle shadow for skyline line art */}
-        <filter id="glow-skyline" x="-10%" y="-10%" width="120%" height="120%">
-          <feDropShadow dx="0" dy="0" stdDeviation="1" floodColor="#000000" floodOpacity="0.08" />
-        </filter>
-        <linearGradient id="building-stroke-grad" x1="0" y1="0" x2="0" y2="160" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0f172a" stopOpacity="0.85" />
-          <stop offset="60%" stopColor="#334155" stopOpacity="0.7" />
-          <stop offset="100%" stopColor="#64748b" stopOpacity="0.45" />
+        <linearGradient id="distant-facade" x1="0" y1="0" x2="0" y2="180" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#e2e8f0" stopOpacity="0.85" />
+          <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0.4" />
         </linearGradient>
       </defs>
 
-      {/* Baseline Road Line */}
-      <line x1="0" y1="156" x2="1600" y2="156" stroke="#0f172a" strokeOpacity="0.85" strokeWidth="2.5" />
+      <g stroke="#94a3b8" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="url(#distant-facade)">
+        {/* Distant Landmark 1: Communication Tower with Observation Pod */}
+        <path d="M 88 172 L 104 48 L 98 46 L 98 36 L 118 36 L 118 46 L 112 48 L 128 172 Z" />
+        <ellipse cx="108" cy="40" rx="16" ry="5" fill="#cbd5e1" stroke="#94a3b8" />
+        <line x1="108" y1="36" x2="108" y2="10" stroke="#64748b" strokeWidth="1.6" />
+        <circle cx="108" cy="8" r="2.5" fill="#ef4444" stroke="#dc2626" />
 
-      {/* Group of Outlined Buildings & Trees matching reference image */}
-      <g stroke="url(#building-stroke-grad)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        
-        {/* Building 1: Stepped Small Block */}
-        <path d="M 10 156 V 92 H 36 V 156" />
-        <line x1="18" y1="104" x2="28" y2="104" strokeWidth="1.5" />
-        <line x1="18" y1="116" x2="28" y2="116" strokeWidth="1.5" />
-        <line x1="18" y1="128" x2="28" y2="128" strokeWidth="1.5" />
-        <line x1="18" y1="140" x2="28" y2="140" strokeWidth="1.5" />
+        {/* Distant Office Tower 1 */}
+        <rect x="144" y="68" width="46" height="104" />
+        <line x1="144" y1="90" x2="190" y2="90" />
+        <line x1="144" y1="112" x2="190" y2="112" />
+        <line x1="144" y1="134" x2="190" y2="134" />
+        <line x1="144" y1="154" x2="190" y2="154" />
 
-        {/* Tree 1 */}
-        <circle cx="56" cy="126" r="14" strokeWidth="1.6" />
-        <circle cx="56" cy="126" r="6" strokeWidth="1.2" strokeOpacity="0.7" />
-        <line x1="56" y1="140" x2="56" y2="156" strokeWidth="1.8" />
+        {/* Distant Landmark 2: Pyramid Spire Tower (The Shard Style) */}
+        <path d="M 276 172 L 314 20 L 352 172 Z" />
+        <line x1="314" y1="20" x2="314" y2="172" strokeDasharray="3 3" />
 
-        {/* Building 2: Slanted Roof Commercial Highrise */}
-        <path d="M 80 156 V 68 L 108 54 V 156" />
-        {/* Window Grids */}
-        <line x1="88" y1="80" x2="100" y2="76" strokeWidth="1.4" />
-        <line x1="88" y1="94" x2="100" y2="90" strokeWidth="1.4" />
-        <line x1="88" y1="108" x2="100" y2="104" strokeWidth="1.4" />
-        <line x1="88" y1="122" x2="100" y2="118" strokeWidth="1.4" />
-        <line x1="88" y1="136" x2="100" y2="132" strokeWidth="1.4" />
+        {/* Distant Stepped Tower */}
+        <path d="M 392 172 V 62 H 418 V 40 H 438 V 62 H 464 V 172 Z" />
+        <line x1="428" y1="40" x2="428" y2="22" strokeWidth="1.5" />
+        <circle cx="428" cy="20" r="2" fill="#ef4444" />
 
-        {/* Tree 2 */}
-        <circle cx="128" cy="132" r="11" strokeWidth="1.5" />
-        <line x1="128" y1="143" x2="128" y2="156" strokeWidth="1.8" />
+        {/* Distant Landmark 3: Suspension Bridge Cable Towers */}
+        <path d="M 568 172 V 32 H 584 V 172 Z" />
+        <path d="M 680 172 V 32 H 696 V 172 Z" />
+        <path d="M 515 172 Q 576 32 632 112 T 688 32 Q 745 172 755 172" fill="none" strokeWidth="1.6" stroke="#94a3b8" />
 
-        {/* Building 3: Mid-rise with Antennas */}
-        <path d="M 152 156 V 76 H 188 V 156" />
-        <path d="M 164 76 V 62 H 176 V 76" />
-        <line x1="170" y1="62" x2="170" y2="44" strokeWidth="1.5" />
-        <circle cx="170" cy="42" r="2" fill="#0f172a" />
-        {/* Dual Window columns */}
-        <line x1="160" y1="90" x2="166" y2="90" strokeWidth="1.5" />
-        <line x1="174" y1="90" x2="180" y2="90" strokeWidth="1.5" />
-        <line x1="160" y1="104" x2="166" y2="104" strokeWidth="1.5" />
-        <line x1="174" y1="104" x2="180" y2="104" strokeWidth="1.5" />
-        <line x1="160" y1="118" x2="166" y2="118" strokeWidth="1.5" />
-        <line x1="174" y1="118" x2="180" y2="118" strokeWidth="1.5" />
-        <line x1="160" y1="132" x2="166" y2="132" strokeWidth="1.5" />
-        <line x1="174" y1="132" x2="180" y2="132" strokeWidth="1.5" />
+        {/* Distant Slanted Roof Landmark */}
+        <path d="M 792 172 V 52 L 836 30 V 172 Z" />
 
-        {/* Tree 3 */}
-        <circle cx="210" cy="130" r="12" strokeWidth="1.5" />
-        <line x1="210" y1="142" x2="210" y2="156" strokeWidth="1.8" />
+        {/* Distant Landmark 4: Supertall Center Spire */}
+        <path d="M 912 172 V 38 H 938 V 18 H 948 V 38 H 974 V 172 Z" />
+        <line x1="943" y1="18" x2="943" y2="4" strokeWidth="1.6" stroke="#64748b" />
+        <circle cx="943" cy="3" r="2.5" fill="#ef4444" stroke="#dc2626" />
 
-        {/* Building 4: Tall Stepped Tower (Centerpiece 1) */}
-        <path d="M 234 156 V 82 H 246 V 48 H 272 V 82 H 284 V 156" />
-        <line x1="259" y1="48" x2="259" y2="30" strokeWidth="1.6" />
-        <circle cx="259" cy="28" r="2.5" fill="#0f172a" />
-        {/* Tower Windows */}
-        <line x1="252" y1="62" x2="266" y2="62" strokeWidth="1.5" />
-        <line x1="252" y1="74" x2="266" y2="74" strokeWidth="1.5" />
-        <line x1="240" y1="96" x2="248" y2="96" strokeWidth="1.5" />
-        <line x1="255" y1="96" x2="263" y2="96" strokeWidth="1.5" />
-        <line x1="270" y1="96" x2="278" y2="96" strokeWidth="1.5" />
-        <line x1="240" y1="112" x2="248" y2="112" strokeWidth="1.5" />
-        <line x1="255" y1="112" x2="263" y2="112" strokeWidth="1.5" />
-        <line x1="270" y1="112" x2="278" y2="112" strokeWidth="1.5" />
-        <line x1="240" y1="128" x2="248" y2="128" strokeWidth="1.5" />
-        <line x1="255" y1="128" x2="263" y2="128" strokeWidth="1.5" />
-        <line x1="270" y1="128" x2="278" y2="128" strokeWidth="1.5" />
-        <line x1="240" y1="144" x2="248" y2="144" strokeWidth="1.5" />
-        <line x1="255" y1="144" x2="263" y2="144" strokeWidth="1.5" />
-        <line x1="270" y1="144" x2="278" y2="144" strokeWidth="1.5" />
+        {/* Distant Blocks */}
+        <rect x="1040" y="58" width="72" height="114" />
+        <rect x="1134" y="42" width="52" height="130" />
+        <line x1="1160" y1="42" x2="1160" y2="26" />
 
-        {/* Tree 4 & 5 */}
-        <circle cx="304" cy="134" r="10" strokeWidth="1.5" />
-        <line x1="304" y1="144" x2="304" y2="156" strokeWidth="1.8" />
-        <circle cx="324" cy="130" r="12" strokeWidth="1.5" />
-        <line x1="324" y1="142" x2="324" y2="156" strokeWidth="1.8" />
-
-        {/* Building 5: Angular Modern Office Complex */}
-        <path d="M 346 156 V 56 L 382 72 V 156" />
-        <line x1="356" y1="80" x2="372" y2="86" strokeWidth="1.5" />
-        <line x1="356" y1="96" x2="372" y2="102" strokeWidth="1.5" />
-        <line x1="356" y1="112" x2="372" y2="118" strokeWidth="1.5" />
-        <line x1="356" y1="128" x2="372" y2="134" strokeWidth="1.5" />
-        <line x1="356" y1="144" x2="372" y2="150" strokeWidth="1.5" />
-
-        {/* Tree 6 */}
-        <circle cx="404" cy="128" r="13" strokeWidth="1.5" />
-        <circle cx="404" cy="128" r="5" strokeWidth="1.2" strokeOpacity="0.7" />
-        <line x1="404" y1="141" x2="404" y2="156" strokeWidth="1.8" />
-
-        {/* Building 6: Cathedral/Arch Roof Highrise */}
-        <path d="M 428 156 V 78 L 444 60 L 460 78 V 156" />
-        <circle cx="444" cy="74" r="6" strokeWidth="1.4" />
-        <line x1="436" y1="94" x2="452" y2="94" strokeWidth="1.5" />
-        <line x1="436" y1="108" x2="452" y2="108" strokeWidth="1.5" />
-        <line x1="436" y1="122" x2="452" y2="122" strokeWidth="1.5" />
-        <line x1="436" y1="136" x2="452" y2="136" strokeWidth="1.5" />
-        <line x1="436" y1="148" x2="452" y2="148" strokeWidth="1.5" />
-
-        {/* Attached Block */}
-        <path d="M 460 156 V 90 H 488 V 156" />
-        <line x1="468" y1="102" x2="480" y2="102" strokeWidth="1.5" />
-        <line x1="468" y1="116" x2="480" y2="116" strokeWidth="1.5" />
-        <line x1="468" y1="130" x2="480" y2="130" strokeWidth="1.5" />
-        <line x1="468" y1="144" x2="480" y2="144" strokeWidth="1.5" />
-
-        {/* Tree 7 */}
-        <circle cx="508" cy="133" r="11" strokeWidth="1.5" />
-        <line x1="508" y1="144" x2="508" y2="156" strokeWidth="1.8" />
-
-        {/* Building 7: Twin Peak Tower */}
-        <path d="M 528 156 V 64 L 544 50 L 560 64 V 156" />
-        <path d="M 560 156 V 76 L 576 62 L 592 76 V 156" />
-        <line x1="536" y1="84" x2="552" y2="84" strokeWidth="1.4" />
-        <line x1="536" y1="100" x2="552" y2="100" strokeWidth="1.4" />
-        <line x1="536" y1="116" x2="552" y2="116" strokeWidth="1.4" />
-        <line x1="536" y1="132" x2="552" y2="132" strokeWidth="1.4" />
-        <line x1="568" y1="92" x2="584" y2="92" strokeWidth="1.4" />
-        <line x1="568" y1="108" x2="584" y2="108" strokeWidth="1.4" />
-        <line x1="568" y1="124" x2="584" y2="124" strokeWidth="1.4" />
-        <line x1="568" y1="140" x2="584" y2="140" strokeWidth="1.4" />
-
-        {/* Trees 8 & 9 */}
-        <circle cx="612" cy="130" r="13" strokeWidth="1.5" />
-        <line x1="612" y1="143" x2="612" y2="156" strokeWidth="1.8" />
-        <circle cx="634" cy="135" r="9" strokeWidth="1.5" />
-        <line x1="634" y1="144" x2="634" y2="156" strokeWidth="1.8" />
-
-        {/* Building 8: Modern Concave Centerpiece Tower */}
-        <path d="M 654 156 V 40 H 688 V 156" />
-        <line x1="671" y1="40" x2="671" y2="18" strokeWidth="1.8" />
-        <circle cx="671" cy="16" r="3" fill="#0f172a" />
-        {/* Modern vertical split and horizontal stripes */}
-        <line x1="671" y1="40" x2="671" y2="156" strokeWidth="1.2" strokeOpacity="0.6" />
-        <line x1="660" y1="56" x2="682" y2="56" strokeWidth="1.5" />
-        <line x1="660" y1="72" x2="682" y2="72" strokeWidth="1.5" />
-        <line x1="660" y1="88" x2="682" y2="88" strokeWidth="1.5" />
-        <line x1="660" y1="104" x2="682" y2="104" strokeWidth="1.5" />
-        <line x1="660" y1="120" x2="682" y2="120" strokeWidth="1.5" />
-        <line x1="660" y1="136" x2="682" y2="136" strokeWidth="1.5" />
-
-        {/* Tree 10 */}
-        <circle cx="708" cy="130" r="12" strokeWidth="1.5" />
-        <circle cx="708" cy="130" r="5" strokeWidth="1.2" strokeOpacity="0.7" />
-        <line x1="708" y1="142" x2="708" y2="156" strokeWidth="1.8" />
-
-        {/* Building 9: Stepped Residential Block */}
-        <path d="M 730 156 V 96 H 746 V 74 H 768 V 96 H 782 V 156" />
-        <line x1="757" y1="74" x2="757" y2="58" strokeWidth="1.4" />
-        <line x1="738" y1="110" x2="774" y2="110" strokeWidth="1.4" />
-        <line x1="738" y1="126" x2="774" y2="126" strokeWidth="1.4" />
-        <line x1="738" y1="142" x2="774" y2="142" strokeWidth="1.4" />
-
-        {/* Tree 11 */}
-        <circle cx="802" cy="134" r="11" strokeWidth="1.5" />
-        <line x1="802" y1="145" x2="802" y2="156" strokeWidth="1.8" />
-
-        {/* Building 10: Mirrored Modern Highrise */}
-        <path d="M 824 156 V 70 L 856 52 V 156" />
-        <line x1="832" y1="80" x2="848" y2="72" strokeWidth="1.4" />
-        <line x1="832" y1="96" x2="848" y2="88" strokeWidth="1.4" />
-        <line x1="832" y1="112" x2="848" y2="104" strokeWidth="1.4" />
-        <line x1="832" y1="128" x2="848" y2="120" strokeWidth="1.4" />
-        <line x1="832" y1="144" x2="848" y2="136" strokeWidth="1.4" />
-
-        {/* Tree 12 & 13 */}
-        <circle cx="878" cy="130" r="12" strokeWidth="1.5" />
-        <line x1="878" y1="142" x2="878" y2="156" strokeWidth="1.8" />
-        <circle cx="900" cy="136" r="9" strokeWidth="1.5" />
-        <line x1="900" y1="145" x2="900" y2="156" strokeWidth="1.8" />
-
-        {/* Building 11: Grand City Center with Crown */}
-        <path d="M 922 156 V 58 H 936 V 34 H 968 V 58 H 982 V 156" />
-        <line x1="952" y1="34" x2="952" y2="16" strokeWidth="1.8" />
-        <circle cx="952" cy="14" r="3" fill="#0f172a" />
-        {/* Crown & grid */}
-        <line x1="942" y1="48" x2="962" y2="48" strokeWidth="1.5" />
-        <line x1="930" y1="74" x2="974" y2="74" strokeWidth="1.5" />
-        <line x1="930" y1="92" x2="974" y2="92" strokeWidth="1.5" />
-        <line x1="930" y1="110" x2="974" y2="110" strokeWidth="1.5" />
-        <line x1="930" y1="128" x2="974" y2="128" strokeWidth="1.5" />
-        <line x1="930" y1="144" x2="974" y2="144" strokeWidth="1.5" />
-
-        {/* Tree 14 */}
-        <circle cx="1004" cy="130" r="13" strokeWidth="1.5" />
-        <circle cx="1004" cy="130" r="5" strokeWidth="1.2" strokeOpacity="0.7" />
-        <line x1="1004" y1="143" x2="1004" y2="156" strokeWidth="1.8" />
-
-        {/* Building 12: Angled Office Block */}
-        <path d="M 1028 156 V 66 L 1060 82 V 156" />
-        <line x1="1036" y1="88" x2="1052" y2="96" strokeWidth="1.4" />
-        <line x1="1036" y1="104" x2="1052" y2="112" strokeWidth="1.4" />
-        <line x1="1036" y1="120" x2="1052" y2="128" strokeWidth="1.4" />
-        <line x1="1036" y1="136" x2="1052" y2="144" strokeWidth="1.4" />
-
-        {/* Tree 15 */}
-        <circle cx="1082" cy="133" r="11" strokeWidth="1.5" />
-        <line x1="1082" y1="144" x2="1082" y2="156" strokeWidth="1.8" />
-
-        {/* Building 13: Highrise with Rooftop Gazebo */}
-        <path d="M 1104 156 V 80 H 1144 V 156" />
-        <path d="M 1114 80 L 1124 66 L 1134 80" />
-        <line x1="1124" y1="66" x2="1124" y2="52" strokeWidth="1.4" />
-        <circle cx="1124" cy="50" r="2" fill="#0f172a" />
-        <line x1="1112" y1="96" x2="1136" y2="96" strokeWidth="1.5" />
-        <line x1="1112" y1="112" x2="1136" y2="112" strokeWidth="1.5" />
-        <line x1="1112" y1="128" x2="1136" y2="128" strokeWidth="1.5" />
-        <line x1="1112" y1="144" x2="1136" y2="144" strokeWidth="1.5" />
-
-        {/* Trees 16 & 17 */}
-        <circle cx="1166" cy="130" r="12" strokeWidth="1.5" />
-        <line x1="1166" y1="142" x2="1166" y2="156" strokeWidth="1.8" />
-        <circle cx="1188" cy="135" r="9" strokeWidth="1.5" />
-        <line x1="1188" y1="144" x2="1188" y2="156" strokeWidth="1.8" />
-
-        {/* Building 14: Modern Slanted Skyscraper */}
-        <path d="M 1210 156 V 46 L 1248 64 V 156" />
-        <line x1="1220" y1="74" x2="1238" y2="82" strokeWidth="1.5" />
-        <line x1="1220" y1="92" x2="1238" y2="100" strokeWidth="1.5" />
-        <line x1="1220" y1="110" x2="1238" y2="118" strokeWidth="1.5" />
-        <line x1="1220" y1="128" x2="1238" y2="136" strokeWidth="1.5" />
-        <line x1="1220" y1="144" x2="1238" y2="152" strokeWidth="1.5" />
-
-        {/* Tree 18 */}
-        <circle cx="1270" cy="128" r="13" strokeWidth="1.5" />
-        <circle cx="1270" cy="128" r="5" strokeWidth="1.2" strokeOpacity="0.7" />
-        <line x1="1270" y1="141" x2="1270" y2="156" strokeWidth="1.8" />
-
-        {/* Building 15: Cathedral Dome Center */}
-        <path d="M 1294 156 V 82 L 1312 62 L 1330 82 V 156" />
-        <circle cx="1312" cy="76" r="6" strokeWidth="1.4" />
-        <line x1="1302" y1="96" x2="1322" y2="96" strokeWidth="1.5" />
-        <line x1="1302" y1="112" x2="1322" y2="112" strokeWidth="1.5" />
-        <line x1="1302" y1="128" x2="1322" y2="128" strokeWidth="1.5" />
-        <line x1="1302" y1="144" x2="1322" y2="144" strokeWidth="1.5" />
-
-        {/* Attached Block */}
-        <path d="M 1330 156 V 94 H 1358 V 156" />
-        <line x1="1338" y1="108" x2="1350" y2="108" strokeWidth="1.5" />
-        <line x1="1338" y1="124" x2="1350" y2="124" strokeWidth="1.5" />
-        <line x1="1338" y1="140" x2="1350" y2="140" strokeWidth="1.5" />
-
-        {/* Tree 19 */}
-        <circle cx="1380" cy="133" r="11" strokeWidth="1.5" />
-        <line x1="1380" y1="144" x2="1380" y2="156" strokeWidth="1.8" />
-
-        {/* Building 16: Stepped Tower with Antenna */}
-        <path d="M 1402 156 V 84 H 1416 V 50 H 1442 V 84 H 1456 V 156" />
-        <line x1="1429" y1="50" x2="1429" y2="30" strokeWidth="1.6" />
-        <circle cx="1429" cy="28" r="2.5" fill="#0f172a" />
-        <line x1="1410" y1="98" x2="1448" y2="98" strokeWidth="1.5" />
-        <line x1="1410" y1="114" x2="1448" y2="114" strokeWidth="1.5" />
-        <line x1="1410" y1="130" x2="1448" y2="130" strokeWidth="1.5" />
-        <line x1="1410" y1="144" x2="1448" y2="144" strokeWidth="1.5" />
-
-        {/* Trees 20 & 21 */}
-        <circle cx="1478" cy="130" r="12" strokeWidth="1.5" />
-        <line x1="1478" y1="142" x2="1478" y2="156" strokeWidth="1.8" />
-        <circle cx="1500" cy="135" r="9" strokeWidth="1.5" />
-        <line x1="1500" y1="144" x2="1500" y2="156" strokeWidth="1.8" />
-
-        {/* Building 17: Finishing Block connecting seamlessly */}
-        <path d="M 1522 156 V 72 L 1554 56 V 156" />
-        <line x1="1530" y1="84" x2="1546" y2="76" strokeWidth="1.4" />
-        <line x1="1530" y1="102" x2="1546" y2="94" strokeWidth="1.4" />
-        <line x1="1530" y1="120" x2="1546" y2="112" strokeWidth="1.4" />
-        <line x1="1530" y1="138" x2="1546" y2="130" strokeWidth="1.4" />
-
-        {/* Final Tree connecting to next loop */}
-        <circle cx="1576" cy="128" r="13" strokeWidth="1.5" />
-        <circle cx="1576" cy="128" r="5" strokeWidth="1.2" strokeOpacity="0.7" />
-        <line x1="1576" y1="141" x2="1576" y2="156" strokeWidth="1.8" />
+        {/* Distant Landmark 5: Crown Spire */}
+        <path d="M 1272 172 V 48 L 1294 28 L 1316 48 V 172 Z" />
+        <rect x="1392" y="66" width="56" height="106" />
+        <path d="M 1482 172 V 40 L 1524 60 V 172 Z" />
       </g>
     </svg>
   );
 };
 
 /**
- * High-detail Vector White Sedan Car
- * Styled exactly like the modern luxury white sedan in the user's reference image
- * with rotating alloy wheels, glowing light-green/white headlights, and red taillights.
+ * Real Architectural Foreground Skyline Segment (1600px width modular loop)
+ * Detailed solid architectural archetypes:
+ * 1. Modern 12-Story Commercial High-Rise with stepped penthouse deck & antenna.
+ * 2. Diagrid Skyscraper with iconic structural steel X-bracing.
+ * 3. Contemporary Slanted Glass Tower with horizontal & vertical mullions.
+ * 4. Iconic Twin Towers with suspended Skybridge and pinnacle spires.
+ * 5. Luxury Residential Tower with staggered cantilevered balconies and sky lounge.
+ * 6. Stepped Art Deco Landmark with fluted columns & stainless spire.
+ * 7. High-Tech Diamond Facet Tower with geometric light reflections.
+ * 8. Corporate Grand Atrium Complex with emerald-tinted grand glass arch.
+ * 9. Aerodynamic Curvilinear Tower with wave louvers.
+ * 10. Connecting block and realistic streetscape with boulevard trees & modern LED lamps.
  */
-const ModernWhiteSedan: React.FC = () => {
+const RealArchitecturalSkylineSegment: React.FC = () => {
   return (
-    <div className="relative w-[210px] h-[72px] pointer-events-none select-none animate-car-bounce">
-      
-      {/* Headlight Forward Light Beam (Casting on road) */}
-      <div className="headlight-beam absolute top-[30px] right-[-140px] w-[150px] h-[34px] z-0 opacity-80" />
+    <svg
+      viewBox="0 0 1600 180"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-[1600px] h-[180px] flex-shrink-0 pointer-events-none select-none"
+      preserveAspectRatio="none"
+    >
+      <defs>
+        {/* Realistic Solid Glass Facade Gradient */}
+        <linearGradient id="real-glass-tower" x1="0" y1="0" x2="0" y2="180" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+          <stop offset="45%" stopColor="#f8fafc" stopOpacity="0.98" />
+          <stop offset="100%" stopColor="#f1f5f9" stopOpacity="0.95" />
+        </linearGradient>
 
-      {/* Car Body SVG */}
-      <svg
-        viewBox="0 0 240 82"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-[210px] h-[72px] relative z-10 filter drop-shadow-[0_6px_16px_rgba(0,0,0,0.22)]"
-      >
-        <defs>
-          {/* Car Metallic White Gradient */}
-          <linearGradient id="carBodyGrad" x1="0" y1="0" x2="0" y2="82" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#FFFFFF" />
-            <stop offset="60%" stopColor="#F1F5F9" />
-            <stop offset="100%" stopColor="#CBD5E1" />
-          </linearGradient>
+        {/* Sky-Blue Modern Glass Gradient */}
+        <linearGradient id="glass-blue" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#f0f9ff" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#e0f2fe" stopOpacity="0.6" />
+        </linearGradient>
 
-          {/* Tinted Glass Gradient */}
-          <linearGradient id="glassGrad" x1="0" y1="0" x2="0" y2="40" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#1E293B" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#090D16" stopOpacity="0.98" />
-          </linearGradient>
+        {/* Atrium Emerald Glass Gradient */}
+        <linearGradient id="glass-emerald" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ecfdf5" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#d1fae5" stopOpacity="0.75" />
+        </linearGradient>
+      </defs>
 
-          {/* Underbody Shadow */}
-          <linearGradient id="underbodyGrad" x1="0" y1="0" x2="0" y2="20" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#0B0F19" />
-            <stop offset="100%" stopColor="#020408" />
-          </linearGradient>
-        </defs>
+      {/* Buildings Group with Architectural Linework and Solid Mass */}
+      <g stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="url(#real-glass-tower)">
+        
+        {/* ========================================================
+            BUILDING 1: Modern 12-Story Commercial High-Rise (x=12..86)
+            ======================================================== */}
+        <path d="M 12 172 V 52 H 86 V 172 Z" />
+        {/* Penthouse & Roof Mechanical Deck */}
+        <path d="M 28 52 V 36 H 70 V 52 Z" fill="#ffffff" />
+        <line x1="49" y1="36" x2="49" y2="16" strokeWidth="1.6" />
+        <circle cx="49" cy="14" r="2.5" fill="#ef4444" stroke="#dc2626" />
+        {/* Window Grids */}
+        <line x1="12" y1="66" x2="86" y2="66" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="12" y1="80" x2="86" y2="80" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="12" y1="94" x2="86" y2="94" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="12" y1="108" x2="86" y2="108" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="12" y1="122" x2="86" y2="122" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="12" y1="136" x2="86" y2="136" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="12" y1="150" x2="86" y2="150" stroke="#64748b" strokeWidth="1.2" />
+        {/* Vertical Structural Mullions */}
+        <line x1="28" y1="52" x2="28" y2="166" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="44" y1="52" x2="44" y2="166" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="60" y1="52" x2="60" y2="166" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="74" y1="52" x2="74" y2="166" stroke="#64748b" strokeWidth="1.2" />
+        {/* Glowing Office Windows */}
+        <rect x="30" y="82" width="12" height="10" fill="#fef08a" stroke="#eab308" strokeWidth="0.8" />
+        <rect x="62" y="110" width="10" height="10" fill="#fef08a" stroke="#eab308" strokeWidth="0.8" />
+        {/* Entrance Portico Canopy */}
+        <rect x="36" y="160" width="26" height="12" fill="#0f172a" stroke="#0f172a" />
 
-        {/* 1. Main Aerodynamic Sedan Chassis (Profile) */}
-        <path
-          d="M 12 55 
-             C 10 55 8 50 10 44
-             C 13 36 22 34 32 33
-             C 42 32 54 31 66 23
-             C 76 16 95 10 128 10
-             C 162 10 182 17 194 28
-             C 204 35 220 38 230 43
-             C 236 46 238 52 236 56
-             C 234 58 226 60 216 60
-             C 214 53 205 47 194 47
-             C 183 47 174 53 172 60
-             L 76 60
-             C 74 53 65 47 54 47
-             C 43 47 34 53 32 60
-             L 16 60
-             Z"
-          fill="url(#carBodyGrad)"
-          stroke="#94A3B8"
-          strokeWidth="0.8"
-        />
+        {/* Landscaped Tree 1 & Modern LED Streetlamp */}
+        <circle cx="106" cy="144" r="14" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <circle cx="106" cy="144" r="7" fill="#10b981" stroke="#047857" strokeWidth="1" />
+        <line x1="106" y1="158" x2="106" y2="172" stroke="#78350f" strokeWidth="2.2" />
+        {/* LED Streetlamp 1 */}
+        <path d="M 126 172 V 116 H 136" fill="none" strokeWidth="1.6" stroke="#0f172a" />
+        <rect x="133" y="114" width="7" height="3" rx="1" fill="#0f172a" />
+        <circle cx="136" cy="120" r="1.5" fill="#fde047" />
 
-        {/* 2. Sleek Tinted Windows & Roof Pillars */}
-        <path
-          d="M 68 25 
-             C 78 18 96 13 126 13 
-             C 156 13 174 19 184 29 
-             L 190 32 
-             L 66 32 
-             Z"
-          fill="url(#glassGrad)"
-          stroke="#334155"
-          strokeWidth="0.7"
-        />
-        {/* Center B-pillar divider */}
-        <line x1="126" y1="13" x2="126" y2="32" stroke="#475569" strokeWidth="2.5" />
-        {/* Chrome Window Trim Outline */}
-        <path
-          d="M 66 32 C 78 17 96 12 126 12 C 156 12 175 18 186 30"
-          stroke="#E2E8F0"
-          strokeWidth="1.2"
-          fill="none"
-        />
+        {/* ========================================================
+            BUILDING 2: Diagonal Braced Mega-Skyscraper (x=150..274)
+            ======================================================== */}
+        <path d="M 152 172 V 74 L 168 46 H 258 L 274 74 V 172 Z" />
+        {/* Crown & Dual Antenna Spires */}
+        <rect x="194" y="22" width="38" height="24" fill="#ffffff" />
+        <line x1="203" y1="22" x2="203" y2="6" strokeWidth="1.6" />
+        <circle cx="203" cy="5" r="2.5" fill="#ef4444" stroke="#dc2626" />
+        <line x1="223" y1="22" x2="223" y2="6" strokeWidth="1.6" />
+        <circle cx="223" cy="5" r="2.5" fill="#ef4444" stroke="#dc2626" />
+        {/* Heavy Diagrid Structural X-Bracing */}
+        <line x1="168" y1="46" x2="274" y2="108" stroke="#1e293b" strokeWidth="1.8" />
+        <line x1="258" y1="46" x2="152" y2="108" stroke="#1e293b" strokeWidth="1.8" />
+        <line x1="152" y1="108" x2="274" y2="172" stroke="#1e293b" strokeWidth="1.8" />
+        <line x1="274" y1="108" x2="152" y2="172" stroke="#1e293b" strokeWidth="1.8" />
+        {/* Floor Tie Beams */}
+        <line x1="162" y1="78" x2="264" y2="78" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="152" y1="108" x2="274" y2="108" stroke="#1e293b" strokeWidth="2" />
+        <line x1="152" y1="138" x2="274" y2="138" stroke="#64748b" strokeWidth="1.4" />
+        {/* Glowing Office Windows in Diagrid */}
+        <rect x="208" y="86" width="12" height="10" fill="#fef08a" stroke="#eab308" strokeWidth="0.8" />
+        <rect x="180" y="120" width="10" height="9" fill="#fef08a" stroke="#eab308" strokeWidth="0.8" />
 
-        {/* 3. Aerodynamic Contour Swage Line along Side */}
-        <path
-          d="M 30 38 C 70 38 150 36 226 46"
-          stroke="#CBD5E1"
-          strokeWidth="1.2"
-          strokeLinecap="round"
-        />
+        {/* Boulevard Trees 2 */}
+        <circle cx="295" cy="146" r="13" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="295" y1="159" x2="295" y2="172" stroke="#78350f" strokeWidth="2.2" />
+        <circle cx="316" cy="140" r="15" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="316" y1="155" x2="316" y2="172" stroke="#78350f" strokeWidth="2.2" />
 
-        {/* 4. Door Cut Lines */}
-        <path d="M 82 32 L 82 58" stroke="#94A3B8" strokeWidth="0.7" />
-        <path d="M 128 32 L 128 58" stroke="#94A3B8" strokeWidth="0.7" />
-        <path d="M 172 32 L 172 56" stroke="#94A3B8" strokeWidth="0.7" />
+        {/* ========================================================
+            BUILDING 3: Contemporary Slanted Glass Tower (x=338..428)
+            ======================================================== */}
+        <path d="M 338 172 V 40 L 428 70 V 172 Z" fill="url(#glass-blue)" />
+        {/* Slanted Glass Facade Lines */}
+        <line x1="338" y1="62" x2="428" y2="92" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="338" y1="84" x2="428" y2="114" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="338" y1="106" x2="428" y2="136" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="338" y1="128" x2="428" y2="158" stroke="#64748b" strokeWidth="1.4" />
+        {/* Vertical Aerodynamic Fins */}
+        <line x1="360" y1="47" x2="360" y2="172" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="384" y1="55" x2="384" y2="172" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="406" y1="63" x2="406" y2="172" stroke="#64748b" strokeWidth="1.2" />
 
-        {/* Flush Chrome Door Handles */}
-        <rect x="94" y="37" width="10" height="2" rx="1" fill="#475569" stroke="#E2E8F0" strokeWidth="0.5" />
-        <rect x="140" y="37" width="10" height="2" rx="1" fill="#475569" stroke="#E2E8F0" strokeWidth="0.5" />
+        {/* LED Streetlamp 2 & Bush */}
+        <path d="M 446 172 V 120 H 456" fill="none" strokeWidth="1.6" stroke="#0f172a" />
+        <rect x="453" y="118" width="7" height="3" rx="1" fill="#0f172a" />
+        <circle cx="456" cy="124" r="1.5" fill="#fde047" />
+        <circle cx="470" cy="146" r="14" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="470" y1="160" x2="470" y2="172" stroke="#78350f" strokeWidth="2.2" />
 
-        {/* Side Mirror */}
-        <path d="M 70 30 C 66 28 62 30 64 34 L 72 34 Z" fill="#FFFFFF" stroke="#94A3B8" strokeWidth="0.8" />
+        {/* ========================================================
+            BUILDING 4: Iconic Twin Towers with Skybridge (x=496..656)
+            ======================================================== */}
+        {/* Tower A (Left) */}
+        <path d="M 496 172 V 34 L 526 20 L 556 34 V 172 Z" />
+        <line x1="526" y1="20" x2="526" y2="4" strokeWidth="1.8" />
+        <circle cx="526" cy="3" r="2.5" fill="#ef4444" stroke="#dc2626" />
+        {/* Tower B (Right) */}
+        <path d="M 596 172 V 34 L 626 20 L 656 34 V 172 Z" />
+        <line x1="626" y1="20" x2="626" y2="4" strokeWidth="1.8" />
+        <circle cx="626" cy="3" r="2.5" fill="#ef4444" stroke="#dc2626" />
+        {/* Suspended Iconic Two-Tier Skybridge */}
+        <rect x="556" y="84" width="40" height="24" rx="4" fill="#ffffff" stroke="#0f172a" strokeWidth="1.8" />
+        <line x1="562" y1="96" x2="590" y2="96" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="570" y1="84" x2="570" y2="108" stroke="#64748b" strokeWidth="1" />
+        <line x1="582" y1="84" x2="582" y2="108" stroke="#64748b" strokeWidth="1" />
+        {/* Tower A Floor Bands */}
+        <line x1="496" y1="54" x2="556" y2="54" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="496" y1="70" x2="556" y2="70" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="496" y1="118" x2="556" y2="118" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="496" y1="136" x2="556" y2="136" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="496" y1="152" x2="556" y2="152" stroke="#64748b" strokeWidth="1.2" />
+        {/* Tower B Floor Bands */}
+        <line x1="596" y1="54" x2="656" y2="54" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="596" y1="70" x2="656" y2="70" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="596" y1="118" x2="656" y2="118" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="596" y1="136" x2="656" y2="136" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="596" y1="152" x2="656" y2="152" stroke="#64748b" strokeWidth="1.2" />
+        {/* Illuminated Skybridge Windows */}
+        <rect x="564" y="88" width="10" height="7" fill="#fef08a" stroke="#eab308" strokeWidth="0.8" />
+        <rect x="578" y="88" width="10" height="7" fill="#fef08a" stroke="#eab308" strokeWidth="0.8" />
 
-        {/* 5. Front Headlight: Modern LED Projector in Pure Crisp White */}
-        <path
-          d="M 224 44 C 230 45 236 48 234 52 L 222 52 Z"
-          fill="#FFFFFF"
-          stroke="#E2E8F0"
-          strokeWidth="1"
-        />
-        <circle cx="228" cy="48" r="2.5" fill="#FFFFFF" />
-        <circle cx="228" cy="48" r="1.2" fill="#CBD5E1" />
+        {/* Boulevard Trees 3 */}
+        <circle cx="678" cy="144" r="14" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="678" y1="158" x2="678" y2="172" stroke="#78350f" strokeWidth="2.2" />
+        <circle cx="700" cy="140" r="16" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="700" y1="156" x2="700" y2="172" stroke="#78350f" strokeWidth="2.2" />
 
-        {/* 6. Rear Taillight: Distinctive Red LED Wrap-around */}
-        <path
-          d="M 10 44 C 14 44 18 46 18 49 L 11 49 Z"
-          fill="#EF4444"
-          stroke="#DC2626"
-          strokeWidth="0.8"
-        />
-        <circle cx="14" cy="46" r="1.5" fill="#F87171" />
+        {/* ========================================================
+            BUILDING 5: Luxury Residential Tower with Balconies (x=724..826)
+            ======================================================== */}
+        <path d="M 724 172 V 46 H 826 V 172 Z" />
+        {/* Rooftop Sky Lounge Pergola */}
+        <rect x="744" y="30" width="62" height="16" fill="#ffffff" stroke="#0f172a" />
+        <line x1="758" y1="30" x2="758" y2="46" stroke="#64748b" />
+        <line x1="775" y1="30" x2="775" y2="46" stroke="#64748b" />
+        <line x1="792" y1="30" x2="792" y2="46" stroke="#64748b" />
+        {/* Cantilevered Glass Balconies */}
+        <rect x="718" y="60" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
+        <rect x="784" y="60" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
+        <rect x="718" y="78" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
+        <rect x="784" y="78" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
+        <rect x="718" y="96" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
+        <rect x="784" y="96" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
+        <rect x="718" y="114" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
+        <rect x="784" y="114" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
+        <rect x="718" y="132" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
+        <rect x="784" y="132" width="48" height="8" rx="2" fill="#ffffff" stroke="#0f172a" strokeWidth="1.2" />
 
-        {/* 7. Front Lower Air Dam & Grille Accent */}
-        <rect x="220" y="54" width="12" height="4" rx="1.5" fill="#0F172A" />
+        {/* LED Streetlamp 3 */}
+        <path d="M 842 172 V 118 H 832" fill="none" strokeWidth="1.6" stroke="#0f172a" />
+        <rect x="829" y="116" width="7" height="3" rx="1" fill="#0f172a" />
+        <circle cx="832" cy="122" r="1.5" fill="#fde047" />
 
-        {/* 8. Underbody Bottom Skirt */}
-        <path d="M 14 60 L 32 60 L 76 60 L 172 60 L 216 60 L 232 60" stroke="#0F172A" strokeWidth="2.5" />
+        {/* ========================================================
+            BUILDING 6: Stepped Art Deco Landmark Tower (x=856..966)
+            ======================================================== */}
+        <path d="M 856 172 V 86 H 870 V 56 H 890 V 30 H 932 V 56 H 952 V 86 H 966 V 172 Z" />
+        {/* Tapered Crown & Stainless Needle Spire */}
+        <path d="M 902 30 L 911 10 L 920 30 Z" fill="#ffffff" />
+        <line x1="911" y1="10" x2="911" y2="1" strokeWidth="1.8" />
+        <circle cx="911" cy="1" r="2.5" fill="#ef4444" stroke="#dc2626" />
+        {/* Fluted Vertical Mullion Columns */}
+        <line x1="880" y1="92" x2="880" y2="168" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="895" y1="62" x2="895" y2="168" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="911" y1="34" x2="911" y2="168" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="927" y1="62" x2="927" y2="168" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="942" y1="92" x2="942" y2="168" stroke="#64748b" strokeWidth="1.4" />
+        {/* Illuminated Crown Windows */}
+        <rect x="906" y="44" width="10" height="8" fill="#fef08a" stroke="#eab308" strokeWidth="0.8" />
 
-        {/* 9. Wheel Arches Shadow Fill */}
-        <circle cx="54" cy="60" r="16" fill="#090D16" />
-        <circle cx="194" cy="60" r="16" fill="#090D16" />
-      </svg>
+        {/* Boulevard Trees 4 */}
+        <circle cx="985" cy="146" r="13" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="985" y1="159" x2="985" y2="172" stroke="#78350f" strokeWidth="2.2" />
+        <circle cx="1006" cy="140" r="16" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="1006" y1="156" x2="1006" y2="172" stroke="#78350f" strokeWidth="2.2" />
 
-      {/* Rotating Rear Wheel (Alloy Rim + Rubber Tire) */}
+        {/* ========================================================
+            BUILDING 7: High-Tech Diamond Facet Tower (x=1030..1134)
+            ======================================================== */}
+        <path d="M 1030 172 V 60 L 1082 26 L 1134 60 V 172 Z" fill="url(#glass-blue)" />
+        {/* Diamond Facet Spine & Reflection Ribs */}
+        <line x1="1082" y1="26" x2="1082" y2="172" stroke="#1e293b" strokeWidth="1.6" />
+        <line x1="1030" y1="60" x2="1082" y2="90" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="1134" y1="60" x2="1082" y2="90" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="1030" y1="100" x2="1082" y2="130" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="1134" y1="100" x2="1082" y2="130" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="1030" y1="140" x2="1082" y2="170" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="1134" y1="140" x2="1082" y2="170" stroke="#64748b" strokeWidth="1.4" />
+
+        {/* LED Streetlamp 4 & Tree */}
+        <path d="M 1152 172 V 120 H 1162" fill="none" strokeWidth="1.6" stroke="#0f172a" />
+        <rect x="1159" y="118" width="7" height="3" rx="1" fill="#0f172a" />
+        <circle cx="1162" cy="124" r="1.5" fill="#fde047" />
+        <circle cx="1178" cy="144" r="14" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="1178" y1="158" x2="1178" y2="172" stroke="#78350f" strokeWidth="2.2" />
+
+        {/* ========================================================
+            BUILDING 8: Corporate Grand Atrium Complex (x=1202..1304)
+            ======================================================== */}
+        <path d="M 1202 172 V 66 H 1304 V 172 Z" />
+        {/* Emerald Grand Glass Atrium Entrance */}
+        <path d="M 1236 172 V 108 Q 1253 92 1270 108 V 172 Z" fill="url(#glass-emerald)" stroke="#059669" strokeWidth="1.6" />
+        {/* Office Window Grid */}
+        <line x1="1202" y1="82" x2="1304" y2="82" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="1202" y1="100" x2="1304" y2="100" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="1202" y1="118" x2="1304" y2="118" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="1202" y1="136" x2="1304" y2="136" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="1202" y1="154" x2="1304" y2="154" stroke="#64748b" strokeWidth="1.2" />
+        {/* Lit Windows */}
+        <rect x="1214" y="86" width="10" height="9" fill="#fef08a" stroke="#eab308" strokeWidth="0.8" />
+        <rect x="1282" y="122" width="10" height="9" fill="#fef08a" stroke="#eab308" strokeWidth="0.8" />
+
+        {/* Boulevard Trees 5 */}
+        <circle cx="1326" cy="144" r="14" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="1326" y1="158" x2="1326" y2="172" stroke="#78350f" strokeWidth="2.2" />
+        <circle cx="1348" cy="140" r="16" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="1348" y1="156" x2="1348" y2="172" stroke="#78350f" strokeWidth="2.2" />
+
+        {/* ========================================================
+            BUILDING 9: Aerodynamic Curvilinear Tower (x=1372..1484)
+            ======================================================== */}
+        <path d="M 1372 172 V 44 Q 1428 18 1484 44 V 172 Z" fill="url(#glass-blue)" />
+        <line x1="1428" y1="26" x2="1428" y2="8" strokeWidth="1.8" />
+        <circle cx="1428" cy="6" r="2.5" fill="#ef4444" stroke="#dc2626" />
+        {/* Curvilinear Aerodynamic Louver Lines */}
+        <path d="M 1372 66 Q 1428 46 1484 66" fill="none" stroke="#64748b" strokeWidth="1.4" />
+        <path d="M 1372 88 Q 1428 68 1484 88" fill="none" stroke="#64748b" strokeWidth="1.4" />
+        <path d="M 1372 110 Q 1428 90 1484 110" fill="none" stroke="#64748b" strokeWidth="1.4" />
+        <path d="M 1372 132 Q 1428 112 1484 132" fill="none" stroke="#64748b" strokeWidth="1.4" />
+        <path d="M 1372 152 Q 1428 134 1484 152" fill="none" stroke="#64748b" strokeWidth="1.4" />
+
+        {/* ========================================================
+            BUILDING 10: Seamless Connecting High-Rise (x=1502..1582)
+            ======================================================== */}
+        <path d="M 1502 172 V 58 L 1542 40 L 1582 58 V 172 Z" />
+        <line x1="1542" y1="40" x2="1542" y2="172" stroke="#64748b" strokeWidth="1.4" />
+        <line x1="1502" y1="76" x2="1582" y2="76" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="1502" y1="100" x2="1582" y2="100" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="1502" y1="124" x2="1582" y2="124" stroke="#64748b" strokeWidth="1.2" />
+        <line x1="1502" y1="148" x2="1582" y2="148" stroke="#64748b" strokeWidth="1.2" />
+
+        {/* Final Connecting Tree seamlessly bridging with Building 1 */}
+        <circle cx="1594" cy="146" r="12" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+        <line x1="1594" y1="158" x2="1594" y2="172" stroke="#78350f" strokeWidth="2.2" />
+      </g>
+
+      {/* Baseline Solid Highway Asphalt Line */}
+      <line x1="0" y1="172" x2="1600" y2="172" stroke="#0f172a" strokeWidth="2.5" />
+    </svg>
+  );
+};
+
+/**
+ * Authentic Photorealistic Toyota Premio Sedan
+ * Executive white Toyota Premio sedan with:
+ * - Precisely aligned rotating 10-spoke Bridgestone alloy wheels
+ * - Forward LED projector headlight beam illuminating the highway
+ * - Authentic suspension micro-bounce
+ */
+const RealToyotaPremio: React.FC = () => {
+  return (
+    <div className="relative w-[240px] h-[76.5px] pointer-events-none select-none animate-car-bounce">
+      {/* 1. Forward LED Projector Headlight Beam */}
+      <div className="headlight-beam absolute top-[30px] right-[-135px] w-[150px] h-[34px] z-0 opacity-85" />
+
+      {/* 2. Authentic Toyota Premio Body */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/cars/toyota_premio.png"
+        alt="Toyota Premio"
+        width={240}
+        height={76.5}
+        className="w-full h-full object-contain relative z-10 filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]"
+      />
+
+      {/* 3. Rotating Rear Toyota Premio Alloy Wheel (Mathematical Center: x=56.0px, y=58.6px, diam=34.6px) */}
       <div
-        className="absolute top-[44px] left-[38px] w-[32px] h-[32px] z-20 animate-wheel-spin"
-        style={{ transformOrigin: 'center' }}
+        className="absolute z-20 animate-wheel-spin overflow-hidden rounded-full shadow-sm"
+        style={{
+          left: '38.7px',
+          top: '41.3px',
+          width: '34.6px',
+          height: '34.6px',
+        }}
       >
-        <svg viewBox="0 0 32 32" className="w-full h-full">
-          {/* Black Rubber Tire */}
-          <circle cx="16" cy="16" r="15" fill="#1E293B" stroke="#0F172A" strokeWidth="2" />
-          {/* Alloy Rim Inner Ring */}
-          <circle cx="16" cy="16" r="11" fill="#0F172A" stroke="#E2E8F0" strokeWidth="1" />
-          {/* 5-Spoke Alloy Pattern */}
-          <line x1="16" y1="5" x2="16" y2="27" stroke="#CBD5E1" strokeWidth="1.8" />
-          <line x1="6" y1="12" x2="26" y2="20" stroke="#CBD5E1" strokeWidth="1.8" />
-          <line x1="6" y1="20" x2="26" y2="12" stroke="#CBD5E1" strokeWidth="1.8" />
-          {/* Brake Rotor & Caliper accent */}
-          <circle cx="16" cy="16" r="6" fill="#475569" />
-          {/* Center Chrome Cap */}
-          <circle cx="16" cy="16" r="3.5" fill="#0F172A" stroke="#FFFFFF" strokeWidth="1" />
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/cars/toyota_premio_wheel.png"
+          alt="Premio Rear Wheel"
+          width={35}
+          height={35}
+          className="w-full h-full object-cover"
+        />
       </div>
 
-      {/* Rotating Front Wheel (Alloy Rim + Rubber Tire) */}
+      {/* 4. Rotating Front Toyota Premio Alloy Wheel (Mathematical Center: x=198.3px, y=58.6px, diam=34.6px) */}
       <div
-        className="absolute top-[44px] left-[160px] w-[32px] h-[32px] z-20 animate-wheel-spin"
-        style={{ transformOrigin: 'center' }}
+        className="absolute z-20 animate-wheel-spin overflow-hidden rounded-full shadow-sm"
+        style={{
+          left: '181.0px',
+          top: '41.3px',
+          width: '34.6px',
+          height: '34.6px',
+        }}
       >
-        <svg viewBox="0 0 32 32" className="w-full h-full">
-          {/* Black Rubber Tire */}
-          <circle cx="16" cy="16" r="15" fill="#1E293B" stroke="#0F172A" strokeWidth="2" />
-          {/* Alloy Rim Inner Ring */}
-          <circle cx="16" cy="16" r="11" fill="#0F172A" stroke="#E2E8F0" strokeWidth="1" />
-          {/* 5-Spoke Alloy Pattern */}
-          <line x1="16" y1="5" x2="16" y2="27" stroke="#CBD5E1" strokeWidth="1.8" />
-          <line x1="6" y1="12" x2="26" y2="20" stroke="#CBD5E1" strokeWidth="1.8" />
-          <line x1="6" y1="20" x2="26" y2="12" stroke="#CBD5E1" strokeWidth="1.8" />
-          {/* Brake Rotor & Caliper accent */}
-          <circle cx="16" cy="16" r="6" fill="#475569" />
-          {/* Center Chrome Cap */}
-          <circle cx="16" cy="16" r="3.5" fill="#0F172A" stroke="#FFFFFF" strokeWidth="1" />
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/cars/toyota_premio_wheel.png"
+          alt="Premio Front Wheel"
+          width={35}
+          height={35}
+          className="w-full h-full object-cover"
+        />
       </div>
-
     </div>
   );
 };
@@ -500,55 +450,51 @@ export const CityDriveBackground: React.FC<CityDriveBackgroundProps> = ({
     <div
       className={`city-drive-container relative w-full overflow-hidden select-none pointer-events-none ${
         variant === 'hero'
-          ? 'h-[200px] lg:h-[230px]'
+          ? 'h-[190px] lg:h-[210px]'
           : variant === 'banner'
           ? 'h-[160px]'
           : 'h-[140px]'
       } ${className}`}
       aria-hidden="true"
     >
-      {/* 1. Subtle Dark Vignette & Top Fade */}
-      <div className="absolute inset-0 z-10 bg-gradient-to-t from-transparent via-transparent to-brand-dark/90" />
-      <div className="absolute inset-y-0 left-0 w-24 z-10 bg-gradient-to-r from-brand-dark to-transparent" />
-      <div className="absolute inset-y-0 right-0 w-24 z-10 bg-gradient-to-l from-brand-dark to-transparent" />
+      {/* 1. Subtle Side Vignettes & Top Fade */}
+      <div className="absolute inset-x-0 top-0 h-12 z-10 bg-gradient-to-b from-white via-white/80 to-transparent" />
+      <div className="absolute inset-y-0 left-0 w-20 z-10 bg-gradient-to-r from-white to-transparent" />
+      <div className="absolute inset-y-0 right-0 w-20 z-10 bg-gradient-to-l from-white to-transparent" />
 
-      {/* 2. Parallax Infinite Skyline Track (Two identical segments looping side-by-side) */}
-      <div className="absolute bottom-6 left-0 flex w-[3200px] animate-city-scroll">
-        <SkylineSegment />
-        <SkylineSegment />
+      {/* 2. Distant Skyline Slower Parallax Layer (60s loop) */}
+      <div className="absolute bottom-[8px] left-0 flex w-[3200px] opacity-40 animate-city-scroll-slow">
+        <DistantSkylineSegment />
+        <DistantSkylineSegment />
       </div>
 
-      {/* 3. Secondary Slower Far Skyline (Adding Depth Parallax) */}
-      <div className="absolute bottom-10 left-0 flex w-[3200px] opacity-35 animate-city-scroll-slow">
-        <div className="scale-90 origin-bottom">
-          <SkylineSegment />
-        </div>
-        <div className="scale-90 origin-bottom">
-          <SkylineSegment />
-        </div>
+      {/* 3. Foreground Architectural City Skyline (35s dual seamless loop) */}
+      <div className="absolute bottom-[8px] left-0 flex w-[3200px] animate-city-scroll">
+        <RealArchitecturalSkylineSegment />
+        <RealArchitecturalSkylineSegment />
       </div>
 
-      {/* 4. Moving Road Dashes */}
-      <div className="absolute bottom-6 left-0 right-0 h-[3px] overflow-hidden z-10">
+      {/* 4. Moving Road Lane Dashes along the Highway */}
+      <div className="absolute bottom-[8px] left-0 right-0 h-[3px] overflow-hidden z-10">
         <div className="flex w-[200%] animate-road-dash">
           {Array.from({ length: 80 }).map((_, i) => (
             <span
               key={i}
-              className="inline-block w-8 h-[2px] bg-slate-800/80 rounded-full mx-3 flex-shrink-0"
+              className="inline-block w-8 h-[2.5px] bg-slate-700/75 rounded-full mx-3 flex-shrink-0"
             />
           ))}
         </div>
       </div>
 
-      {/* 5. Cruising Modern White Sedan (Smooth Highway Drive Position) */}
+      {/* 5. Cruising Real Toyota Premio on the Highway (Baseline touches road at bottom: 8px) */}
       {showCar && (
-        <div className="absolute bottom-[2px] left-[8%] sm:left-[14%] lg:left-[20%] z-20">
-          <ModernWhiteSedan />
+        <div className="absolute bottom-[8px] left-[6%] sm:left-[12%] lg:left-[18%] z-20">
+          <RealToyotaPremio />
         </div>
       )}
 
-      {/* 6. Road Ground Glow */}
-      <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-b from-transparent to-brand-dark" />
+      {/* 6. Road Ground Base Tone */}
+      <div className="absolute bottom-0 left-0 right-0 h-2 bg-slate-900/[0.08] z-10" />
     </div>
   );
 };
