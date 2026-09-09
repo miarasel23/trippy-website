@@ -16,21 +16,15 @@ export const Footer: React.FC = () => {
           
           {/* Col 1: Brand Bio */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-flex items-center gap-3 mb-4">
-              <svg className="w-9 h-9" viewBox="0 0 44 44" fill="none">
-                <rect width="44" height="44" rx="12" fill="url(#logo_grad_footer)"/>
-                <path d="M12 16C12 14.8954 12.8954 14 14 14H30C31.1046 14 32 14.8954 32 16V18C32 19.1046 31.1046 20 30 20H24V31C24 32.1046 23.1046 33 22 33C20.8954 33 20 32.1046 20 31V20H14C12.8954 20 12 19.1046 12 18V16Z" fill="#090D16"/>
-                <circle cx="22" cy="17" r="3" fill="#34D399"/>
-                <defs>
-                  <linearGradient id="logo_grad_footer" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#22C55E"/>
-                    <stop offset="1" stopColor="#4ADE80"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-              <span className="text-2xl font-extrabold text-slate-900 font-heading">
-                {t.common.brandName}<span className="text-brand-primary">.</span>
-              </span>
+            <Link href="/" className="inline-flex items-center mb-4 group" aria-label="Tripyy Home">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/tripyy_logo.svg"
+                alt="Tripyy"
+                width={140}
+                height={38}
+                className="h-9 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03]"
+              />
             </Link>
             <p className="text-slate-600 text-sm leading-relaxed max-w-sm mb-6">
               {t.footer.bio}

@@ -25,24 +25,15 @@ export const Header: React.FC = () => {
         <div className="flex items-center justify-between h-20">
           
           {/* Logo */}
-          <Link href="/" className="brand-logo flex items-center gap-3 group">
-            <div className="relative">
-              <svg className="w-10 h-10 transition-transform duration-300 group-hover:scale-105" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="44" height="44" rx="12" fill="url(#logo_grad_header)"/>
-                <path d="M12 16C12 14.8954 12.8954 14 14 14H30C31.1046 14 32 14.8954 32 16V18C32 19.1046 31.1046 20 30 20H24V31C24 32.1046 23.1046 33 22 33C20.8954 33 20 32.1046 20 31V20H14C12.8954 20 12 19.1046 12 18V16Z" fill="#090D16"/>
-                <circle cx="22" cy="17" r="3" fill="#34D399"/>
-                <defs>
-                  <linearGradient id="logo_grad_header" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#22C55E"/>
-                    <stop offset="1" stopColor="#4ADE80"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-brand-primary animate-ping" />
-            </div>
-            <span className="text-2xl font-extrabold tracking-tight text-slate-900 font-heading">
-              {t.common.brandName}<span className="text-brand-primary">.</span>
-            </span>
+          <Link href="/" className="brand-logo flex items-center group py-1" aria-label="Tripyy Home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/tripyy_logo.svg"
+              alt="Tripyy"
+              width={145}
+              height={40}
+              className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03]"
+            />
           </Link>
 
           {/* Desktop Navigation */}

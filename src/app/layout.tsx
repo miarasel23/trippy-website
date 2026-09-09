@@ -56,6 +56,15 @@ export const metadata: Metadata = {
     'intercity travel bangladesh',
   ],
   authors: [{ name: 'Tripyy Technologies Bangladesh Ltd.' }],
+  icons: {
+    icon: [
+      { url: '/images/Icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico' },
+    ],
+    shortcut: '/images/Icon.svg',
+    apple: '/images/Icon.svg',
+  },
 };
 
 export default function RootLayout({
