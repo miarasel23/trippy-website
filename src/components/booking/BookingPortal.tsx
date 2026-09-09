@@ -7,10 +7,12 @@ import { useRouter } from 'next/navigation';
 import { FLEET_VEHICLES, VehicleKey } from '@/types/fleet';
 import { DriverBid } from '@/types/booking';
 import { Badge } from '../common/Badge';
-import { MapPin, Navigation, Sparkles, Check, X, ArrowRight, ShieldCheck } from 'lucide-react';
+import { MapPin, Navigation, Sparkles, Check, X, ArrowRight } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 export const BookingPortal: React.FC = () => {
   const router = useRouter();
+  const { t } = useLanguage();
 
   const [pickup, setPickup] = useState('412/1, 412 Senpara Parbata Ln, Dhaka 1216');
   const [dropoff, setDropoff] = useState('Gazipur, Bangladesh');
@@ -65,14 +67,16 @@ export const BookingPortal: React.FC = () => {
         {/* Top Status Banner */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <Badge variant="primary" className="mb-2">LIVE FARE PROPOSER</Badge>
+            <Badge variant="primary" className="mb-2">
+              {t.bookingWidget.liveFareProposer}
+            </Badge>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-heading">
-              Book Your Trip & Set Your Fare
+              {t.bookingWidget.bookTripTitle}
             </h1>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="badge badge-cyan">📍 Dhaka ➔ Gazipur</span>
-            <span className="badge badge-amber">⚡ 12 Drivers Nearby</span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="badge badge-cyan">📍 {t.bookingWidget.dhakaToGazipur}</span>
+            <span className="badge badge-amber">⚡ {t.bookingWidget.driversNearby}</span>
           </div>
         </div>
 
@@ -90,7 +94,7 @@ export const BookingPortal: React.FC = () => {
                 </span>
                 <div className="flex-1 min-w-0">
                   <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                    Pickup Address
+                    {t.bookingWidget.pickupLabel}
                   </label>
                   <input
                     type="text"
@@ -107,7 +111,7 @@ export const BookingPortal: React.FC = () => {
                 </span>
                 <div className="flex-1 min-w-0">
                   <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                    Destination Address
+                    {t.bookingWidget.dropoffLabel}
                   </label>
                   <input
                     type="text"
@@ -121,19 +125,20 @@ export const BookingPortal: React.FC = () => {
 
             {/* Trip Meta Summary */}
             <div className="flex justify-between items-center text-xs text-slate-400 bg-black/25 border border-white/5 rounded-xl p-3 px-4 mb-6">
-              <span>Estimated Distance: <strong className="text-white">20.82 km</strong></span>
-              <span>Est. Travel Time: <strong className="text-brand-primary-light">45-55 mins</strong></span>
+              <span>{t.bookingWidget.estDistance}: <strong className="text-white">20.82 {t.common.km}</strong></span>
+              <span>{t.bookingWidget.estTime}: <strong className="text-brand-primary-light">45-55 {t.common.mins}</strong></span>
             </div>
 
             {/* Vehicle Selector */}
             <div className="mb-6">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                Select Vehicle
+                {t.bookingWidget.selectVehicle}
               </label>
 
               <div className="space-y-2.5">
                 {(['sedan', 'noah', 'hiace'] as VehicleKey[]).map((key) => {
                   const v = FLEET_VEHICLES[key];
+                  const locVehicle = t.fleet.vehicles[key];
                   const isSelected = selectedVehicle === key;
                   return (
                     <div
@@ -158,18 +163,20 @@ export const BookingPortal: React.FC = () => {
                         </div>
                         <div>
                           <div className="text-sm font-bold text-white leading-tight">
-                            {v.name}
+                            {locVehicle?.name || v.name}
                           </div>
-                          <div className="text-xs text-slate-400">{v.seats} • {v.luggage}</div>
+                          <div className="text-xs text-slate-400">
+                            {locVehicle?.seats || v.seats} • {locVehicle?.luggage || v.luggage}
+                          </div>
                         </div>
                       </div>
 
                       <div className="text-right">
                         <div className="text-sm font-extrabold text-brand-primary-light font-heading">
-                          BDT {v.baseFare}
+                          {t.common.currency} {v.baseFare}
                         </div>
                         <div className="text-[10px] text-slate-500 font-semibold">
-                          {isSelected ? 'Selected' : 'Base Fare'}
+                          {isSelected ? t.common.verified : t.fleet.estimatedBase}
                         </div>
                       </div>
                     </div>
@@ -181,15 +188,17 @@ export const BookingPortal: React.FC = () => {
             {/* Fare Proposer Box */}
             <div className="bg-black/40 border border-white/10 rounded-xl p-4 sm:p-5 mb-5">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold text-slate-300">Offer Your Fare</span>
+                <span className="text-xs font-bold text-slate-300">
+                  {t.bookingWidget.offerFare}
+                </span>
                 <span className="text-xs text-brand-primary-light font-semibold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> Direct Negotiation
+                  <Sparkles className="w-3 h-3" /> {t.bookingWidget.directNegotiation}
                 </span>
               </div>
 
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-base font-bold text-brand-primary-light">BDT</span>
+                  <span className="text-base font-bold text-brand-primary-light">{t.common.currency}</span>
                   <span className="text-4xl font-extrabold text-white font-heading">
                     {fare}
                   </span>
@@ -224,7 +233,7 @@ export const BookingPortal: React.FC = () => {
                       : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
                   }`}
                 >
-                  BDT {chipBase}
+                  {t.common.currency} {chipBase}
                 </button>
                 <button
                   type="button"
@@ -235,7 +244,7 @@ export const BookingPortal: React.FC = () => {
                       : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
                   }`}
                 >
-                  BDT {chip10} (+10%)
+                  {t.common.currency} {chip10} (+10%)
                 </button>
                 <button
                   type="button"
@@ -246,7 +255,7 @@ export const BookingPortal: React.FC = () => {
                       : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
                   }`}
                 >
-                  BDT {chip20} (+20%)
+                  {t.common.currency} {chip20} (+20%)
                 </button>
               </div>
             </div>
@@ -254,13 +263,13 @@ export const BookingPortal: React.FC = () => {
             {/* Optional Trip Note */}
             <div className="mb-6">
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Trip Note (Optional)
+                {t.bookingWidget.tripNoteLabel}
               </label>
               <input
                 type="text"
                 value={tripNote}
                 onChange={(e) => setTripNote(e.target.value)}
-                placeholder="e.g. Please pick up from Gate 2, luggage: 2 bags"
+                placeholder={t.bookingWidget.tripNotePlaceholder}
                 className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-primary/50 transition-all"
               />
             </div>
@@ -275,11 +284,11 @@ export const BookingPortal: React.FC = () => {
               {isSearching ? (
                 <>
                   <span className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-                  Connecting to Nearby Drivers...
+                  {t.bookingWidget.connecting}
                 </>
               ) : (
                 <>
-                  Give Offer for BDT {fare}
+                  {t.bookingWidget.giveOffer} {t.common.currency} {fare}
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -309,10 +318,10 @@ export const BookingPortal: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] uppercase font-bold text-brand-primary-light block">
-                      Driver Offer
+                      {t.bookingWidget.driverFound}
                     </span>
                     <div className="text-xl font-extrabold text-white font-heading">
-                      BDT {incomingBid.driverFare}
+                      {t.common.currency} {incomingBid.driverFare}
                     </div>
                   </div>
                 </div>
@@ -323,14 +332,14 @@ export const BookingPortal: React.FC = () => {
                     onClick={() => router.push('/tracking')}
                     className="flex-1 btn btn-primary py-2.5 px-4 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-glow/20"
                   >
-                    <Check className="w-4 h-4" /> Accept Offer (BDT {incomingBid.driverFare})
+                    <Check className="w-4 h-4" /> {t.bookingWidget.acceptOffer} ({t.common.currency} {incomingBid.driverFare})
                   </button>
                   <button
                     type="button"
                     onClick={() => setIncomingBid(null)}
                     className="btn btn-secondary py-2.5 px-4 text-xs font-semibold rounded-xl text-slate-300 hover:text-white"
                   >
-                    <X className="w-4 h-4" /> Decline
+                    <X className="w-4 h-4" /> {t.bookingWidget.decline}
                   </button>
                 </div>
               </div>
@@ -344,9 +353,9 @@ export const BookingPortal: React.FC = () => {
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-sm font-bold text-white">Live Route: Dhaka N3 Expressway</span>
+                <span className="text-sm font-bold text-white">{t.bookingWidget.liveRouteTitle}</span>
               </div>
-              <span className="badge badge-cyan text-xs">ETA: 14 mins to pickup</span>
+              <span className="badge badge-cyan text-xs">{t.bookingWidget.etaToPickup}</span>
             </div>
 
             <div className="w-full h-[580px] rounded-xl overflow-hidden relative bg-[#080c16] border border-white/5">
@@ -416,12 +425,16 @@ export const BookingPortal: React.FC = () => {
               {/* Floating Bottom Info Pill */}
               <div className="absolute bottom-5 right-5 bg-brand-surface/90 border border-white/10 rounded-xl p-3 px-4 backdrop-blur-md flex items-center gap-4 text-xs shadow-lg">
                 <div>
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Tolls & Parking</span>
-                  <strong className="text-white">Inclusive</strong>
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase">
+                    {t.bookingWidget.tollsInclusive}
+                  </span>
+                  <strong className="text-white">{t.common.verified}</strong>
                 </div>
                 <div className="border-l border-white/10 pl-4">
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Cancellation</span>
-                  <strong className="text-brand-primary-light">Free within 5m</strong>
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase">
+                    {t.bookingWidget.freeCancellation}
+                  </span>
+                  <strong className="text-brand-primary-light">0 {t.common.currency}</strong>
                 </div>
               </div>
             </div>

@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import { Outfit, Inter, JetBrains_Mono } from 'next/font/google';
+import { Outfit, Inter, JetBrains_Mono, Hind_Siliguri } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { LanguageProvider } from '@/context/LanguageContext';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -23,6 +24,13 @@ const jetbrainsMono = JetBrains_Mono({
   variable: '--font-mono',
   display: 'swap',
   weight: ['400', '500', '700'],
+});
+
+const hindSiliguri = Hind_Siliguri({
+  subsets: ['bengali', 'latin'],
+  variable: '--font-bengali',
+  display: 'swap',
+  weight: ['300', '400', '500', '600', '700'],
 });
 
 export const viewport = {
@@ -56,13 +64,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable} ${hindSiliguri.variable}`}>
       <body className="bg-brand-dark text-slate-100 font-body min-h-screen flex flex-col antialiased">
-        <Header />
-        <main className="flex-1">
-          {children}
-        </main>
-        <Footer />
+        <LanguageProvider>
+          <Header />
+          <main className="flex-1">
+            {children}
+          </main>
+          <Footer />
+        </LanguageProvider>
       </body>
     </html>
   );

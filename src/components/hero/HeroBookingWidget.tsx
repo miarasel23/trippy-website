@@ -7,9 +7,11 @@ import { useRouter } from 'next/navigation';
 import { FLEET_VEHICLES, VehicleKey } from '@/types/fleet';
 import { ServiceType, DriverBid } from '@/types/booking';
 import { ArrowRight, Check, X, MapPin, Navigation, Sparkles } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 export const HeroBookingWidget: React.FC = () => {
   const router = useRouter();
+  const { t } = useLanguage();
 
   const [service, setService] = useState<ServiceType>('rideshare');
   const [pickup, setPickup] = useState('412/1 Senpara Parbata Ln, Dhaka 1216');
@@ -72,50 +74,23 @@ export const HeroBookingWidget: React.FC = () => {
       
       {/* Service Tabs */}
       <div className="flex bg-black/40 p-1 rounded-xl gap-1 mb-5 border border-white/5">
-        <button
-          type="button"
-          onClick={() => setService('rideshare')}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-            service === 'rideshare'
-              ? 'bg-gradient-to-r from-brand-primary/20 to-brand-secondary/20 text-brand-primary-light border border-brand-primary/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <span>🚗</span> Ride Share
-        </button>
-        <button
-          type="button"
-          onClick={() => setService('intercity')}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-            service === 'intercity'
-              ? 'bg-gradient-to-r from-brand-primary/20 to-brand-secondary/20 text-brand-primary-light border border-brand-primary/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <span>🛣️</span> Intercity
-        </button>
-        <button
-          type="button"
-          onClick={() => setService('return')}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-            service === 'return'
-              ? 'bg-gradient-to-r from-brand-primary/20 to-brand-secondary/20 text-brand-primary-light border border-brand-primary/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <span>🔄</span> Return
-        </button>
-        <button
-          type="button"
-          onClick={() => setService('hourly')}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-            service === 'hourly'
-              ? 'bg-gradient-to-r from-brand-primary/20 to-brand-secondary/20 text-brand-primary-light border border-brand-primary/40 shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <span>⏱️</span> Hourly
-        </button>
+        {(['rideshare', 'intercity', 'return', 'hourly'] as ServiceType[]).map((tabKey) => {
+          const icon = tabKey === 'rideshare' ? '🚗' : tabKey === 'intercity' ? '🛣️' : tabKey === 'return' ? '🔄' : '⏱️';
+          return (
+            <button
+              key={tabKey}
+              type="button"
+              onClick={() => setService(tabKey)}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                service === tabKey
+                  ? 'bg-gradient-to-r from-brand-primary/20 to-brand-secondary/20 text-brand-primary-light border border-brand-primary/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <span>{icon}</span> {t.bookingWidget.tabs[tabKey]}
+            </button>
+          );
+        })}
       </div>
 
       {/* Origin & Destination Inputs */}
@@ -126,14 +101,14 @@ export const HeroBookingWidget: React.FC = () => {
           </span>
           <div className="flex-1 min-w-0">
             <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              Pickup Location
+              {t.bookingWidget.pickupLabel}
             </label>
             <input
               type="text"
               value={pickup}
               onChange={(e) => setPickup(e.target.value)}
               className="w-full bg-transparent text-sm font-semibold text-white focus:outline-none truncate"
-              placeholder="Enter pickup address in Dhaka"
+              placeholder={t.bookingWidget.pickupPlaceholder}
             />
           </div>
         </div>
@@ -144,14 +119,14 @@ export const HeroBookingWidget: React.FC = () => {
           </span>
           <div className="flex-1 min-w-0">
             <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              Destination (20.82 km)
+              {t.bookingWidget.dropoffLabel}
             </label>
             <input
               type="text"
               value={dropoff}
               onChange={(e) => setDropoff(e.target.value)}
               className="w-full bg-transparent text-sm font-semibold text-white focus:outline-none truncate"
-              placeholder="Enter destination in Gazipur or BD"
+              placeholder={t.bookingWidget.dropoffPlaceholder}
             />
           </div>
         </div>
@@ -160,15 +135,18 @@ export const HeroBookingWidget: React.FC = () => {
       {/* Fleet Strip */}
       <div className="mb-5">
         <div className="flex justify-between items-center mb-2 text-xs">
-          <span className="text-slate-400 font-bold uppercase tracking-wider">Select Vehicle Type</span>
+          <span className="text-slate-400 font-bold uppercase tracking-wider">
+            {t.bookingWidget.selectVehicle}
+          </span>
           <Link href="/fleet" className="text-brand-primary-light hover:underline font-semibold">
-            View Specs →
+            {t.common.exploreFleet} →
           </Link>
         </div>
 
         <div className="grid grid-cols-4 gap-2">
           {(Object.keys(FLEET_VEHICLES) as VehicleKey[]).map((key) => {
             const v = FLEET_VEHICLES[key];
+            const localizedVehicle = t.fleet.vehicles[key];
             const isSelected = selectedVehicle === key;
             return (
               <button
@@ -192,9 +170,11 @@ export const HeroBookingWidget: React.FC = () => {
                   />
                 </div>
                 <span className="text-xs font-bold text-white leading-tight truncate w-full">
-                  {key === 'chander' ? 'Chander Gari' : v.name.split(' ')[key === 'sedan' ? 0 : 1] || v.name}
+                  {localizedVehicle?.name || v.name}
                 </span>
-                <span className="text-[10px] text-slate-400 mt-0.5">{v.seats}</span>
+                <span className="text-[10px] text-slate-400 mt-0.5">
+                  {localizedVehicle?.seats || v.seats}
+                </span>
               </button>
             );
           })}
@@ -204,15 +184,17 @@ export const HeroBookingWidget: React.FC = () => {
       {/* Fare Proposer Box */}
       <div className="bg-black/40 border border-white/10 rounded-xl p-4 mb-4">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-xs font-bold text-slate-300">Propose Your Fare</span>
+          <span className="text-xs font-bold text-slate-300">
+            {t.bookingWidget.offerFare}
+          </span>
           <span className="text-xs text-brand-primary-light font-semibold flex items-center gap-1">
-            <Sparkles className="w-3 h-3" /> Direct Negotiation
+            <Sparkles className="w-3 h-3" /> {t.bookingWidget.directNegotiation}
           </span>
         </div>
 
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-baseline gap-2">
-            <span className="text-sm font-bold text-brand-primary-light">BDT</span>
+            <span className="text-sm font-bold text-brand-primary-light">{t.common.currency}</span>
             <span className="text-3xl font-extrabold text-white font-heading tracking-tight">
               {fare}
             </span>
@@ -249,7 +231,7 @@ export const HeroBookingWidget: React.FC = () => {
                 : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
             }`}
           >
-            BDT {chipBase}
+            {t.common.currency} {chipBase}
           </button>
           <button
             type="button"
@@ -260,7 +242,7 @@ export const HeroBookingWidget: React.FC = () => {
                 : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
             }`}
           >
-            BDT {chip10} (+10%)
+            {t.common.currency} {chip10} (+10%)
           </button>
           <button
             type="button"
@@ -271,7 +253,7 @@ export const HeroBookingWidget: React.FC = () => {
                 : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
             }`}
           >
-            BDT {chip20} (+20%)
+            {t.common.currency} {chip20} (+20%)
           </button>
         </div>
       </div>
@@ -286,11 +268,11 @@ export const HeroBookingWidget: React.FC = () => {
         {isSearching ? (
           <>
             <span className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-            Searching Available Drivers...
+            {t.bookingWidget.connecting}
           </>
         ) : (
           <>
-            Give Offer for BDT {fare}
+            {t.bookingWidget.giveOffer} {t.common.currency} {fare}
             <ArrowRight className="w-4 h-4" />
           </>
         )}
@@ -300,7 +282,7 @@ export const HeroBookingWidget: React.FC = () => {
       {isSearching && (
         <div className="flex items-center justify-center gap-2 mt-4 text-xs text-brand-primary-light font-medium animate-pulse">
           <span className="w-2.5 h-2.5 rounded-full bg-brand-primary animate-ping" />
-          Broadcasting trip offer to Hiace & Sedan drivers nearby...
+          {t.bookingWidget.connecting}
         </div>
       )}
 
@@ -328,10 +310,10 @@ export const HeroBookingWidget: React.FC = () => {
             </div>
             <div className="text-right">
               <span className="text-[10px] uppercase font-bold text-brand-primary-light block">
-                Counter Offer
+                {t.bookingWidget.driverFound}
               </span>
               <div className="text-lg font-extrabold text-white font-heading">
-                BDT {incomingBid.driverFare}
+                {t.common.currency} {incomingBid.driverFare}
               </div>
             </div>
           </div>
@@ -342,14 +324,14 @@ export const HeroBookingWidget: React.FC = () => {
               onClick={handleAcceptBid}
               className="flex-1 btn btn-primary py-2 px-3 text-xs font-bold rounded-lg flex items-center justify-center gap-1"
             >
-              <Check className="w-3.5 h-3.5" /> Accept & Start Ride
+              <Check className="w-3.5 h-3.5" /> {t.bookingWidget.acceptOffer}
             </button>
             <button
               type="button"
               onClick={handleDeclineBid}
               className="btn btn-secondary py-2 px-3 text-xs font-semibold rounded-lg text-slate-300 hover:text-white"
             >
-              <X className="w-3.5 h-3.5" /> Decline
+              <X className="w-3.5 h-3.5" /> {t.bookingWidget.decline}
             </button>
           </div>
         </div>

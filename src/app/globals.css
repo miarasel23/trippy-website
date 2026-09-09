@@ -39,8 +39,8 @@
   --border-focus: rgba(16, 185, 129, 0.5);
   --border-cyan: rgba(6, 182, 212, 0.4);
 
-  --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: 'Outfit', var(--font-bengali), 'Hind Siliguri', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', var(--font-bengali), 'Hind Siliguri', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   --radius-sm: 8px;

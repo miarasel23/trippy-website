@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Badge } from '../common/Badge';
 import { Share2, Phone, AlertTriangle, ShieldCheck, Check } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 export const TrackingPortal: React.FC = () => {
+  const { t } = useLanguage();
   const [speed, setSpeed] = useState(48);
   const [etaMinutes, setEtaMinutes] = useState(18);
   const [progress, setProgress] = useState(70);
@@ -43,19 +45,19 @@ export const TrackingPortal: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
-              <Badge variant="primary">LIVE GPS ACTIVE</Badge>
+              <Badge variant="primary">{t.tracking.badge}</Badge>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-heading">
-              Live Trip Monitoring - Ongoing Journey to Gazipur
+              {t.tracking.title}
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Shared Trip Link <span className="text-brand-primary-light font-mono font-bold">#TRP-849201</span> • Foreground Real-Time Location Stream
+              {t.tracking.sharedTripLabel} <span className="text-brand-primary-light font-mono font-bold">#TRP-849201</span> • {t.tracking.foregroundStream}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-extrabold text-xs sm:text-sm tracking-wide font-heading">
-              ARRIVING IN {etaMinutes} MINS
+              {t.tracking.arrivingIn} {etaMinutes} {t.common.mins}
             </div>
             <button
               type="button"
@@ -64,11 +66,11 @@ export const TrackingPortal: React.FC = () => {
             >
               {copied ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-brand-primary" /> Link Copied!
+                  <Check className="w-3.5 h-3.5 text-brand-primary" /> {t.tracking.linkCopied}
                 </>
               ) : (
                 <>
-                  <Share2 className="w-3.5 h-3.5" /> Share Link
+                  <Share2 className="w-3.5 h-3.5" /> {t.tracking.shareLink}
                 </>
               )}
             </button>
@@ -99,9 +101,9 @@ export const TrackingPortal: React.FC = () => {
                   </h3>
                   <div className="flex items-center gap-2 text-xs mt-0.5">
                     <span className="text-amber-400 font-semibold">★ 4.9</span>
-                    <span className="text-slate-400">(210 Verified Rides)</span>
+                    <span className="text-slate-400">(210 {t.tracking.verifiedRides})</span>
                     <span className="text-brand-primary-light font-semibold flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Verified
+                      <ShieldCheck className="w-3 h-3" /> {t.common.verified}
                     </span>
                   </div>
                 </div>
@@ -110,8 +112,8 @@ export const TrackingPortal: React.FC = () => {
               {/* Vehicle & Plate */}
               <div className="bg-black/30 border border-white/5 rounded-xl p-3 px-4 flex items-center justify-between mb-4">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Vehicle Model</span>
-                  <div className="text-xs font-bold text-white">Toyota Hiace (11 Seats)</div>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">{t.tracking.vehicleModel}</span>
+                  <div className="text-xs font-bold text-white">{t.fleet.vehicles.hiace.name} (11)</div>
                 </div>
                 <span className="text-xs font-mono font-bold bg-slate-800 text-cyan-400 border border-cyan-500/30 px-2.5 py-1 rounded-md">
                   Dhaka-Metro-cha-54-1400
@@ -120,9 +122,9 @@ export const TrackingPortal: React.FC = () => {
 
               {/* Agreed Negotiated Fare */}
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 px-4 flex items-center justify-between">
-                <span className="text-xs text-slate-300">Agreed Negotiated Fare</span>
+                <span className="text-xs text-slate-300">{t.tracking.agreedFare}</span>
                 <span className="text-base font-extrabold text-brand-primary-light font-heading">
-                  BDT 1597 (Cash)
+                  {t.common.currency} 1597 {t.tracking.cashPayment}
                 </span>
               </div>
             </div>
@@ -130,7 +132,7 @@ export const TrackingPortal: React.FC = () => {
             {/* Route Progress & Milestones */}
             <div className="bg-brand-card/90 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-2xl">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Route Progress</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t.tracking.routeProgress}</span>
                 <span className="text-sm font-extrabold text-brand-primary-light font-heading">{progress}%</span>
               </div>
 
@@ -144,18 +146,18 @@ export const TrackingPortal: React.FC = () => {
               <div className="grid grid-cols-3 text-center text-xs">
                 <div className="flex flex-col items-center">
                   <span className="w-2.5 h-2.5 rounded-full bg-brand-primary mb-1.5" />
-                  <strong className="text-white text-xs">Senpara</strong>
+                  <strong className="text-white text-xs">{t.tracking.milestone1}</strong>
                   <span className="text-[10px] text-slate-400">03:20 AM</span>
                 </div>
                 <div className="flex flex-col items-center">
                   <span className="w-2.5 h-2.5 rounded-full bg-brand-primary mb-1.5" />
-                  <strong className="text-white text-xs">Tongi</strong>
-                  <span className="text-[10px] text-slate-400">Passed</span>
+                  <strong className="text-white text-xs">{t.tracking.milestone2}</strong>
+                  <span className="text-[10px] text-slate-400">{t.tracking.passed}</span>
                 </div>
                 <div className="flex flex-col items-center">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 mb-1.5" />
-                  <strong className="text-white text-xs">Gazipur</strong>
-                  <span className="text-[10px] text-slate-400">ETA {etaMinutes}m</span>
+                  <strong className="text-white text-xs">{t.tracking.milestone3}</strong>
+                  <span className="text-[10px] text-slate-400">{t.tracking.arrivingIn} {etaMinutes}m</span>
                 </div>
               </div>
             </div>
@@ -163,15 +165,15 @@ export const TrackingPortal: React.FC = () => {
             {/* Live Telemetry Stats */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-brand-card/90 border border-white/10 rounded-xl p-3.5 text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">SPEED</span>
-                <strong className="text-sm sm:text-base font-extrabold text-white font-mono">{speed} km/h</strong>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">{t.tracking.speed}</span>
+                <strong className="text-sm sm:text-base font-extrabold text-white font-mono">{speed} {t.common.kmh}</strong>
               </div>
               <div className="bg-brand-card/90 border border-white/10 rounded-xl p-3.5 text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">REMAINING</span>
-                <strong className="text-sm sm:text-base font-extrabold text-cyan-400 font-mono">6.2 km</strong>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">{t.tracking.remaining}</span>
+                <strong className="text-sm sm:text-base font-extrabold text-cyan-400 font-mono">6.2 {t.common.km}</strong>
               </div>
               <div className="bg-brand-card/90 border border-white/10 rounded-xl p-3.5 text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">BATTERY</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">{t.tracking.battery}</span>
                 <strong className="text-sm sm:text-base font-extrabold text-emerald-400 font-mono">84%</strong>
               </div>
             </div>
@@ -179,22 +181,22 @@ export const TrackingPortal: React.FC = () => {
             {/* Safety Controls Card */}
             <div className="bg-brand-card/90 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-2xl space-y-3">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Passenger Safety & Assistance
+                {t.tracking.safetyTitle}
               </span>
 
               <button
                 type="button"
-                onClick={() => alert('Triggering National Emergency SOS (Bangladesh Police 999). Live GPS coordinates broadcasted to control room.')}
+                onClick={() => alert(t.tracking.sosAlert)}
                 className="w-full btn btn-danger py-3 px-4 text-xs font-extrabold rounded-xl flex items-center justify-center gap-2 shadow-lg"
               >
-                <AlertTriangle className="w-4 h-4" /> Emergency SOS (Police 999)
+                <AlertTriangle className="w-4 h-4" /> {t.tracking.emergencySosBtn}
               </button>
 
               <a
                 href="tel:16223"
                 className="w-full btn btn-secondary py-3 px-4 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 border-white/20"
               >
-                <Phone className="w-4 h-4 text-brand-primary" /> 24/7 Safety Hotline (16223)
+                <Phone className="w-4 h-4 text-brand-primary" /> {t.tracking.hotlineBtn}
               </a>
             </div>
 
@@ -241,7 +243,7 @@ export const TrackingPortal: React.FC = () => {
                 <circle r="10" fill="#06B6D4" />
                 <circle r="4" fill="#FFFFFF" />
                 <text x="24" y="6" fill="#F8FAFC" fontFamily="var(--font-body)" fontSize="14" fontWeight="700">
-                  412/1 Senpara, Dhaka (Origin)
+                  412/1 {t.tracking.milestone1}, Dhaka
                 </text>
               </g>
 
@@ -251,7 +253,7 @@ export const TrackingPortal: React.FC = () => {
                 <circle r="11" fill="#EF4444" />
                 <circle r="4" fill="#FFFFFF" />
                 <text x="-165" y="6" fill="#F8FAFC" fontFamily="var(--font-body)" fontSize="14" fontWeight="700">
-                  Gazipur (Destination)
+                  {t.tracking.milestone3}
                 </text>
               </g>
 
@@ -266,7 +268,7 @@ export const TrackingPortal: React.FC = () => {
                 <polygon points="-12,-26 -26,-56 26,-56 12,-26" fill="rgba(251, 191, 36, 0.3)" />
                 <rect x="26" y="-20" width="130" height="30" rx="6" fill="rgba(15,23,42,0.95)" stroke="#10B981" strokeWidth="1.5" />
                 <text x="36" y="0" fill="#34D399" fontFamily="var(--font-mono)" fontSize="12" fontWeight="700">
-                  {speed} km/h • On Route
+                  {speed} {t.common.kmh} • Live
                 </text>
               </g>
 
@@ -280,12 +282,12 @@ export const TrackingPortal: React.FC = () => {
             {/* Floating Top GPS Telemetry Pill */}
             <div className="absolute top-6 left-6 bg-brand-surface/90 border border-white/10 rounded-xl p-3.5 px-5 backdrop-blur-md flex gap-6 shadow-xl text-xs">
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">GPS Accuracy</span>
-                <strong className="text-brand-primary-light">± 3 meters (High Precision)</strong>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">{t.common.gpsProtected}</span>
+                <strong className="text-brand-primary-light">± 3m ({t.common.verified})</strong>
               </div>
               <div className="border-l border-white/10 pl-6">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Traffic Conditions</span>
-                <strong className="text-white">Light Flow at Tongi</strong>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">{t.radarMap.trafficStatus}</span>
+                <strong className="text-white">{t.radarMap.normalFlow}</strong>
               </div>
             </div>
 

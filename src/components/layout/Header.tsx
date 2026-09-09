@@ -3,18 +3,20 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Download, Menu, X, ShieldCheck } from 'lucide-react';
+import { Download, Menu, X, Globe } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 export const Header: React.FC = () => {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { language, setLanguage, t } = useLanguage();
 
   const navLinks = [
-    { label: 'Home', href: '/' },
-    { label: 'Ride Booking', href: '/booking' },
-    { label: 'Vehicle Fleet', href: '/fleet' },
-    { label: 'Live Tracking', href: '/tracking' },
-    { label: 'Rider Hub', href: '/app' },
+    { label: t.nav.home, href: '/' },
+    { label: t.nav.booking, href: '/booking' },
+    { label: t.nav.fleet, href: '/fleet' },
+    { label: t.nav.tracking, href: '/tracking' },
+    { label: t.nav.app, href: '/app' },
   ];
 
   return (
@@ -39,7 +41,7 @@ export const Header: React.FC = () => {
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-brand-primary animate-ping" />
             </div>
             <span className="text-2xl font-extrabold tracking-tight text-white font-heading">
-              Tripyy<span className="text-brand-primary">.</span>
+              {t.common.brandName}<span className="text-brand-primary">.</span>
             </span>
           </Link>
 
@@ -64,25 +66,63 @@ export const Header: React.FC = () => {
             })}
           </nav>
 
-          {/* Action CTAs */}
+          {/* Action CTAs & Language Switcher */}
           <div className="hidden lg:flex items-center gap-3">
+            {/* Language Switcher Pill */}
+            <div className="flex items-center bg-black/40 border border-white/10 rounded-xl p-1 gap-1 text-xs">
+              <Globe className="w-3.5 h-3.5 ml-1.5 text-slate-400" />
+              <button
+                type="button"
+                onClick={() => setLanguage('en')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  language === 'en'
+                    ? 'bg-brand-primary text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage('bn')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all font-heading ${
+                  language === 'bn'
+                    ? 'bg-brand-primary text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                বাংলা
+              </button>
+            </div>
+
             <Link
               href="/booking"
               className="btn btn-secondary px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl hover:border-brand-primary/40"
             >
-              Online Booking
+              {t.common.onlineBooking}
             </Link>
             <Link
               href="/app"
               className="btn btn-primary btn-glow px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl flex items-center gap-2 shadow-glow"
             >
               <Download className="w-4 h-4" />
-              Get The App
+              {t.common.getTheApp}
             </Link>
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Button & Quick Language Switcher */}
           <div className="flex md:hidden items-center gap-2">
+            {/* Mobile Lang Button */}
+            <button
+              type="button"
+              onClick={() => setLanguage(language === 'en' ? 'bn' : 'en')}
+              className="px-2.5 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-bold text-brand-primary-light flex items-center gap-1"
+              aria-label="Toggle language"
+            >
+              <Globe className="w-3 h-3" />
+              {language === 'en' ? 'বাংলা' : 'EN'}
+            </button>
+
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -97,7 +137,7 @@ export const Header: React.FC = () => {
 
         {/* Mobile Dropdown Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-white/10 bg-brand-card/95 backdrop-blur-2xl rounded-2xl mb-4 px-4 shadow-modal">
+          <div className="md:hidden py-4 border-t border-white/10 bg-brand-card/95 backdrop-blur-2xl rounded-2xl mb-4 px-4 shadow-modal animate-fade-in">
             <nav className="flex flex-col gap-2">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href;
@@ -116,13 +156,41 @@ export const Header: React.FC = () => {
                   </Link>
                 );
               })}
+
+              {/* Mobile Language Switcher Row */}
+              <div className="flex items-center justify-between px-4 py-2 mt-1 bg-black/30 rounded-xl border border-white/5">
+                <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-brand-primary" /> {t.common.switchLanguage}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setLanguage('en')}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold ${
+                      language === 'en' ? 'bg-brand-primary text-slate-950' : 'text-slate-400'
+                    }`}
+                  >
+                    EN
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLanguage('bn')}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold ${
+                      language === 'bn' ? 'bg-brand-primary text-slate-950' : 'text-slate-400'
+                    }`}
+                  >
+                    বাংলা
+                  </button>
+                </div>
+              </div>
+
               <div className="pt-3 mt-2 border-t border-white/10 flex flex-col gap-2">
                 <Link
                   href="/booking"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="btn btn-secondary w-full py-2.5 text-sm font-semibold rounded-xl text-center"
                 >
-                  Online Booking
+                  {t.common.onlineBooking}
                 </Link>
                 <Link
                   href="/app"
@@ -130,7 +198,7 @@ export const Header: React.FC = () => {
                   className="btn btn-primary w-full py-2.5 text-sm font-bold rounded-xl text-center flex items-center justify-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Get The App
+                  {t.common.getTheApp}
                 </Link>
               </div>
             </nav>

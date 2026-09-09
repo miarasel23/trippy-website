@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { useLanguage } from '@/context/LanguageContext';
 
 export const LiveRadarMap: React.FC = () => {
+  const { t } = useLanguage();
   const [etaMinutes, setEtaMinutes] = useState(14);
   const [speed, setSpeed] = useState(48);
 
@@ -43,23 +45,23 @@ export const LiveRadarMap: React.FC = () => {
             strokeDasharray="8 6"
           />
 
-          {/* Pickup Pin: Senpara, Dhaka */}
+          {/* Pickup Pin */}
           <g transform="translate(180, 460)">
             <circle r="14" fill="rgba(16, 185, 129, 0.3)" />
             <circle r="8" fill="#10B981" />
             <circle r="3" fill="#FFFFFF" />
             <text x="20" y="5" fill="#F8FAFC" fontFamily="var(--font-body)" fontSize="12" fontWeight="700">
-              Dhaka (Pickup)
+              {t.radarMap.dhakaPickup}
             </text>
           </g>
 
-          {/* Destination Pin: Gazipur */}
+          {/* Destination Pin */}
           <g transform="translate(380, 70)">
             <circle r="14" fill="rgba(239, 68, 68, 0.3)" />
             <circle r="8" fill="#EF4444" />
             <circle r="3" fill="#FFFFFF" />
             <text x="-140" y="5" fill="#F8FAFC" fontFamily="var(--font-body)" fontSize="12" fontWeight="700">
-              Gazipur (Destination)
+              {t.radarMap.gazipurDest}
             </text>
           </g>
 
@@ -108,7 +110,7 @@ export const LiveRadarMap: React.FC = () => {
             <p className="text-[11px] text-slate-400">Hiace Microbus • 210 Trips</p>
           </div>
           <div className="ml-2 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-extrabold font-heading">
-            BDT 1597
+            {t.common.currency} 1597
           </div>
         </div>
       </div>
@@ -120,10 +122,10 @@ export const LiveRadarMap: React.FC = () => {
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-              Arrival Countdown
+              {t.radarMap.arrivalCountdown}
             </span>
             <div className="text-xs font-bold text-white font-heading">
-              {etaMinutes} mins remaining ({speed} km/h)
+              {etaMinutes} {t.radarMap.minsRemaining} ({speed} {t.common.kmh})
             </div>
           </div>
         </div>
@@ -133,10 +135,10 @@ export const LiveRadarMap: React.FC = () => {
           <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-              N3 Highway Traffic
+              {t.radarMap.trafficStatus}
             </span>
             <div className="text-xs font-bold text-emerald-400">
-              Normal Flow
+              {t.radarMap.normalFlow}
             </div>
           </div>
         </div>

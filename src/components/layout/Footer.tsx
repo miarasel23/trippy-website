@@ -1,8 +1,13 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
-import { Phone, Shield, MapPin, ArrowRight } from 'lucide-react';
+import { Phone, Shield, MapPin } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 export const Footer: React.FC = () => {
+  const { t } = useLanguage();
+
   return (
     <footer className="site-footer bg-[#04070d] border-t border-white/10 pt-16 pb-8 mt-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -24,18 +29,18 @@ export const Footer: React.FC = () => {
                 </defs>
               </svg>
               <span className="text-2xl font-extrabold text-white font-heading">
-                Tripyy<span className="text-brand-primary">.</span>
+                {t.common.brandName}<span className="text-brand-primary">.</span>
               </span>
             </Link>
             <p className="text-slate-400 text-sm leading-relaxed max-w-sm mb-6">
-              Bangladesh&apos;s transparent mobility and intercity travel platform. Propose your fare, ride with verified drivers, and experience zero surge fees nationwide.
+              {t.footer.bio}
             </p>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                <Shield className="w-3.5 h-3.5" /> 100% Verified Drivers
+                <Shield className="w-3.5 h-3.5" /> {t.common.verifiedDriver}
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                <MapPin className="w-3.5 h-3.5" /> GPS Protected
+                <MapPin className="w-3.5 h-3.5" /> {t.common.gpsProtected}
               </span>
             </div>
           </div>
@@ -43,50 +48,50 @@ export const Footer: React.FC = () => {
           {/* Col 2: Services */}
           <div>
             <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4 font-heading">
-              Services
+              {t.footer.colServices}
             </h4>
             <ul className="space-y-2.5 text-sm text-slate-400">
-              <li><Link href="/booking" className="hover:text-brand-primary transition-colors">Daily Ride Share</Link></li>
-              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">Intercity Express</Link></li>
-              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">Return Round Trips</Link></li>
-              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">Hourly Rental</Link></li>
-              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">Chander Gari Safari</Link></li>
+              <li><Link href="/booking" className="hover:text-brand-primary transition-colors">{t.footer.services.daily}</Link></li>
+              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">{t.footer.services.intercity}</Link></li>
+              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">{t.footer.services.return}</Link></li>
+              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">{t.footer.services.hourly}</Link></li>
+              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">{t.footer.services.chander}</Link></li>
             </ul>
           </div>
 
           {/* Col 3: Platform */}
           <div>
             <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4 font-heading">
-              Platform
+              {t.footer.colPlatform}
             </h4>
             <ul className="space-y-2.5 text-sm text-slate-400">
-              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">Vehicle Fleet Catalog</Link></li>
-              <li><Link href="/tracking" className="hover:text-brand-primary transition-colors">Live Route Tracker</Link></li>
-              <li><Link href="/app" className="hover:text-brand-primary transition-colors">Passenger Mobile App</Link></li>
-              <li><Link href="/app" className="hover:text-brand-primary transition-colors">System Architecture</Link></li>
-              <li><Link href="/app" className="hover:text-brand-primary transition-colors">Driver Sign Up</Link></li>
+              <li><Link href="/fleet" className="hover:text-brand-primary transition-colors">{t.footer.platform.fleet}</Link></li>
+              <li><Link href="/tracking" className="hover:text-brand-primary transition-colors">{t.footer.platform.tracking}</Link></li>
+              <li><Link href="/app" className="hover:text-brand-primary transition-colors">{t.footer.platform.app}</Link></li>
+              <li><Link href="/app" className="hover:text-brand-primary transition-colors">{t.footer.platform.arch}</Link></li>
+              <li><Link href="/app" className="hover:text-brand-primary transition-colors">{t.footer.platform.driverSignUp}</Link></li>
             </ul>
           </div>
 
           {/* Col 4: Safety & Support */}
           <div>
             <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4 font-heading">
-              Safety & Help
+              {t.footer.colSafety}
             </h4>
             <ul className="space-y-2.5 text-sm text-slate-400">
               <li>
                 <Link href="/tracking" className="text-red-400 hover:text-red-300 transition-colors font-semibold flex items-center gap-1.5">
-                  🚨 Emergency SOS (999)
+                  {t.footer.safety.sos}
                 </Link>
               </li>
-              <li><Link href="/tracking" className="hover:text-brand-primary transition-colors">Driver Screening</Link></li>
+              <li><Link href="/tracking" className="hover:text-brand-primary transition-colors">{t.footer.safety.screening}</Link></li>
               <li>
                 <a href="tel:16223" className="hover:text-brand-primary transition-colors flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-brand-primary" /> Hotline: 16223
+                  <Phone className="w-3.5 h-3.5 text-brand-primary" /> {t.footer.safety.hotline}
                 </a>
               </li>
-              <li><Link href="/#faq" className="hover:text-brand-primary transition-colors">Help Center & FAQ</Link></li>
-              <li><Link href="/app" className="hover:text-brand-primary transition-colors">Privacy & Terms</Link></li>
+              <li><Link href="/#faq" className="hover:text-brand-primary transition-colors">{t.footer.safety.faq}</Link></li>
+              <li><Link href="/app" className="hover:text-brand-primary transition-colors">{t.footer.safety.privacy}</Link></li>
             </ul>
           </div>
 
@@ -94,9 +99,9 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} Tripyy Technologies Bangladesh Ltd. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} {t.common.brandName} Technologies Bangladesh Ltd. {t.common.allRightsReserved}</p>
           <p className="flex items-center gap-2">
-            <span>Dhaka</span> • <span>Gazipur</span> • <span>Chittagong</span> • <span>Sylhet</span> • <span>Nationwide Travel</span>
+            <span>{t.footer.cities}</span>
           </p>
         </div>
 

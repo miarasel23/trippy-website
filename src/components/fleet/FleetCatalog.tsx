@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { FLEET_VEHICLES, VehicleCategory, VehicleKey } from '@/types/fleet';
 import { ArrowRight } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface FleetCatalogProps {
   showFilterBar?: boolean;
@@ -15,10 +16,14 @@ interface FleetCatalogProps {
 export const FleetCatalog: React.FC<FleetCatalogProps> = ({
   showFilterBar = true,
   limit,
-  title = 'Vehicles for Every Journey & Group Size',
-  subtitle = 'From personal daily commutes to group tours and mountain terrain expeditions across Bangladesh.',
+  title,
+  subtitle,
 }) => {
+  const { t } = useLanguage();
   const [filter, setFilter] = useState<VehicleCategory>('all');
+
+  const catalogTitle = title || t.fleet.title;
+  const catalogSubtitle = subtitle || t.fleet.subtitle;
 
   const vehicles = (Object.keys(FLEET_VEHICLES) as VehicleKey[])
     .map((k) => FLEET_VEHICLES[k])
@@ -36,12 +41,12 @@ export const FleetCatalog: React.FC<FleetCatalogProps> = ({
         
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <span className="badge badge-primary mb-3">Our Complete Fleet</span>
+          <span className="badge badge-primary mb-3">{t.fleet.badge}</span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-heading mb-4">
-            {title}
+            {catalogTitle}
           </h2>
           <p className="text-slate-400 text-base leading-relaxed">
-            {subtitle}
+            {catalogSubtitle}
           </p>
         </div>
 
@@ -49,10 +54,10 @@ export const FleetCatalog: React.FC<FleetCatalogProps> = ({
         {showFilterBar && (
           <div className="flex justify-center gap-2.5 flex-wrap mb-12">
             {[
-              { id: 'all', label: 'All Vehicles' },
-              { id: 'sedan', label: 'Sedan & Premium' },
-              { id: 'family', label: 'Family & Group (Noah / Hiace)' },
-              { id: 'adventure', label: 'Adventure 4x4 (Chander Gari)' },
+              { id: 'all', label: t.fleet.filterAll },
+              { id: 'sedan', label: t.fleet.filterSedan },
+              { id: 'family', label: t.fleet.filterFamily },
+              { id: 'adventure', label: t.fleet.filterAdventure },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -72,65 +77,75 @@ export const FleetCatalog: React.FC<FleetCatalogProps> = ({
 
         {/* Vehicles Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {displayedVehicles.map((v) => (
-            <div
-              key={v.id}
-              className="bg-brand-card/85 border border-white/10 rounded-2xl overflow-hidden flex flex-col hover:border-brand-primary/40 hover:-translate-y-1.5 transition-all duration-300 shadow-card group"
-            >
-              {/* Vehicle Image Viewport */}
-              <div className="h-44 bg-[#080c16] relative overflow-hidden flex items-center justify-center border-b border-white/5">
-                <span className="absolute top-3 left-3 bg-brand-surface/90 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold px-2.5 py-0.5 rounded-full z-10 backdrop-blur-md">
-                  {v.tag}
-                </span>
-                <div
-                  className="w-full h-44 bg-contain bg-no-repeat transition-transform duration-500 group-hover:scale-110"
-                  style={{
-                    backgroundImage: "url('/selecting_page.png')",
-                    backgroundPosition: v.imagePosition,
-                    transform: `scale(${v.scale || 1.6})`,
-                  }}
-                />
-              </div>
+          {displayedVehicles.map((v) => {
+            const locVehicle = t.fleet.vehicles[v.id];
+            const name = locVehicle?.name || v.name;
+            const tag = locVehicle?.tag || v.tag;
+            const features = locVehicle?.features || v.features;
+            const description = locVehicle?.description || v.description;
 
-              {/* Body */}
-              <div className="p-6 flex flex-col flex-1 justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-white font-heading mb-3">
-                    {v.name}
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {v.features.map((feat, idx) => (
-                      <span
-                        key={idx}
-                        className="text-[11px] font-semibold text-slate-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md"
-                      >
-                        {feat}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-slate-400 text-xs leading-relaxed mb-6 line-clamp-3">
-                    {v.description}
-                  </p>
+            return (
+              <div
+                key={v.id}
+                className="bg-brand-card/85 border border-white/10 rounded-2xl overflow-hidden flex flex-col hover:border-brand-primary/40 hover:-translate-y-1.5 transition-all duration-300 shadow-card group"
+              >
+                {/* Vehicle Image Viewport */}
+                <div className="h-44 bg-[#080c16] relative overflow-hidden flex items-center justify-center border-b border-white/5">
+                  <span className="absolute top-3 left-3 bg-brand-surface/90 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold px-2.5 py-0.5 rounded-full z-10 backdrop-blur-md">
+                    {tag}
+                  </span>
+                  <div
+                    className="w-full h-44 bg-contain bg-no-repeat transition-transform duration-500 group-hover:scale-110"
+                    style={{
+                      backgroundImage: "url('/selecting_page.png')",
+                      backgroundPosition: v.imagePosition,
+                      transform: `scale(${v.scale || 1.6})`,
+                    }}
+                  />
                 </div>
 
-                {/* Footer */}
-                <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                {/* Body */}
+                <div className="p-6 flex flex-col flex-1 justify-between">
                   <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Estimated Base</span>
-                    <div className="text-lg font-extrabold text-brand-primary-light font-heading">
-                      BDT {v.baseFare}
+                    <h3 className="text-lg font-bold text-white font-heading mb-3">
+                      {name}
+                    </h3>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {features.map((feat, idx) => (
+                        <span
+                          key={idx}
+                          className="text-[11px] font-semibold text-slate-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md"
+                        >
+                          {feat}
+                        </span>
+                      ))}
                     </div>
+                    <p className="text-slate-400 text-xs leading-relaxed mb-6 line-clamp-3">
+                      {description}
+                    </p>
                   </div>
-                  <Link
-                    href={`/booking?vehicle=${v.id}`}
-                    className="btn btn-primary py-2 px-4 text-xs font-bold rounded-xl shadow-glow/20"
-                  >
-                    Book Ride
-                  </Link>
+
+                  {/* Footer */}
+                  <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase font-bold">
+                        {t.fleet.estimatedBase}
+                      </span>
+                      <div className="text-lg font-extrabold text-brand-primary-light font-heading">
+                        {t.common.currency} {v.baseFare}
+                      </div>
+                    </div>
+                    <Link
+                      href={`/booking?vehicle=${v.id}`}
+                      className="btn btn-primary py-2 px-4 text-xs font-bold rounded-xl shadow-glow/20"
+                    >
+                      {t.fleet.bookRideBtn}
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {limit && limit < 4 && (
@@ -139,7 +154,7 @@ export const FleetCatalog: React.FC<FleetCatalogProps> = ({
               href="/fleet"
               className="btn btn-secondary py-3 px-8 rounded-xl font-bold text-sm inline-flex items-center gap-2 border-white/20 hover:border-white/40"
             >
-              Explore All Vehicles & Intercity Route Fares <ArrowRight className="w-4 h-4" />
+              {t.fleet.exploreAllBtn} <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         )}
