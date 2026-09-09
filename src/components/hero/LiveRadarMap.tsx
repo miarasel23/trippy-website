@@ -17,18 +17,18 @@ export const LiveRadarMap: React.FC = () => {
   }, []);
 
   return (
-    <div className="hero-map-frame relative w-full h-full min-h-[520px] bg-[#0a0f1d] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col justify-between">
+    <div className="hero-map-frame relative w-full h-full min-h-[520px] bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between">
       
       {/* SVG Map Container */}
       <div className="map-svg-container absolute inset-0 w-full h-full pointer-events-none">
         <svg className="w-full h-full" viewBox="0 0 600 520" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Dark Background Grid Roads */}
-          <rect width="600" height="520" fill="#0a0f1d" />
-          <path d="M-20 80 Q 200 120 620 90" stroke="#162035" strokeWidth="6" />
-          <path d="M-10 240 Q 300 220 610 280" stroke="#162035" strokeWidth="8" />
-          <path d="M-10 420 Q 320 380 620 440" stroke="#162035" strokeWidth="6" />
-          <path d="M120 -10 Q 140 260 110 530" stroke="#162035" strokeWidth="8" />
-          <path d="M480 -10 Q 460 260 500 530" stroke="#162035" strokeWidth="8" />
+          {/* Light Background Grid Roads */}
+          <rect width="600" height="520" fill="#f8fafc" />
+          <path d="M-20 80 Q 200 120 620 90" stroke="#e2e8f0" strokeWidth="6" />
+          <path d="M-10 240 Q 300 220 610 280" stroke="#e2e8f0" strokeWidth="8" />
+          <path d="M-10 420 Q 320 380 620 440" stroke="#e2e8f0" strokeWidth="6" />
+          <path d="M120 -10 Q 140 260 110 530" stroke="#e2e8f0" strokeWidth="8" />
+          <path d="M480 -10 Q 460 260 500 530" stroke="#e2e8f0" strokeWidth="8" />
 
           {/* Dhaka to Gazipur Highway (N3) with Emerald Glow */}
           <path
@@ -47,10 +47,10 @@ export const LiveRadarMap: React.FC = () => {
 
           {/* Pickup Pin */}
           <g transform="translate(180, 460)">
-            <circle r="14" fill="rgba(16, 185, 129, 0.3)" />
-            <circle r="8" fill="#10B981" />
+            <circle r="14" fill="rgba(34, 197, 94, 0.3)" />
+            <circle r="8" fill="#22C55E" />
             <circle r="3" fill="#FFFFFF" />
-            <text x="20" y="5" fill="#F8FAFC" fontFamily="var(--font-body)" fontSize="12" fontWeight="700">
+            <text x="20" y="5" fill="#0f172a" fontFamily="var(--font-body)" fontSize="12" fontWeight="700">
               {t.radarMap.dhakaPickup}
             </text>
           </g>
@@ -60,27 +60,27 @@ export const LiveRadarMap: React.FC = () => {
             <circle r="14" fill="rgba(239, 68, 68, 0.3)" />
             <circle r="8" fill="#EF4444" />
             <circle r="3" fill="#FFFFFF" />
-            <text x="-140" y="5" fill="#F8FAFC" fontFamily="var(--font-body)" fontSize="12" fontWeight="700">
+            <text x="-140" y="5" fill="#0f172a" fontFamily="var(--font-body)" fontSize="12" fontWeight="700">
               {t.radarMap.gazipurDest}
             </text>
           </g>
 
           {/* Moving Toyota Hiace Marker */}
           <g transform="translate(260, 280)">
-            <circle r="24" fill="rgba(16, 185, 129, 0.2)">
+            <circle r="24" fill="rgba(34, 197, 94, 0.25)">
               <animate attributeName="r" values="20;28;20" dur="2s" repeatCount="indefinite" />
             </circle>
-            <rect x="-12" y="-18" width="24" height="36" rx="6" fill="#FFFFFF" stroke="#10B981" strokeWidth="2" />
-            <rect x="-9" y="-14" width="18" height="8" rx="2" fill="#1E293B" />
-            <rect x="-9" y="8" width="18" height="8" rx="2" fill="#1E293B" />
-            <polygon points="-8,-18 -16,-34 16,-34 8,-18" fill="rgba(251, 191, 36, 0.25)" />
+            <rect x="-12" y="-18" width="24" height="36" rx="6" fill="#FFFFFF" stroke="#22C55E" strokeWidth="2" />
+            <rect x="-9" y="-14" width="18" height="8" rx="2" fill="#0F172A" />
+            <rect x="-9" y="8" width="18" height="8" rx="2" fill="#0F172A" />
+            <polygon points="-8,-18 -16,-34 16,-34 8,-18" fill="rgba(234, 179, 8, 0.35)" />
           </g>
 
           {/* Other roaming vehicles */}
-          <circle cx="210" cy="380" r="4" fill="#38BDF8" opacity="0.8" />
-          <circle cx="340" cy="220" r="4" fill="#38BDF8" opacity="0.8" />
-          <circle cx="150" cy="240" r="4" fill="#38BDF8" opacity="0.8" />
-          <circle cx="420" cy="360" r="4" fill="#38BDF8" opacity="0.8" />
+          <circle cx="210" cy="380" r="4" fill="#10B981" opacity="0.9" />
+          <circle cx="340" cy="220" r="4" fill="#0F172A" opacity="0.8" />
+          <circle cx="150" cy="240" r="4" fill="#10B981" opacity="0.9" />
+          <circle cx="420" cy="360" r="4" fill="#0F172A" opacity="0.8" />
         </svg>
 
         {/* Animated Radar Pulse Center */}
@@ -93,8 +93,8 @@ export const LiveRadarMap: React.FC = () => {
 
       {/* Floating Top Card: Live Driver Matched */}
       <div className="relative z-10 m-5 self-end">
-        <div className="bg-brand-card/90 border border-brand-primary/40 rounded-2xl p-3 px-4 backdrop-blur-xl shadow-2xl flex items-center gap-3 animate-slide-up">
-          <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-brand-primary flex-shrink-0 relative">
+        <div className="bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-xl flex items-center gap-3 animate-slide-up">
+          <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-black flex-shrink-0 relative">
             <Image
               src="/driver_found_page.png"
               alt="Driver"
@@ -104,12 +104,12 @@ export const LiveRadarMap: React.FC = () => {
             />
           </div>
           <div>
-            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-              Md Rasel Mia <span className="text-amber-400 text-[10px]">★ 4.9</span>
+            <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              Md Rasel Mia <span className="text-amber-500 text-[10px]">★ 4.9</span>
             </div>
-            <p className="text-[11px] text-slate-400">Hiace Microbus • 210 Trips</p>
+            <p className="text-[11px] text-slate-500">Hiace Microbus • 210 Trips</p>
           </div>
-          <div className="ml-2 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-extrabold font-heading">
+          <div className="ml-2 px-2.5 py-1 rounded-lg bg-black text-white text-xs font-extrabold font-heading">
             {t.common.currency} 1597
           </div>
         </div>
@@ -118,26 +118,26 @@ export const LiveRadarMap: React.FC = () => {
       {/* Floating Bottom Cards */}
       <div className="relative z-10 m-5 flex justify-between items-center gap-4">
         {/* Arrival Countdown */}
-        <div className="bg-brand-card/90 border border-white/10 rounded-xl p-3 px-4 backdrop-blur-xl shadow-xl flex items-center gap-3">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="bg-white border border-slate-200 rounded-xl p-3 px-4 shadow-xl flex items-center gap-3">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+            <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">
               {t.radarMap.arrivalCountdown}
             </span>
-            <div className="text-xs font-bold text-white font-heading">
+            <div className="text-xs font-bold text-slate-900 font-heading">
               {etaMinutes} {t.radarMap.minsRemaining} ({speed} {t.common.kmh})
             </div>
           </div>
         </div>
 
         {/* Highway Traffic Status */}
-        <div className="bg-brand-card/90 border border-white/10 rounded-xl p-3 px-4 backdrop-blur-xl shadow-xl flex items-center gap-3">
-          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
+        <div className="bg-white border border-slate-200 rounded-xl p-3 px-4 shadow-xl flex items-center gap-3">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+            <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">
               {t.radarMap.trafficStatus}
             </span>
-            <div className="text-xs font-bold text-emerald-400">
+            <div className="text-xs font-bold text-emerald-700">
               {t.radarMap.normalFlow}
             </div>
           </div>

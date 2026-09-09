@@ -65,7 +65,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable} ${hindSiliguri.variable}`}>
-      <body className="bg-brand-dark text-slate-100 font-body min-h-screen flex flex-col antialiased">
+      <body className="bg-white text-slate-900 font-body min-h-screen flex flex-col antialiased">
         <LanguageProvider>
           <Header />
           <main className="flex-1">

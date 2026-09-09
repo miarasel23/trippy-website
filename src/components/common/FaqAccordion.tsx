@@ -21,24 +21,24 @@ export const FaqAccordion: React.FC = () => {
             key={index}
             className={`border rounded-2xl transition-all duration-300 overflow-hidden ${
               isOpen
-                ? 'bg-brand-card/90 border-brand-primary/40 shadow-glow/10'
-                : 'bg-brand-card/50 border-white/10 hover:border-white/20'
+                ? 'bg-white border-slate-300 shadow-md'
+                : 'bg-white border-slate-200 hover:border-slate-300 shadow-xs'
             }`}
           >
             <button
               type="button"
               onClick={() => toggle(index)}
-              className="w-full px-6 py-5 flex items-center justify-between text-left text-white font-bold text-base transition-colors"
+              className="w-full px-6 py-5 flex items-center justify-between text-left text-slate-900 font-bold text-base transition-colors"
             >
               <span>{item.q}</span>
               <ChevronDown
-                className={`w-5 h-5 text-slate-400 transition-transform duration-300 flex-shrink-0 ml-4 ${
-                  isOpen ? 'rotate-180 text-brand-primary' : ''
+                className={`w-5 h-5 transition-transform duration-300 flex-shrink-0 ml-4 ${
+                  isOpen ? 'rotate-180 text-black' : 'text-slate-400'
                 }`}
               />
             </button>
             {isOpen && (
-              <div className="px-6 pb-5 pt-1 text-slate-300 text-sm leading-relaxed border-t border-white/5">
+              <div className="px-6 pb-5 pt-1 text-slate-600 text-sm leading-relaxed border-t border-slate-100">
                 {item.a}
               </div>
             )}

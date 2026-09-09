@@ -40,7 +40,7 @@ export const HomeView: React.FC = () => {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <Badge variant="cyan" className="mb-3">{t.testimonials.badge}</Badge>
+            <Badge variant="primary" className="mb-3">{t.testimonials.badge}</Badge>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-heading mb-4">
               {t.testimonials.title}
             </h2>
@@ -53,7 +53,7 @@ export const HomeView: React.FC = () => {
       <section id="faq" className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <Badge variant="amber" className="mb-3">{t.faq.badge}</Badge>
+            <Badge variant="warning" className="mb-3">{t.faq.badge}</Badge>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-heading mb-4">
               {t.faq.title}
             </h2>

@@ -26,29 +26,29 @@ export const Testimonials: React.FC = () => {
         return (
           <div
             key={idx}
-            className="bg-brand-card/75 border border-white/10 rounded-2xl p-7 flex flex-col justify-between hover:border-white/20 transition-all duration-300"
+            className="bg-white border border-slate-200 rounded-2xl p-7 flex flex-col justify-between hover:border-slate-300 hover:shadow-md transition-all duration-300 shadow-sm"
           >
             <div>
-              <div className="flex items-center gap-1 mb-4 text-amber-400">
+              <div className="flex items-center gap-1 mb-4 text-amber-500">
                 {[...Array(5)].map((_, i) => (
                   <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
                 ))}
               </div>
-              <p className="text-slate-300 text-sm italic leading-relaxed mb-6">
+              <p className="text-slate-700 text-sm italic leading-relaxed mb-6">
                 &ldquo;{review.quote}&rdquo;
               </p>
             </div>
-            <div className="flex items-center gap-3 pt-4 border-t border-white/10">
+            <div className="flex items-center gap-3 pt-4 border-t border-slate-200">
               <div
-                className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-bold text-white text-xs shadow-md`}
+                className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-bold text-white text-xs shadow-sm`}
               >
                 {initials}
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white leading-tight">
+                <h4 className="text-sm font-bold text-slate-900 leading-tight">
                   {review.name}
                 </h4>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500">
                   {review.location}
                 </span>
               </div>

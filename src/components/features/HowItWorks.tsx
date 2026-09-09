@@ -13,10 +13,10 @@ export const HowItWorks: React.FC = () => {
         
         <div className="text-center max-w-2xl mx-auto mb-14">
           <Badge variant="amber" className="mb-3">{t.howItWorks.badge}</Badge>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-heading mb-4">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-heading mb-4">
             {t.howItWorks.title}
           </h2>
-          <p className="text-slate-400 text-base leading-relaxed">
+          <p className="text-slate-600 text-base leading-relaxed">
             {t.howItWorks.subtitle}
           </p>
         </div>
@@ -25,15 +25,15 @@ export const HowItWorks: React.FC = () => {
           {t.howItWorks.steps.map((step, idx) => (
             <div
               key={idx}
-              className="bg-brand-card/75 border border-white/10 rounded-2xl p-7 relative hover:border-white/20 transition-all duration-300"
+              className="bg-white border border-slate-200 rounded-2xl p-7 relative hover:border-slate-300 hover:shadow-md transition-all duration-300 shadow-sm"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary text-brand-dark font-extrabold text-lg flex items-center justify-center mb-5 font-heading shadow-md">
+              <div className="w-10 h-10 rounded-xl bg-black text-white font-extrabold text-lg flex items-center justify-center mb-5 font-heading shadow-sm">
                 {step.num}
               </div>
-              <h3 className="text-lg font-bold text-white font-heading mb-2.5">
+              <h3 className="text-lg font-bold text-slate-900 font-heading mb-2.5">
                 {step.title}
               </h3>
-              <p className="text-slate-400 text-sm leading-relaxed">
+              <p className="text-slate-600 text-sm leading-relaxed">
                 {step.desc}
               </p>
             </div>

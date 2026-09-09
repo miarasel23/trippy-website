@@ -14,8 +14,8 @@ export const QrCodeBox: React.FC<QrCodeBoxProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`inline-flex items-center gap-4 bg-brand-card/85 border border-white/10 rounded-2xl p-4 backdrop-blur-xl shadow-card ${className}`}>
-      <div className="w-16 h-16 bg-white rounded-xl p-1.5 flex-shrink-0 flex items-center justify-center shadow-md">
+    <div className={`inline-flex items-center gap-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm ${className}`}>
+      <div className="w-16 h-16 bg-slate-50 border border-slate-200 rounded-xl p-1.5 flex-shrink-0 flex items-center justify-center shadow-xs">
         <svg viewBox="0 0 100 100" className="w-full h-full">
           <rect width="100" height="100" fill="#ffffff" />
           <rect x="10" y="10" width="30" height="30" fill="#000000" />
@@ -32,13 +32,13 @@ export const QrCodeBox: React.FC<QrCodeBoxProps> = ({
         </svg>
       </div>
       <div className="text-left">
-        <span className="text-[10px] uppercase font-bold text-brand-primary-light tracking-wider block">
+        <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider block">
           {category}
         </span>
-        <h4 className="text-sm font-bold text-white leading-snug">
+        <h4 className="text-sm font-bold text-slate-900 leading-snug">
           {title}
         </h4>
-        <p className="text-xs text-slate-400 mt-0.5">
+        <p className="text-xs text-slate-500 mt-0.5">
           {subtitle}
         </p>
       </div>
