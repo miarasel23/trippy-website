@@ -4,6 +4,9 @@ import './globals.css';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { LanguageProvider } from '@/context/LanguageContext';
+import { ReduxProvider } from '@/redux/provider';
+import { AuthPromptManager } from '@/components/auth/AuthPromptManager';
+import { LoginModal } from '@/components/auth/LoginModal';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -76,11 +79,15 @@ export default function RootLayout({
     <html lang="en" className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable} ${hindSiliguri.variable}`}>
       <body className="bg-white text-slate-900 font-body min-h-screen flex flex-col antialiased">
         <LanguageProvider>
-          <Header />
-          <main className="flex-1">
-            {children}
-          </main>
-          <Footer />
+          <ReduxProvider>
+            <AuthPromptManager />
+            <LoginModal />
+            <Header />
+            <main className="flex-1">
+              {children}
+            </main>
+            <Footer />
+          </ReduxProvider>
         </LanguageProvider>
       </body>
     </html>
