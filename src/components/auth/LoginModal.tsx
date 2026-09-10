@@ -171,7 +171,7 @@ export const LoginModal: React.FC = () => {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/favicon.svg"
-              alt="Tripyy"
+              alt="Trippy"
               className="w-7 h-7 object-contain"
             />
           </div>

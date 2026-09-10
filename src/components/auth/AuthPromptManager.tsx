@@ -10,7 +10,7 @@ import {
 
 // 20 minutes in milliseconds
 const TWENTY_MINUTES_MS = 20 * 60 * 1000;
-const LAST_PROMPT_KEY = 'tripyy_last_login_prompt';
+const LAST_PROMPT_KEY = 'trippy_last_login_prompt';
 
 export const AuthPromptManager: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -35,7 +35,7 @@ export const AuthPromptManager: React.FC = () => {
       let promptTime = lastPromptTimestamp;
 
       if (!promptTime && typeof window !== 'undefined') {
-        const stored = localStorage.getItem(LAST_PROMPT_KEY);
+        const stored = localStorage.getItem(LAST_PROMPT_KEY) || localStorage.getItem('tripyy_last_login_prompt');
         if (stored) {
           promptTime = parseInt(stored, 10) || 0;
         }

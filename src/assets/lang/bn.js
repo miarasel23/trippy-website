@@ -1,4 +1,4 @@
-// Bengali (বাংলা) Translation Dictionary for Tripyy
+// Bengali (বাংলা) Translation Dictionary for Trippy
 export const bn = {
   common: {
     brandName: "ট্রিপি",

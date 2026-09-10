@@ -2,9 +2,9 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { AuthState, User, SendOtpPayload, VerifyOtpPayload } from '@/types/auth';
 import { authApi } from '@/services/authApi';
 
-const TOKEN_KEY = 'tripyy_auth_token';
-const USER_KEY = 'tripyy_auth_user';
-const LAST_PROMPT_KEY = 'tripyy_last_login_prompt';
+const TOKEN_KEY = 'trippy_auth_token';
+const USER_KEY = 'trippy_auth_user';
+const LAST_PROMPT_KEY = 'trippy_last_login_prompt';
 
 const initialState: AuthState = {
   user: null,
@@ -60,9 +60,9 @@ export const authSlice = createSlice({
     initializeAuth: (state) => {
       if (typeof window === 'undefined') return;
       try {
-        const token = localStorage.getItem(TOKEN_KEY);
-        const savedUser = localStorage.getItem(USER_KEY);
-        const lastPrompt = localStorage.getItem(LAST_PROMPT_KEY);
+        const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('tripyy_auth_token');
+        const savedUser = localStorage.getItem(USER_KEY) || localStorage.getItem('tripyy_auth_user');
+        const lastPrompt = localStorage.getItem(LAST_PROMPT_KEY) || localStorage.getItem('tripyy_last_login_prompt');
 
         if (token && savedUser) {
           state.token = token;

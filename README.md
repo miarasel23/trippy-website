@@ -1,6 +1,6 @@
-# Tripyy - Ride Sharing, Intercity Travel & Set Your Own Fare in Bangladesh
+# Trippy - Ride Sharing, Intercity Travel & Set Your Own Fare in Bangladesh
 
-Tripyy is Bangladesh's premier fair-fare ride-sharing and intercity travel platform. Built with **Next.js 15 (App Router)**, **React 19**, **TypeScript**, and **Tailwind CSS**.
+Trippy is Bangladesh's premier fair-fare ride-sharing and intercity travel platform. Built with **Next.js 15 (App Router)**, **React 19**, **TypeScript**, and **Tailwind CSS**.
 
 ---
 

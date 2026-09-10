@@ -16,11 +16,11 @@ export const Footer: React.FC = () => {
           
           {/* Col 1: Brand Bio */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-flex items-center mb-4 group" aria-label="Tripyy Home">
+            <Link href="/" className="inline-flex items-center mb-4 group" aria-label="Trippy Home">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/tripyy_logo.svg"
-                alt="Tripyy"
+                src="/images/trippy_logo.svg"
+                alt="Trippy"
                 width={140}
                 height={38}
                 className="h-9 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03]"

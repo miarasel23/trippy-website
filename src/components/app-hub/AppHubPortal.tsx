@@ -32,7 +32,7 @@ export const AppHubPortal: React.FC = () => {
             {/* Google Play */}
             <button
               type="button"
-              onClick={() => alert('Downloading Tripyy Customer App for Android (v2.4.0 APK)...')}
+              onClick={() => alert('Downloading Trippy Customer App for Android (v2.4.0 APK)...')}
               className="bg-black text-white hover:bg-slate-900 border border-black rounded-2xl p-3 px-6 flex items-center gap-3.5 transition-all hover:-translate-y-0.5 shadow-md group"
             >
               <svg className="w-7 h-7 fill-white" viewBox="0 0 24 24">
@@ -51,7 +51,7 @@ export const AppHubPortal: React.FC = () => {
             {/* Apple App Store */}
             <button
               type="button"
-              onClick={() => alert('Opening Tripyy on Apple App Store...')}
+              onClick={() => alert('Opening Trippy on Apple App Store...')}
               className="bg-black text-white hover:bg-slate-900 border border-black rounded-2xl p-3 px-6 flex items-center gap-3.5 transition-all hover:-translate-y-0.5 shadow-md group"
             >
               <svg className="w-7 h-7 fill-white" viewBox="0 0 24 24">
@@ -187,7 +187,7 @@ export const AppHubPortal: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={() => alert('Tripyy Architecture View: Foreground Location Service compliant with Android 14+ policies and WebSocket telemetry sync.')}
+            onClick={() => alert('Trippy Architecture View: Foreground Location Service compliant with Android 14+ policies and WebSocket telemetry sync.')}
             className="btn btn-secondary py-3 px-6 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-2 bg-black text-white hover:bg-slate-900 border border-black"
           >
             {t.appHub.viewDocBtn} <ArrowRight className="w-4 h-4" />

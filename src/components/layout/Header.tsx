@@ -45,11 +45,11 @@ export const Header: React.FC = () => {
         <div className="flex items-center justify-between h-20">
           
           {/* Logo */}
-          <Link href="/" className="brand-logo flex items-center group py-1" aria-label="Tripyy Home">
+          <Link href="/" className="brand-logo flex items-center group py-1" aria-label="Trippy Home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/tripyy_logo.svg"
-              alt="Tripyy"
+              src="/images/trippy_logo.svg"
+              alt="Trippy"
               width={145}
               height={40}
               className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03]"

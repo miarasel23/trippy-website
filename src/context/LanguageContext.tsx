@@ -15,7 +15,7 @@ const LanguageContext = createContext<LanguageContextProps>({
   t: en,
 });
 
-const STORAGE_KEY = 'tripyy_language_preference';
+const STORAGE_KEY = 'trippy_language_preference';
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>('en');
@@ -24,7 +24,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     setMounted(true);
     try {
-      const savedLang = localStorage.getItem(STORAGE_KEY) as Language;
+      const savedLang = (localStorage.getItem(STORAGE_KEY) || localStorage.getItem('tripyy_language_preference')) as Language;
       if (savedLang === 'en' || savedLang === 'bn') {
         setLanguageState(savedLang);
         document.documentElement.lang = savedLang;

@@ -1,7 +1,7 @@
-// English Translation Dictionary for Tripyy
+// English Translation Dictionary for Trippy
 export const en = {
   common: {
-    brandName: "Tripyy",
+    brandName: "Trippy",
     currency: "BDT",
     perKm: "/km",
     mins: "mins",
@@ -82,7 +82,7 @@ export const en = {
     gazipurDest: "Gazipur (Destination)",
   },
   features: {
-    badge: "Why Tripyy Stands Apart",
+    badge: "Why Trippy Stands Apart",
     title: "Built for Real Convenience in Bangladesh",
     subtitle:
       "Experience a transparent, fair-price mobility ecosystem designed to overcome surge pricing and inflexible booking.",
@@ -110,7 +110,7 @@ export const en = {
     ],
   },
   howItWorks: {
-    badge: "How Tripyy Works",
+    badge: "How Trippy Works",
     title: "Your Journey in 4 Easy Steps",
     subtitle:
       "Simple, transparent, and direct booking experience without surge algorithms.",
@@ -262,7 +262,7 @@ export const en = {
   },
   appHub: {
     badge: "📲 SMARTPHONE APP FOR ANDROID & IOS",
-    heroTitle1: "Download The Tripyy App",
+    heroTitle1: "Download The Trippy App",
     heroTitle2: "Your Journey, Your Price",
     heroSubtitle:
       "Experience effortless bidding, direct driver messaging, foreground GPS safety tracking, and complete ride history in the palm of your hand.",
@@ -285,7 +285,7 @@ export const en = {
     featureHistoryDesc:
       "Keep track of all your past travels, pending offers, and accepted bookings. Export invoices for business travel expenses with one click.",
     archBadge: "ENGINEERING & PLAY STORE POLICIES",
-    archTitle: "Tripyy System Architecture & Foreground Service",
+    archTitle: "Trippy System Architecture & Foreground Service",
     archDesc:
       "Our background location engine, live driver radar matching, and WebSocket real-time messaging strictly comply with Google Play foreground service specifications.",
     viewDocBtn: "View Engineering Architecture Docs",
@@ -310,7 +310,7 @@ export const en = {
       },
       {
         quote:
-          "Hired a Chander Gari for our Sajek tour right through Tripyy. The driver was verified, experienced on hill climbs, and the fare was transparent.",
+          "Hired a Chander Gari for our Sajek tour right through Trippy. The driver was verified, experienced on hill climbs, and the fare was transparent.",
         name: "Sabbir Hossain",
         location: "Chittagong",
         rating: 5,
@@ -323,15 +323,15 @@ export const en = {
     items: [
       {
         q: "How does the 'Set Your Own Fare' bidding work?",
-        a: "When you enter your pickup and drop-off points, Tripyy shows an estimated baseline fare. You can choose to offer the baseline, adjust it downwards, or add a bonus for faster driver pickup. Nearby verified drivers view your offer and can either accept immediately or propose a counter-offer.",
+        a: "When you enter your pickup and drop-off points, Trippy shows an estimated baseline fare. You can choose to offer the baseline, adjust it downwards, or add a bonus for faster driver pickup. Nearby verified drivers view your offer and can either accept immediately or propose a counter-offer.",
       },
       {
         q: "Can I book intercity microbuses like Toyota Noah or Hiace?",
-        a: "Yes! Tripyy specializes in long-distance intercity trips with 7-seater Noah and 11-seater Hiace microbuses. You can book for one-way journeys, round trips, or multi-day tours across all 64 districts in Bangladesh.",
+        a: "Yes! Trippy specializes in long-distance intercity trips with 7-seater Noah and 11-seater Hiace microbuses. You can book for one-way journeys, round trips, or multi-day tours across all 64 districts in Bangladesh.",
       },
       {
-        q: "What makes Tripyy safer than ordinary street taxi hiring?",
-        a: "Every Tripyy driver undergoes strict NID verification, vehicle fitness check, and driving license inspection. During trips, our app streams continuous foreground GPS telemetry, provides one-click Emergency SOS connected to National Police 999, and lets you share your live trip link with loved ones.",
+        q: "What makes Trippy safer than ordinary street taxi hiring?",
+        a: "Every Trippy driver undergoes strict NID verification, vehicle fitness check, and driving license inspection. During trips, our app streams continuous foreground GPS telemetry, provides one-click Emergency SOS connected to National Police 999, and lets you share your live trip link with loved ones.",
       },
       {
         q: "Are tolls and highway fees included in the fare?",
@@ -346,7 +346,7 @@ export const en = {
   appBanner: {
     badge: "Available for Android & iOS",
     title: "Ready to Experience Fair Fares in Bangladesh?",
-    desc: "Download the Tripyy app today to negotiate your ride, track drivers live on radar, and travel anywhere with zero surge fees.",
+    desc: "Download the Trippy app today to negotiate your ride, track drivers live on radar, and travel anywhere with zero surge fees.",
   },
   footer: {
     bio: "Bangladesh's transparent mobility and intercity travel platform. Propose your fare, ride with verified drivers, and experience zero surge fees nationwide.",
@@ -379,7 +379,7 @@ export const en = {
   auth: {
     login: "Login",
     logout: "Logout",
-    loginTitle: "Welcome to Tripyy",
+    loginTitle: "Welcome to Trippy",
     loginSubtitle: "Sign in with your phone number to manage your rides and bookings",
     phoneLabel: "Mobile Phone Number",
     phonePlaceholder: "01XXXXXXXXX",
@@ -397,7 +397,7 @@ export const en = {
     changePhone: "Edit",
     welcomeBack: "Welcome,",
     customerRole: "Customer",
-    secureNote: "Protected by Tripyy Security & 2FA SMS Verification.",
+    secureNote: "Protected by Trippy Security & 2FA SMS Verification.",
     invalidPhone: "Please enter a valid 11-digit mobile number (e.g. 01997709990)",
     invalidOtp: "Please enter the 6-digit OTP code",
   },

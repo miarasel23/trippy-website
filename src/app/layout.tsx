@@ -43,14 +43,14 @@ export const viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: 'Tripyy - Ride Sharing, Intercity Travel & Set Your Own Fare in Bangladesh',
-    template: '%s | Tripyy Bangladesh',
+    default: 'Trippy - Ride Sharing, Intercity Travel & Set Your Own Fare in Bangladesh',
+    template: '%s | Trippy Bangladesh',
   },
   description:
-    "Tripyy is Bangladesh's premier ride-sharing platform where you set your own fare. Book Sedans, Toyota Noah, Hiace microbus, and Chander Gari with transparent pricing and live GPS tracking.",
+    "Trippy is Bangladesh's premier ride-sharing platform where you set your own fare. Book Sedans, Toyota Noah, Hiace microbus, and Chander Gari with transparent pricing and live GPS tracking.",
   keywords: [
     'ride sharing bangladesh',
-    'tripyy',
+    'trippy',
     'set your own fare',
     'dhaka to gazipur ride',
     'toyota hiace rental bangladesh',
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     'chander gari sajek',
     'intercity travel bangladesh',
   ],
-  authors: [{ name: 'Tripyy Technologies Bangladesh Ltd.' }],
+  authors: [{ name: 'Trippy Technologies Bangladesh Ltd.' }],
   icons: {
     icon: [
       { url: '/images/Icon.svg', type: 'image/svg+xml' },
