@@ -154,6 +154,19 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     setSelectedCar(null);
   }, [selectedService]);
 
+  // When activeTrip becomes active, automatically scroll to driver finding radar so user never has to scroll up
+  useEffect(() => {
+    if (activeTrip) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      requestAnimationFrame(() => {
+        const target = document.getElementById('booking-top') || document.getElementById('home-booking');
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
+  }, [activeTrip?.uuid]);
+
   const handleSelectCar = (car: CarInfo, baseFare: number) => {
     setSelectedCar(car);
     setProposedFare(baseFare);
@@ -311,72 +324,84 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       created_at: tripData.createdAt,
       drivers: [],
     } as any);
+
+    // Automatically scroll to driver finding radar view so user immediately sees next step without scrolling up
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      const target = document.getElementById('booking-top') || document.getElementById('home-booking');
+      if (target) {
+        target.scrollIntoView({ behavior: 'auto', block: 'start' });
+      }
+    });
   };
 
 
   return (
     <div id="booking-top" className={isHero ? 'py-4 bg-transparent' : 'py-8 bg-slate-50/60 min-h-screen scroll-mt-24'}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Top Header Banner */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Badge variant="primary">
-                <Sparkles className="w-3.5 h-3.5" />
+        {/* Top Header Banner (Only shown in search/form mode, hidden when driver finding is active) */}
+        {!activeTrip && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Badge variant="primary">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {isBn
+                    ? isHero
+                      ? 'বাংলাদেশে প্রথম স্বয়ংক্রিয় রাইড শেয়ারিং ও রেন্টাল প্ল্যাটফর্ম'
+                      : 'লাইভ ট্রিপ বুকিং ও রুট ম্যাপ'
+                    : isHero
+                    ? 'First Direct Driver Bidding Platform in Bangladesh'
+                    : 'Live Trip Booking & Route Map'}
+                </Badge>
+              </div>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight font-heading">
                 {isBn
                   ? isHero
-                    ? 'বাংলাদেশে প্রথম স্বয়ংক্রিয় রাইড শেয়ারিং ও রেন্টাল প্ল্যাটফর্ম'
-                    : 'লাইভ ট্রিপ বুকিং ও রুট ম্যাপ'
+                    ? 'আপনার যাত্রা, আপনার নিজের প্রস্তাবিত ভাড়া'
+                    : 'ট্রিপ বুক করুন ও নিজের পছন্দমত ভাড়া দিন'
                   : isHero
-                  ? 'First Direct Driver Bidding Platform in Bangladesh'
-                  : 'Live Trip Booking & Route Map'}
-              </Badge>
+                  ? 'Your Ride, Your Own Proposed Fare'
+                  : 'Book Your Trip & Set Your Own Fare'}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5 max-w-2xl">
+                {isBn
+                  ? isHero
+                    ? 'পছন্দের সার্ভিস, গাড়ি ও নিজের প্রস্তাবিত ভাড়ায় চালকদের সাথে সরাসরি যুক্ত হোন। কোনো হিডেন চার্জ ছাড়া বাংলাদেশের যেকোনো প্রান্তে ভ্রমণ করুন।'
+                    : 'যাচাইকৃত চালক, লাইভ গুগল রুট ও কোনো হিডেন চার্জ ছাড়া বাংলাদেশের যেকোনো প্রান্তে ভ্রমণ করুন'
+                  : isHero
+                  ? 'Choose your service, select vehicles, and negotiate directly with drivers. Travel anywhere in Bangladesh with zero hidden fees.'
+                  : 'Verified drivers, live Google routing, and transparent pricing across Bangladesh.'}
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight font-heading">
-              {isBn
-                ? isHero
-                  ? 'আপনার যাত্রা, আপনার নিজের প্রস্তাবিত ভাড়া'
-                  : 'ট্রিপ বুক করুন ও নিজের পছন্দমত ভাড়া দিন'
-                : isHero
-                ? 'Your Ride, Your Own Proposed Fare'
-                : 'Book Your Trip & Set Your Own Fare'}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 max-w-2xl">
-              {isBn
-                ? isHero
-                  ? 'পছন্দের সার্ভিস, গাড়ি ও নিজের প্রস্তাবিত ভাড়ায় চালকদের সাথে সরাসরি যুক্ত হোন। কোনো হিডেন চার্জ ছাড়া বাংলাদেশের যেকোনো প্রান্তে ভ্রমণ করুন।'
-                  : 'যাচাইকৃত চালক, লাইভ গুগল রুট ও কোনো হিডেন চার্জ ছাড়া বাংলাদেশের যেকোনো প্রান্তে ভ্রমণ করুন'
-                : isHero
-                ? 'Choose your service, select vehicles, and negotiate directly with drivers. Travel anywhere in Bangladesh with zero hidden fees.'
-                : 'Verified drivers, live Google routing, and transparent pricing across Bangladesh.'}
-            </p>
-          </div>
 
-          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-            <span className="badge badge-primary flex items-center gap-1 text-xs">
-              <MapPin className="w-3 h-3 text-emerald-600" />{' '}
-              {isBn ? 'সারা বাংলাদেশে' : 'All Across Bangladesh'}
-            </span>
-            <span className="badge badge-warning flex items-center gap-1 text-xs">
-              <Zap className="w-3 h-3 text-amber-500" />{' '}
-              {isBn ? 'চালকরা প্রস্তুত' : 'Drivers Ready'}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+              <span className="badge badge-primary flex items-center gap-1 text-xs">
+                <MapPin className="w-3 h-3 text-emerald-600" />{' '}
+                {isBn ? 'সারা বাংলাদেশে' : 'All Across Bangladesh'}
+              </span>
+              <span className="badge badge-warning flex items-center gap-1 text-xs">
+                <Zap className="w-3 h-3 text-amber-500" />{' '}
+                {isBn ? 'চালকরা প্রস্তুত' : 'Drivers Ready'}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Live Bidding Radar View (When trip offer is active) */}
+        {/* Live Bidding Radar View (When trip offer is active - starts cleanly at top) */}
         {activeTrip ? (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 text-white rounded-2xl px-5 py-3 shadow-md border border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <span className="relative flex h-2.5 w-2.5">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 bg-slate-900 text-white rounded-2xl px-4 py-2.5 shadow-sm border border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className="text-xs font-bold text-slate-200">
+                <span className="text-xs font-semibold text-slate-200">
                   {isBn
-                    ? 'আপনার চলমান রাইড রিকোয়েস্টের বিডিং রাডার চালু আছে।'
-                    : 'Active trip request live bidding radar is open.'}
+                    ? 'আপনার রাইড রিকোয়েস্টের বিডিং চালু আছে'
+                    : 'Active Trip Request - Bidding Open'}
                 </span>
               </div>
 
@@ -386,7 +411,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
                   setHasDismissedRadar(true);
                   setActiveTrip(null);
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold transition-all border border-slate-700 shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all border border-slate-700 shadow-xs"
               >
                 <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
                 <span>{isBn ? 'নতুন রাইড খুঁজুন' : 'New Ride Search'}</span>
