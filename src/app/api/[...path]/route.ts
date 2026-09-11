@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { API_BASE_URL, AppUrls } from '@/config/appUrls';
 
-const BACKEND_URL =
-  process.env.BACKEND_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'http://3.209.161.158/api';
+const BACKEND_URL = API_BASE_URL;
 
 /**
  * Maps incoming path segments to the corresponding backend endpoint.
@@ -19,35 +17,35 @@ function resolveBackendUrl(pathSegments: string[], reqMethod: string): string {
   // Friendly aliases
   switch (fullPath) {
     case 'locations/search':
-      return `${BACKEND_URL}/v1/global-api/search-location`;
+      return AppUrls.backend.searchLocation;
     case 'rental/info':
-      return `${BACKEND_URL}/v1/rental-trip/rental-info`;
+      return AppUrls.backend.rentalInfo;
     case 'rental/price-details':
-      return `${BACKEND_URL}/v1/rental-trip/trip-price-details-customer`;
+      return AppUrls.backend.tripPriceDetailsCustomer;
     case 'rental/create-trip':
-      return `${BACKEND_URL}/v1/rental-trip/create-rental-trip`;
+      return AppUrls.backend.createRentalTrip;
     case 'rental/bids':
-      return `${BACKEND_URL}/v1/rental-trip/rental-bid-trip-list_for_customer`;
+      return AppUrls.backend.rentalBidTripListForCustomer;
     case 'rental/accept-bid':
-      return `${BACKEND_URL}/v1/rental-trip/accept_trip_for_customer`;
+      return AppUrls.backend.acceptTripForCustomer;
     case 'rental/cancel-trip':
-      return `${BACKEND_URL}/v1/rental-trip/cancel-trip-driver-or-customer-admin`;
+      return AppUrls.backend.cancelTripDriverOrCustomerAdmin;
     case 'rental/cancel-bid':
-      return `${BACKEND_URL}/v1/rental-trip/cancel-rent-bid-driver-or-customer-admin`;
+      return AppUrls.backend.cancelRentBidDriverOrCustomerAdmin;
     case 'rental/update-offer':
-      return `${BACKEND_URL}/v1/rental-trip/update-trip-offer-amount`;
+      return AppUrls.backend.updateTripOfferAmount;
     case 'tracking/driver-location':
-      return `${BACKEND_URL}/v1/customer-driver-track/get`;
+      return AppUrls.backend.customerDriverTrackGet;
     case 'customer/profile':
       return reqMethod === 'GET'
-        ? `${BACKEND_URL}/v1/customer/get-current-customer-user`
-        : `${BACKEND_URL}/v1/customer/profile-update`;
+        ? AppUrls.backend.getCurrentCustomerUser
+        : AppUrls.backend.customerProfileUpdate;
     case 'customer/locations':
       return reqMethod === 'GET'
-        ? `${BACKEND_URL}/v1/customer/get-locations`
-        : `${BACKEND_URL}/v1/customer/save-location`;
+        ? AppUrls.backend.getCustomerLocations
+        : AppUrls.backend.saveCustomerLocation;
     case 'customer/review':
-      return `${BACKEND_URL}/v1/rental-trip/give-review`;
+      return AppUrls.backend.rentalTripGiveReview;
     default:
       return `${BACKEND_URL}/${fullPath}`;
   }

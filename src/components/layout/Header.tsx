@@ -3,10 +3,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Download, Menu, X, Globe, User, LogOut, ChevronDown } from 'lucide-react';
+import { Download, Menu, X, Globe, User, LogOut, ChevronDown, Car, Compass } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { openLoginModal, logout } from '@/redux/features/authSlice';
+import { useActiveTrip } from '@/context/ActiveTripContext';
 
 export const Header: React.FC = () => {
   const pathname = usePathname();
@@ -17,6 +18,7 @@ export const Header: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
   const dispatch = useAppDispatch();
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { activeTrip, bidsCount } = useActiveTrip();
 
   // Close user dropdown on outside click
   useEffect(() => {
@@ -110,6 +112,24 @@ export const Header: React.FC = () => {
               </button>
             </div>
 
+            {/* Active Trip Pill in Header if an active requested trip exists */}
+            {activeTrip && activeTrip.trip_status === 'REQUESTED' && (
+              <Link
+                href={`/trips?trip_uuid=${activeTrip.uuid}`}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold transition-all shadow-xs animate-pulse"
+                title={language === 'bn' ? 'চলমান ট্রিপ রাডার দেখুন' : 'View live bidding radar'}
+              >
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span>
+                  {language === 'bn' ? 'চলমান ট্রিপ' : 'Active Trip'}
+                  {bidsCount > 0 ? ` (${bidsCount})` : ''}
+                </span>
+              </Link>
+            )}
+
             {/* Login Button OR Authenticated User Dropdown */}
             {!isAuthenticated ? (
               <button
@@ -146,6 +166,21 @@ export const Header: React.FC = () => {
                       {user?.email && (
                         <div className="text-[10px] text-slate-400 truncate mt-0.5">{user.email}</div>
                       )}
+                    </div>
+                    <div className="py-2 border-b border-slate-100 space-y-1">
+                      <Link
+                        href="/trips"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full text-left px-2.5 py-2 rounded-lg text-xs font-bold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Car className="w-3.5 h-3.5 text-slate-600" />
+                          <span>{language === 'bn' ? 'আমার ট্রিপসমূহ' : 'My Trips'}</span>
+                        </div>
+                        {activeTrip && activeTrip.trip_status === 'REQUESTED' && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                        )}
+                      </Link>
                     </div>
                     <div className="pt-2">
                       <button

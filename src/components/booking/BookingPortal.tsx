@@ -16,8 +16,9 @@ import { VehiclePriceList } from './VehiclePriceList';
 import { LiveBiddingRadarView } from './LiveBiddingRadarView';
 import { GoogleRouteMap } from './GoogleRouteMap';
 import { useLanguage } from '@/context/LanguageContext';
+import { useActiveTrip } from '@/context/ActiveTripContext';
 import { Badge } from '../common/Badge';
-import { Sparkles, MapPin, Zap } from 'lucide-react';
+import { Sparkles, MapPin, Zap, RefreshCw, PlusCircle } from 'lucide-react';
 
 interface BookingPortalProps {
   isHero?: boolean;
@@ -71,17 +72,64 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
   // 4. Vehicle & Fare state
   const [selectedCar, setSelectedCar] = useState<CarInfo | null>(null);
   const [proposedFare, setProposedFare] = useState<number>(1850);
+  const [note, setNote] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 5. Active submitted trip for live bidding radar
+  const {
+    activeTrip: globalActiveTrip,
+    setActiveTripManually,
+    clearActiveTrip: clearGlobalActiveTrip,
+  } = useActiveTrip();
+  const [hasDismissedRadar, setHasDismissedRadar] = useState(false);
+
   const [activeTrip, setActiveTrip] = useState<{
     uuid: string;
     customerUuid: string;
+    serviceName: string;
     vehicleName: string;
     proposedFare: number;
     pickupAddress: string;
     dropoffAddress: string;
+    hoursBooked?: string;
+    note?: string;
+    createdAt?: string;
   } | null>(null);
+
+  // Auto-resume live bidding radar if an active REQUESTED trip exists on server
+  useEffect(() => {
+    if (
+      globalActiveTrip &&
+      globalActiveTrip.trip_status === 'REQUESTED' &&
+      !activeTrip &&
+      !hasDismissedRadar
+    ) {
+      const pAddress =
+        globalActiveTrip.pickup_locations
+          ?.map((p) => p.address)
+          .filter(Boolean)
+          .join(' → ') || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point');
+      const dAddress =
+        globalActiveTrip.dropoff_locations?.[0]?.address ||
+        (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
+
+      setActiveTrip({
+        uuid: globalActiveTrip.uuid || '',
+        customerUuid:
+          user?.uuid ||
+          localStorage.getItem('trippy_customer_uuid') ||
+          '3810b347-ab60-4004-891d-81060cf4135c',
+        serviceName: globalActiveTrip.service_name || 'RIDE_SHARE',
+        vehicleName: globalActiveTrip.car_category?.car_type || 'Vehicle',
+        proposedFare: globalActiveTrip.offer_amount || 0,
+        pickupAddress: pAddress,
+        dropoffAddress: dAddress,
+        hoursBooked: globalActiveTrip.hours_booked || undefined,
+        note: globalActiveTrip.note || undefined,
+        createdAt: globalActiveTrip.created_at,
+      });
+    }
+  }, [globalActiveTrip, activeTrip, hasDismissedRadar, user, isBn]);
 
   // Fetch real-time services from /rental-info
   useEffect(() => {
@@ -135,7 +183,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     }
 
     if (!selectedCar) {
-      alert('অনুগ্রহ করে একটি গাড়ি নির্বাচন করুন।');
+      alert(isBn ? 'অনুগ্রহ করে একটি গাড়ি নির্বাচন করুন।' : 'Please select a vehicle.');
       return;
     }
 
@@ -148,17 +196,47 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       .filter((id) => id && id.trim().length > 0);
 
     if (validPickups.length === 0 || validDropoffs.length === 0) {
-      alert('অনুগ্রহ করে পিকআপ ও ড্রপঅফ লোকেশন নির্বাচন করুন।');
+      alert(
+        isBn
+          ? 'অনুগ্রহ করে পিকআপ ও ড্রপঅফ লোকেশন নির্বাচন করুন।'
+          : 'Please select valid pickup and dropoff locations.'
+      );
       return;
     }
 
-    if (selectedService === 'RETURN' && (!endDatetime || !endDatetime.trim())) {
-      alert(
-        isBn
-          ? 'রিটার্ন ট্রিপের জন্য অনুগ্রহ করে ফেরার তারিখ ও সময় (end_datetime) প্রদান করুন।'
-          : 'Please provide return date and time (end_datetime) for round trip.'
-      );
-      return;
+    // Lead time validation for non-RIDE_SHARE services (at least 2 hours in advance)
+    if (selectedService !== 'RIDE_SHARE') {
+      const minLeadTime = Date.now() + 105 * 60 * 1000; // ~1h 45m min
+      const startTs = new Date(startDatetime.replace(' ', 'T')).getTime();
+      if (!isNaN(startTs) && startTs < minLeadTime) {
+        alert(
+          isBn
+            ? 'ইন্টারসিটি বা শিডিউল করা ট্রিপের জন্য শুরু করার সময় বর্তমান সময় থেকে কমপক্ষে ২ ঘন্টা পরের হতে হবে।'
+            : 'For non-rideshare trips, scheduled departure must be at least 2 hours from now.'
+        );
+        return;
+      }
+    }
+
+    if (selectedService === 'RETURN') {
+      if (!endDatetime || !endDatetime.trim()) {
+        alert(
+          isBn
+            ? 'রিটার্ন ট্রিপের জন্য অনুগ্রহ করে ফেরার তারিখ ও সময় (end_datetime) প্রদান করুন।'
+            : 'Please provide return date and time (end_datetime) for round trip.'
+        );
+        return;
+      }
+      const startTs = new Date(startDatetime.replace(' ', 'T')).getTime();
+      const endTs = new Date(endDatetime.replace(' ', 'T')).getTime();
+      if (endTs <= startTs) {
+        alert(
+          isBn
+            ? 'ফেরার সময় অবশ্যই যাত্রার শুরুর সময়ের পরের হতে হবে।'
+            : 'Return date and time must be later than departure time.'
+        );
+        return;
+      }
     }
 
     const priceSet = selectedCar.price_sets?.[0];
@@ -180,7 +258,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       service_name: selectedService,
       start_datetime: startDatetime,
       ...(selectedService === 'RETURN' ? { end_datetime: endDatetime } : {}),
-      ...(selectedService === 'HOURLY' ? { hours_booked: hoursBooked } : {}),
+      ...(selectedService === 'HOURLY' ? { hours_booked: hoursBooked || '4' } : {}),
       payment_method: 'CASH',
       customer_uuid: customerUuid,
       country_code: 'BD',
@@ -190,36 +268,54 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       dropoff_location_uuid: validDropoffs,
       price_set_uuid: priceSet.uuid,
       offer_ammount: proposedFare,
+      ...(note.trim() ? { note: note.trim() } : {}),
     };
 
     const res = await customerTripService.createRentalTrip(payload);
     setIsSubmitting(false);
 
-    if (res.status) {
-      const tripUuid = res.data?.uuid || `trip-${Date.now()}`;
-      setActiveTrip({
-        uuid: tripUuid,
-        customerUuid,
-        vehicleName: selectedCar.car_type,
-        proposedFare,
-        pickupAddress: pickupLocations[0]?.address || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point'),
-        dropoffAddress: dropoffLocations[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point'),
-      });
-    } else {
-      const fallbackTripUuid = `trip-${Date.now()}`;
-      setActiveTrip({
-        uuid: fallbackTripUuid,
-        customerUuid,
-        vehicleName: selectedCar.car_type,
-        proposedFare,
-        pickupAddress: pickupLocations[0]?.address || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point'),
-        dropoffAddress: dropoffLocations[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point'),
-      });
-    }
+    const formattedPickup =
+      pickupLocations
+        .filter((p) => p.address)
+        .map((p) => p.address)
+        .join(' → ') || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point');
+    const formattedDropoff =
+      dropoffLocations[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
+
+    const tripData = {
+      uuid: res.status && res.data?.uuid ? res.data.uuid : `trip-${Date.now()}`,
+      customerUuid,
+      serviceName: selectedService,
+      vehicleName: selectedCar.car_type,
+      proposedFare,
+      pickupAddress: formattedPickup,
+      dropoffAddress: formattedDropoff,
+      hoursBooked: selectedService === 'HOURLY' ? hoursBooked : undefined,
+      note: note.trim() || undefined,
+      createdAt: res.data?.created_at || new Date().toISOString(),
+    };
+
+    setActiveTrip(tripData);
+
+    // Sync globally so the global overlay and active trip context reflect the new request
+    setActiveTripManually({
+      uuid: tripData.uuid,
+      service_name: selectedService,
+      offer_amount: proposedFare,
+      trip_status: 'REQUESTED',
+      pickup_locations: [{ address: formattedPickup, uuid: validPickups[0] }],
+      dropoff_locations: [{ address: formattedDropoff, uuid: validDropoffs[0] }],
+      car_category: { car_type: selectedCar.car_type },
+      hours_booked: selectedService === 'HOURLY' ? hoursBooked : undefined,
+      note: note.trim() || undefined,
+      created_at: tripData.createdAt,
+      drivers: [],
+    } as any);
   };
 
+
   return (
-    <div className={isHero ? 'py-4 bg-transparent' : 'py-8 bg-slate-50/60 min-h-screen'}>
+    <div id="booking-top" className={isHero ? 'py-4 bg-transparent' : 'py-8 bg-slate-50/60 min-h-screen scroll-mt-24'}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Header Banner */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -270,15 +366,50 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
 
         {/* Live Bidding Radar View (When trip offer is active) */}
         {activeTrip ? (
-          <LiveBiddingRadarView
-            tripUuid={activeTrip.uuid}
-            customerUuid={activeTrip.customerUuid}
-            proposedFare={activeTrip.proposedFare}
-            pickupAddress={activeTrip.pickupAddress}
-            dropoffAddress={activeTrip.dropoffAddress}
-            vehicleName={activeTrip.vehicleName}
-            onCancelTrip={() => setActiveTrip(null)}
-          />
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 text-white rounded-2xl px-5 py-3 shadow-md border border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-bold text-slate-200">
+                  {isBn
+                    ? 'আপনার চলমান রাইড রিকোয়েস্টের বিডিং রাডার চালু আছে।'
+                    : 'Active trip request live bidding radar is open.'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setHasDismissedRadar(true);
+                  setActiveTrip(null);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold transition-all border border-slate-700 shadow-xs"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{isBn ? 'নতুন রাইড খুঁজুন' : 'New Ride Search'}</span>
+              </button>
+            </div>
+
+            <LiveBiddingRadarView
+              tripUuid={activeTrip.uuid}
+              customerUuid={activeTrip.customerUuid}
+              serviceName={activeTrip.serviceName}
+              proposedFare={activeTrip.proposedFare}
+              pickupAddress={activeTrip.pickupAddress}
+              dropoffAddress={activeTrip.dropoffAddress}
+              vehicleName={activeTrip.vehicleName}
+              hoursBooked={activeTrip.hoursBooked}
+              note={activeTrip.note}
+              createdAt={activeTrip.createdAt}
+              onCancelTrip={() => {
+                setActiveTrip(null);
+                clearGlobalActiveTrip();
+              }}
+            />
+          </div>
         ) : (
           /* Two-Column Responsive Layout: Left Controls, Right Sticky Google Map */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -329,7 +460,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
               )}
 
 
-              {/* 4. Vehicles Horizontal Slider & Fare Proposer */}
+              {/* 4. Vehicles Horizontal Slider, Note Field & Fare Proposer */}
               <VehiclePriceList
                 serviceName={selectedService}
                 serviceCategory={services[selectedService] || null}
@@ -347,7 +478,10 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
                 isSubmitting={isSubmitting}
                 isAuthenticated={isAuthenticated}
                 onRequestLogin={() => dispatch(openLoginModal())}
+                note={note}
+                onChangeNote={(val) => setNote(val)}
               />
+
 
 
             </div>

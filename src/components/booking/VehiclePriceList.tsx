@@ -44,7 +44,11 @@ interface VehiclePriceListProps {
   isAuthenticated?: boolean;
   /** Called when a login is needed before fetching prices */
   onRequestLogin?: () => void;
+  /** Optional customer note for driver */
+  note?: string;
+  onChangeNote?: (note: string) => void;
 }
+
 
 const CAR_DISPLAY_NAMES: Record<string, { bn: string; en: string; descBn: string; descEn: string }> = {
   MOTOR_CYCLE:       { bn: 'মোটরসাইকেল',              en: 'Motorcycle',             descBn: 'শহরের জ্যাম এড়িয়ে একা দ্রুত চলার জন্য', descEn: 'Quick solo rides bypassing traffic' },
@@ -73,6 +77,8 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
   isSubmitting = false,
   isAuthenticated = false,
   onRequestLogin,
+  note = '',
+  onChangeNote,
 }) => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
@@ -710,6 +716,50 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
                     : `Estimated fare ${formatFare(sysMinFare)} is the minimum. To attract drivers faster, you can increase your offer up to 100% (max ${formatFare(offerMax)}).`}
                 </span>
               </div>
+
+              {/* Special Note for Driver (User requested field) */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>{isBn ? 'ড্রাইভারের জন্য বিশেষ নোট (ঐচ্ছিক):' : 'Special Note for Driver (Optional):'}</span>
+                  </label>
+                  <span className="text-[10px] font-mono text-slate-400">{note?.length || 0}/120</span>
+                </div>
+                <input
+                  type="text"
+                  maxLength={120}
+                  value={note || ''}
+                  onChange={(e) => onChangeNote?.(e.target.value)}
+                  placeholder={
+                    isBn
+                      ? 'যেমন: এসি চালু রাখবেন, ২টি লাগেজ সাথে আছে, পৌঁছানোর আগে কল করবেন...'
+                      : 'e.g. Please keep AC on, have 2 suitcases, please call before arrival...'
+                  }
+                  className="w-full text-xs font-semibold text-slate-900 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-black focus:ring-1 focus:ring-black/10 transition-all placeholder:text-slate-400 shadow-2xs"
+                />
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {[
+                    { bn: '❄️ এসি চালু রাখবেন', en: '❄️ Keep AC on' },
+                    { bn: '🧳 লাগেজ আছে', en: '🧳 Have luggage' },
+                    { bn: '📞 পৌঁছানোর আগে কল দিন', en: '📞 Call before arrival' },
+                    { bn: '🤫 শান্ত যাত্রা চাই', en: '🤫 Quiet ride' },
+                  ].map((chip) => (
+                    <button
+                      key={chip.en}
+                      type="button"
+                      onClick={() => {
+                        const chipText = isBn ? chip.bn : chip.en;
+                        const next = note ? `${note}, ${chipText}` : chipText;
+                        onChangeNote?.(next.slice(0, 120));
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-medium text-slate-600 hover:bg-slate-100 hover:text-black transition-colors shadow-2xs"
+                    >
+                      {isBn ? chip.bn : chip.en}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
 
               {/* Submit button */}
               <button

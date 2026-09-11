@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { LocationSearchResult } from '@/types/customerApi';
 import { useLanguage } from '@/context/LanguageContext';
 import { MapPin, Navigation, Route, Sparkles, ZoomIn, ZoomOut, Locate } from 'lucide-react';
+import { GOOGLE_MAPS_API_KEY } from '@/config/appUrls';
 
 declare global {
   interface Window {
@@ -22,8 +23,6 @@ interface GoogleRouteMapProps {
   ) => void;
   className?: string;
 }
-
-const GOOGLE_MAPS_API_KEY = 'AIzaSyAYf-MPMgwHhXT2h-kKSchXFH5GiwuURcw';
 
 // Bangladesh center fallback
 const DEFAULT_CENTER = { lat: 23.8103, lng: 90.4125 }; // Dhaka

@@ -90,6 +90,14 @@ export interface TripPriceDetailsResponse {
   data: any;
 }
 
+export interface LocationModel {
+  uuid?: string;
+  address?: string;
+  latitude?: string | number;
+  longitude?: string | number;
+  place_id?: string;
+}
+
 export interface CreateRentalTripPayload {
   service_name: string;
   start_datetime: string;
@@ -110,15 +118,38 @@ export interface CreateRentalTripPayload {
 
 export interface RentalDriverBid {
   uuid?: string;
+  rent_bid_uuid?: string;
+  rentBidUuid?: string;
   driver_uuid?: string;
+  driverUuid?: string;
+  name?: string;
   driver_name?: string;
+  email?: string;
+  phone?: string;
   driver_phone?: string;
+  profile_picture?: string;
+  profilePicture?: string;
   driver_photo?: string;
+  country_code?: string;
+  is_active?: string | boolean;
+  bid_status?: string;
+  has_bid?: boolean;
+  car_photos?: string[];
+  carPhotos?: string[];
+  total_completed_trips?: number;
+  totalCompletedTrips?: number;
+  average_rating?: number;
+  averageRating?: number;
+  rating?: number;
+  car_reg_number?: string;
+  carRegNumber?: string;
+  car_plate?: string;
   car_model?: string;
   car_color?: string;
-  car_plate?: string;
-  rating?: number;
   bid_amount: number;
+  total_amount?: number;
+  insurance_charge_amount?: number;
+  customer_discount_amount?: number;
   time_away_mins?: number;
   created_at?: string;
 }
@@ -134,5 +165,32 @@ export interface RentalTrip {
   start_datetime?: string;
   end_datetime?: string;
   created_at?: string;
+  country_code?: string;
+  hours_booked?: string | null;
+  note?: string | null;
+  accepted_bid_uuid?: string | null;
+  accepted_driver?: RentalDriverBid | null;
+  pickup_locations?: LocationModel[];
+  dropoff_locations?: LocationModel[];
   drivers?: RentalDriverBid[];
+  car_category?: {
+    uuid?: string;
+    car_type?: string;
+    set_capacity?: number | string;
+    car_avatar?: string;
+  };
+  car_service?: {
+    uuid?: string;
+    service_name?: string;
+    avatar?: string;
+  };
+  price_info?: {
+    uuid?: string;
+    price_per_km?: number;
+    minimum_booking_price?: number;
+    waiting_price?: number;
+    cancellation_fee?: number;
+    busy_time_percentage?: number;
+  };
 }
+

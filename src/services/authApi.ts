@@ -5,14 +5,15 @@ import {
   SendOtpSuccessData,
   LoginSuccessData,
 } from '@/types/auth';
+import { AppUrls, API_BASE_URL } from '@/config/appUrls';
 
-export const API_BASE_URL = 'http://3.209.161.158/api';
+export { API_BASE_URL };
 
 export const ENDPOINTS = {
-  SEND_OTP: '/v1/customer/send-otp-for-signup-or-login',
-  VERIFY_OTP: '/v1/customer/otp-verification-with-login',
-  PROXY_SEND_OTP: '/api/auth/send-otp',
-  PROXY_VERIFY_OTP: '/api/auth/verify-otp',
+  SEND_OTP: AppUrls.backend.sendOtpCustomer,
+  VERIFY_OTP: AppUrls.backend.verifyOtpCustomer,
+  PROXY_SEND_OTP: AppUrls.proxy.sendOtp,
+  PROXY_VERIFY_OTP: AppUrls.proxy.verifyOtp,
 };
 
 /**
@@ -23,7 +24,8 @@ export const ENDPOINTS = {
 export async function sendOtpApi(
   payload: SendOtpPayload
 ): Promise<AuthResponse<SendOtpSuccessData>> {
-  const response = await fetch(ENDPOINTS.PROXY_SEND_OTP, {
+  const response = await fetch(AppUrls.proxy.sendOtp, {
+
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

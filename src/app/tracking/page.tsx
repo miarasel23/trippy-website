@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { TrackingPortal } from '@/components/tracking/TrackingPortal';
 
@@ -9,5 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default function TrackingPage() {
-  return <TrackingPortal />;
+  return (
+    <Suspense fallback={<div className="py-20 text-center font-bold text-slate-500">Loading live tracking...</div>}>
+      <TrackingPortal />
+    </Suspense>
+  );
 }
+

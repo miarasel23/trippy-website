@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { AppUrls } from '@/config/appUrls';
 
-const BACKEND_URL = 'http://3.209.161.158/api/v1/customer/send-otp-for-signup-or-login';
+const BACKEND_URL = AppUrls.backend.sendOtpCustomer;
 
 export async function POST(req: NextRequest) {
   try {

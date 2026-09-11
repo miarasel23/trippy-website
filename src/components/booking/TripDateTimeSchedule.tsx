@@ -71,22 +71,32 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
 
   const isReturn = serviceType === 'RETURN';
   const isHourly = serviceType === 'HOURLY';
+  const isRideShare = serviceType === 'RIDE_SHARE';
 
-  const [activePreset, setActivePreset] = React.useState<'now' | 'today_evening' | 'tomorrow_morning' | null>(null);
+  // Minimum allowed start time: now for RIDE_SHARE, or now + 2 hours for all scheduled services
+  const minLeadMs = isRideShare ? 0 : 2 * 3600 * 1000;
+  const minAllowedDate = new Date(Date.now() + minLeadMs);
 
-  const setQuickSchedule = (type: 'now' | 'today_evening' | 'tomorrow_morning') => {
+  const [activePreset, setActivePreset] = React.useState<'earliest' | 'today_evening' | 'tomorrow_morning' | null>(null);
+
+  const setQuickSchedule = (type: 'earliest' | 'today_evening' | 'tomorrow_morning') => {
     setActivePreset(type);
     const now = new Date();
-    if (type === 'now') {
-      onChangeStartDatetime(formatDateTimeToApi(now));
+    if (type === 'earliest') {
+      const earliest = new Date(now.getTime() + minLeadMs);
+      onChangeStartDatetime(formatDateTimeToApi(earliest));
       if (isReturn) {
-        const later = new Date(now.getTime() + 8 * 3600 * 1000);
+        const later = new Date(earliest.getTime() + 8 * 3600 * 1000);
         onChangeEndDatetime(formatDateTimeToApi(later));
       }
     } else if (type === 'today_evening') {
       const evening = new Date();
       evening.setHours(18, 0, 0, 0);
-      if (evening < now) evening.setDate(evening.getDate() + 1);
+      // Ensure it respects 2-hour lead time
+      const minDate = new Date(now.getTime() + minLeadMs);
+      if (evening < minDate) {
+        evening.setDate(evening.getDate() + 1);
+      }
       onChangeStartDatetime(formatDateTimeToApi(evening));
       if (isReturn) {
         const later = new Date(evening.getTime() + 10 * 3600 * 1000);
@@ -104,11 +114,19 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
     }
   };
 
-  const presets: { key: 'now' | 'today_evening' | 'tomorrow_morning'; label: string; labelBn: string }[] = [
-    { key: 'now',              label: '⚡ Ride Now',                   labelBn: '⚡ এখনই যাত্রা' },
+  const presets: { key: 'earliest' | 'today_evening' | 'tomorrow_morning'; label: string; labelBn: string }[] = [
+    {
+      key: 'earliest',
+      label: isRideShare ? '⚡ Ride Now' : '⏱️ Earliest (+2 Hours)',
+      labelBn: isRideShare ? '⚡ এখনই যাত্রা' : '⏱️ দ্রুততম (২ ঘন্টা পর)',
+    },
     { key: 'today_evening',    label: '🌆 This Evening (6:00 PM)',     labelBn: '🌆 আজ সন্ধ্যায় (৬:০০ PM)' },
     { key: 'tomorrow_morning', label: '🌅 Tomorrow Morning (9:00 AM)', labelBn: '🌅 কাল সকালে (৯:০০ AM)' },
   ];
+
+  // Helper check if selected start time is less than 2 hours for scheduled rides
+  const isStartTimeTooEarly = !isRideShare && startDatetime && new Date(startDatetime.replace(' ', 'T')).getTime() < (Date.now() + 110 * 60 * 1000);
+
 
   const startDisplay = formatDisplayLabel(startDatetime);
   const endDisplay   = formatDisplayLabel(endDatetime);
@@ -232,6 +250,17 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
         )}
       </div>
 
+      {isStartTimeTooEarly && (
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-xl px-3 py-2">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
+          <span>
+            {isBn
+              ? 'নোট: ইন্টারসিটি/রিটার্ন ট্রিপের জন্য শিডিউল কমপক্ষে বর্তমান সময় থেকে ২ ঘন্টা পরের হতে হবে।'
+              : 'Notice: Non-rideshare services require departure scheduled at least 2 hours in advance.'}
+          </span>
+        </div>
+      )}
+
       {isReturn && !endDatetime && (
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -247,3 +276,4 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
 };
 
 export default TripDateTimeSchedule;
+

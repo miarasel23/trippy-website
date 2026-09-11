@@ -2,12 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
+
 import { Badge } from '../common/Badge';
 import { Share2, Phone, AlertTriangle, ShieldCheck, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 export const TrackingPortal: React.FC = () => {
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
+  const tripUuidParam = searchParams.get('trip_uuid');
+  const driverUuidParam = searchParams.get('driver_uuid');
+
   const [speed, setSpeed] = useState(48);
   const [etaMinutes, setEtaMinutes] = useState(18);
   const [progress, setProgress] = useState(70);
@@ -36,6 +42,10 @@ export const TrackingPortal: React.FC = () => {
     }
   };
 
+  const displayTripId = tripUuidParam
+    ? `#${tripUuidParam.slice(0, 8).toUpperCase()}`
+    : '#TRP-849201';
+
   return (
     <div className="py-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -51,9 +61,10 @@ export const TrackingPortal: React.FC = () => {
               {t.tracking.title}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              {t.tracking.sharedTripLabel} <span className="text-slate-900 font-mono font-bold">#TRP-849201</span> • {t.tracking.foregroundStream}
+              {t.tracking.sharedTripLabel} <span className="text-slate-900 font-mono font-bold">{displayTripId}</span> • {t.tracking.foregroundStream}
             </p>
           </div>
+
 
           <div className="flex items-center gap-3">
             <div className="px-4 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-900 font-extrabold text-xs sm:text-sm tracking-wide font-heading">

@@ -7,14 +7,10 @@ import {
   CreateRentalTripPayload,
   RentalTrip,
 } from '@/types/customerApi';
+import { AppUrls, getImageUrl, IMAGE_BASE_URL } from '@/config/appUrls';
 
-export const BACKEND_IMAGE_BASE = 'http://3.209.161.158/api/assets/uploads/images';
-
-export function getImageUrl(path: string | null | undefined): string {
-  if (!path) return '/images/car-placeholder.png';
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  return `${BACKEND_IMAGE_BASE}/${path}`;
-}
+export { getImageUrl, IMAGE_BASE_URL, AppUrls };
+export const BACKEND_IMAGE_BASE = IMAGE_BASE_URL;
 
 function getStoredAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -23,6 +19,24 @@ function getStoredAuthToken(): string | null {
     localStorage.getItem('tripyy_auth_token')
   );
 }
+
+export function getActiveCustomerUuid(): string {
+  if (typeof window === 'undefined') return '3810b347-ab60-4004-891d-81060cf4135c';
+  try {
+    const userStr =
+      localStorage.getItem('trippy_auth_user') ||
+      localStorage.getItem('tripyy_auth_user');
+    if (userStr) {
+      const u = JSON.parse(userStr);
+      if (u?.uuid) return u.uuid;
+    }
+  } catch {}
+  return (
+    localStorage.getItem('trippy_customer_uuid') ||
+    '3810b347-ab60-4004-891d-81060cf4135c'
+  );
+}
+
 
 export const customerTripService = {
   /**
@@ -35,7 +49,7 @@ export const customerTripService = {
     if (!query || query.trim().length < 2) return [];
 
     try {
-      const res = await fetch('/api/v1/global-api/search-location', {
+      const res = await fetch(AppUrls.proxy.searchLocation, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +79,7 @@ export const customerTripService = {
   ): Promise<Record<string, ServiceCategory> | null> {
     try {
       const res = await fetch(
-        `/api/v1/rental-trip/rental-info?platform=web&language_code=${languageCode}&action_when=admin_login`
+        `${AppUrls.proxy.rentalInfo}?platform=web&language_code=${languageCode}&action_when=admin_login`
       );
       if (!res.ok) return null;
       const json: RentalInfoResponse = await res.json();
@@ -92,7 +106,7 @@ export const customerTripService = {
         headers.Authorization = `Bearer ${authToken}`;
       }
 
-      const res = await fetch('/api/v1/rental-trip/trip-price-details-customer', {
+      const res = await fetch(AppUrls.proxy.tripPriceDetails, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -130,7 +144,7 @@ export const customerTripService = {
       headers.Authorization = `Bearer ${authToken}`;
     }
 
-    const res = await fetch('/api/v1/rental-trip/create-rental-trip', {
+    const res = await fetch(AppUrls.proxy.createRentalTrip, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -159,7 +173,7 @@ export const customerTripService = {
     }
 
     try {
-      const url = `/api/v1/rental-trip/rental-bid-trip-list_for_customer?platform=web&language_code=${languageCode}&customer_uuid=${customerUuid}&trip_status=${tripStatus}&action_when=rental_bid_trip_list_for_customer`;
+      const url = `${AppUrls.proxy.rentalBids}?platform=web&language_code=${languageCode}&customer_uuid=${customerUuid}&trip_status=${tripStatus}&action_when=rental_bid_trip_list_for_customer`;
       const res = await fetch(url, { headers });
       if (!res.ok) return [];
       const json = await res.json();
@@ -172,6 +186,24 @@ export const customerTripService = {
       return [];
     }
   },
+
+  /**
+   * Fetches the current active REQUESTED trip for a customer
+   */
+  async fetchActiveRequestedTrip(
+    customerUuid?: string,
+    languageCode = 'bn',
+    token?: string
+  ): Promise<RentalTrip | null> {
+    const targetUuid = customerUuid || getActiveCustomerUuid();
+    const trips = await this.fetchBids(targetUuid, languageCode, 'REQUESTED', token);
+    if (trips && trips.length > 0) {
+      const active = trips.find((t) => t.trip_status === 'REQUESTED') || trips[0];
+      return active || null;
+    }
+    return null;
+  },
+
 
   /**
    * Accepts a driver's counter-offer bid
@@ -191,7 +223,7 @@ export const customerTripService = {
       headers.Authorization = `Bearer ${authToken}`;
     }
 
-    const res = await fetch('/api/v1/rental-trip/accept_trip_for_customer', {
+    const res = await fetch(AppUrls.proxy.acceptTrip, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -226,7 +258,7 @@ export const customerTripService = {
     }
 
     const res = await fetch(
-      '/api/v1/rental-trip/cancel-trip-driver-or-customer-admin',
+      AppUrls.proxy.cancelTrip,
       {
         method: 'POST',
         headers,
@@ -261,19 +293,60 @@ export const customerTripService = {
       headers.Authorization = `Bearer ${authToken}`;
     }
 
-    const res = await fetch('/api/v1/rental-trip/update-trip-offer-amount', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        platform: 'web',
-        customer_uuid: customerUuid,
-        trip_uuid: tripUuid,
-        offer_ammount: offerAmount,
-        language_code: languageCode,
-        action_when: 'update_trip_offer_amount',
-      }),
-    });
+    try {
+      const res = await fetch(AppUrls.proxy.updateTripOfferAmount, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          platform: 'web',
+          customer_uuid: customerUuid,
+          trip_uuid: tripUuid,
+          offer_ammount: typeof offerAmount === 'string' ? parseFloat(offerAmount) || 0 : offerAmount,
+          language_code: languageCode,
+          action_when: 'update_trip_offer_amount',
+        }),
+      });
 
-    return await res.json();
+      return await res.json();
+    } catch (err: any) {
+      return { status: false, message: err?.message || 'Failed to update offer amount' };
+    }
+  },
+
+  /**
+   * Declines / cancels a driver's bid
+   */
+  async cancelRentBid(
+    bidUuid: string,
+    comment = 'system decline',
+    languageCode = 'bn',
+    token?: string
+  ): Promise<{ status: boolean; message: string }> {
+    const authToken = token || getStoredAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
+    try {
+      const res = await fetch(AppUrls.proxy.cancelRentBid, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          platform: 'web',
+          language_code: languageCode,
+          action_when: 'cancel_rent_bid_driver_or_customer_admin',
+          bid_uuid: bidUuid,
+          comment: comment || 'system decline',
+        }),
+      });
+
+      return await res.json();
+    } catch (err: any) {
+      return { status: false, message: err?.message || 'Failed to decline bid' };
+    }
   },
 };
+

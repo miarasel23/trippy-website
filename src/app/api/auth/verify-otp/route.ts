@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { AppUrls } from '@/config/appUrls';
 
-const BACKEND_URL = 'http://3.209.161.158/api/v1/customer/otp-verification-with-login';
+const BACKEND_URL = AppUrls.backend.verifyOtpCustomer;
 
 export async function POST(req: NextRequest) {
   try {

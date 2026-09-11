@@ -7,6 +7,8 @@ import { LanguageProvider } from '@/context/LanguageContext';
 import { ReduxProvider } from '@/redux/provider';
 import { AuthPromptManager } from '@/components/auth/AuthPromptManager';
 import { LoginModal } from '@/components/auth/LoginModal';
+import { ActiveTripProvider } from '@/context/ActiveTripContext';
+import { ActiveTripGlobalOverlay } from '@/components/booking/ActiveTripGlobalOverlay';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -80,13 +82,16 @@ export default function RootLayout({
       <body className="bg-white text-slate-900 font-body min-h-screen flex flex-col antialiased">
         <LanguageProvider>
           <ReduxProvider>
-            <AuthPromptManager />
-            <LoginModal />
-            <Header />
-            <main className="flex-1">
-              {children}
-            </main>
-            <Footer />
+            <ActiveTripProvider>
+              <AuthPromptManager />
+              <LoginModal />
+              <Header />
+              <main className="flex-1">
+                {children}
+              </main>
+              <Footer />
+              <ActiveTripGlobalOverlay />
+            </ActiveTripProvider>
           </ReduxProvider>
         </LanguageProvider>
       </body>

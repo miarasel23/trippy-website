@@ -8,9 +8,7 @@ import { FLEET_VEHICLES, VehicleKey } from '@/types/fleet';
 import { DriverBid } from '@/types/booking';
 import { ArrowRight, Check, X, MapPin, Navigation, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-
-const BASE_URL = 'http://3.209.161.158/api';
-const IMAGE_BASE_URL = `${BASE_URL}/assets/uploads/images/`;
+import { AppUrls, getImageUrl } from '@/config/appUrls';
 
 interface ApiCarItem {
   uuid: string;
@@ -112,7 +110,7 @@ export const HeroBookingWidget: React.FC = () => {
     const fetchRentalInfo = async () => {
       try {
         const res = await fetch(
-          '/api/v1/rental-trip/rental-info?platform=web&language_code=bn&action_when=admin_login'
+          `${AppUrls.proxy.rentalInfo}?platform=web&language_code=bn&action_when=admin_login`
         );
         if (!res.ok) return;
         const json = await res.json();
@@ -223,7 +221,7 @@ export const HeroBookingWidget: React.FC = () => {
       <div className="flex bg-slate-100 p-1.5 rounded-xl gap-1.5 mb-5 border border-slate-200 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {serviceList.map((srv) => {
           const isSelected = selectedService === srv.key;
-          const avatarUrl = srv.avatar ? `${IMAGE_BASE_URL}${srv.avatar}` : null;
+          const avatarUrl = srv.avatar ? getImageUrl(srv.avatar) : null;
           return (
             <button
               key={srv.key}
@@ -309,7 +307,7 @@ export const HeroBookingWidget: React.FC = () => {
             {activeCars.slice(0, 4).map((car, idx) => {
               const isSelected = selectedCarIndex === idx;
               const carTitle = CAR_NAMES[car.car_type] || car.car_type.replace(/_/g, ' ');
-              const carAvatarUrl = car.car_avatar ? `${IMAGE_BASE_URL}${car.car_avatar}` : null;
+              const carAvatarUrl = car.car_avatar ? getImageUrl(car.car_avatar) : null;
               return (
                 <button
                   key={car.uuid || idx}
