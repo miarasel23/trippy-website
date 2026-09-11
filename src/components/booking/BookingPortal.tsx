@@ -235,9 +235,6 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
                   ? 'First Direct Driver Bidding Platform in Bangladesh'
                   : 'Live Trip Booking & Route Map'}
               </Badge>
-              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                Platform: Web
-              </span>
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight font-heading">
               {isBn
