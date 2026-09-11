@@ -239,24 +239,24 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     setIsGalleryOpen(true);
   };
 
-  // Decline / Hide a Driver Bid
-  const handleDeclineBid = async (
-    bid: RentalDriverBid,
-    comment = 'system decline'
-  ) => {
-    const bidUuid =
-      bid.rent_bid_uuid ||
-      bid.rentBidUuid ||
-      bid.uuid ||
-      bid.driver_uuid ||
-      bid.driverUuid ||
-      '';
+  // Decline / Hide a Driver Bid (Calls /v1/rental-trip/cancel-rent-bid-driver-or-customer-admin)
+  const handleDeclineBid = useCallback(
+    async (bid: RentalDriverBid, comment = 'system decline') => {
+      const bidUuid =
+        bid.rent_bid_uuid ||
+        bid.rentBidUuid ||
+        bid.uuid ||
+        bid.driver_uuid ||
+        bid.driverUuid ||
+        '';
 
-    if (bidUuid) {
-      setHiddenBidUuids((prev) => new Set(prev).add(bidUuid));
-      await customerTripService.cancelRentBid(bidUuid, comment, language);
-    }
-  };
+      if (bidUuid) {
+        setHiddenBidUuids((prev) => new Set(prev).add(bidUuid));
+        await customerTripService.cancelRentBid(bidUuid, comment, language);
+      }
+    },
+    [language]
+  );
 
   // Filter out hidden bids
   const visibleBids = bids.filter((b) => {
@@ -483,7 +483,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                 tripCreatedAt={tripCreatedAt}
                 isBn={isBn}
                 isCurrentAccepting={Boolean(isCurrentAccepting)}
-                onDecline={(b, comment) => handleDeclineBid(b, comment)}
+                onDecline={handleDeclineBid}
                 onAccept={(b) => setBidToAccept(b)}
                 onOpenGallery={(b) => handleOpenGallery(b)}
               />
@@ -854,34 +854,43 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
 
   // 40 seconds duration for bid acceptance progress bar
   const totalDurationSeconds = 40;
-
-  const bidCreatedAt =
-    bid.created_at || (bid as any).createdAt || tripCreatedAt || new Date().toISOString();
   const hasExpiredRef = useRef(false);
 
-  const parseStartTs = () => {
-    if (!bidCreatedAt) return Date.now();
-    try {
-      const ts = new Date(bidCreatedAt).getTime();
-      return isNaN(ts) ? Date.now() : ts;
-    } catch {
-      return Date.now();
-    }
-  };
+  // Stable persistent start timestamp for this bid card (does not reset on parent re-renders)
+  const startTsRef = useRef<number>(Date.now());
+  const onDeclineRef = useRef(onDecline);
+  const bidRef = useRef(bid);
 
-  const [progressFraction, setProgressFraction] = useState<number>(() => {
-    const startTs = parseStartTs();
-    const elapsedMs = Math.max(0, Date.now() - startTs);
-    return Math.min(1, Math.max(0, elapsedMs / (totalDurationSeconds * 1000)));
+  useEffect(() => {
+    onDeclineRef.current = onDecline;
+    bidRef.current = bid;
   });
 
-  // Smooth progress bar update every 100ms
+  // Calculate start timestamp if bid has a fresh createdAt within the last 40 seconds
   useEffect(() => {
-    const startTs = parseStartTs();
+    const raw = bid.created_at || (bid as any).createdAt;
+    if (raw) {
+      try {
+        const formatted =
+          typeof raw === 'string' && !raw.includes('T') ? raw.replace(' ', 'T') : raw;
+        const ts = new Date(formatted).getTime();
+        const diff = Date.now() - ts;
+        if (!isNaN(ts) && diff >= 0 && diff < totalDurationSeconds * 1000) {
+          startTsRef.current = ts;
+        }
+      } catch {
+        // preserve current mount time
+      }
+    }
+  }, [bid.created_at]);
 
+  const [progressFraction, setProgressFraction] = useState<number>(0);
+
+  // Smooth progress bar update every 100ms; triggers decline API when 40s finishes
+  useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
-      const elapsedMs = Math.max(0, now - startTs);
+      const elapsedMs = Math.max(0, now - startTsRef.current);
       const totalMs = totalDurationSeconds * 1000;
       const frac = Math.min(1, Math.max(0, elapsedMs / totalMs));
 
@@ -891,12 +900,12 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
         hasExpiredRef.current = true;
         clearInterval(interval);
         // Automatically call cancel-rent-bid-driver-or-customer-admin when 40s timer completes
-        onDecline(bid, 'system decline');
+        onDeclineRef.current(bidRef.current, 'system decline');
       }
     }, 100);
 
     return () => clearInterval(interval);
-  }, [totalDurationSeconds, bidCreatedAt, onDecline, bid]);
+  }, [totalDurationSeconds]);
 
   const rawAmount =
     bid.total_amount ??
@@ -1003,28 +1012,28 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
         <button
           type="button"
           onClick={() => onDecline(bid, 'Customer declined bid')}
-          className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm border border-slate-200 transition-all active:scale-98"
+          className="h-12 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm border border-slate-200 transition-all active:scale-98 flex items-center justify-center"
         >
           {isBn ? 'বাতিল' : 'Decline'}
         </button>
 
-        {/* Accept Button with Charcoal Progress Fill (Matching Flutter Color(0xFF5A5E6B)) */}
+        {/* Accept Button with Charcoal Progress Fill (Matching User Screenshot) */}
         <button
           type="button"
           disabled={isCurrentAccepting}
           onClick={() => onAccept(bid)}
-          className={`relative overflow-hidden rounded-xl bg-black border border-black text-white py-3 px-4 font-bold text-sm shadow-md transition-all active:scale-98 flex items-center justify-center cursor-pointer select-none ${
-            isCurrentAccepting ? 'opacity-80 pointer-events-none' : 'hover:bg-slate-900'
+          className={`relative overflow-hidden rounded-2xl bg-black border border-black text-white h-12 px-5 font-bold text-sm shadow-md transition-all active:scale-98 flex items-center justify-center cursor-pointer select-none ${
+            isCurrentAccepting ? 'opacity-80 pointer-events-none' : 'hover:bg-slate-950'
           }`}
         >
-          {/* Charcoal Dark Gray Progress Fill (Smooth 40s linear transition) */}
+          {/* Charcoal Dark Gray Progress Fill (#505562) filling from right as 40s elapses */}
           <div
-            className="absolute inset-y-0 right-0 bg-[#5A5E6B] transition-all duration-100 ease-linear pointer-events-none"
+            className="absolute inset-y-0 right-0 bg-[#505562] transition-all duration-100 ease-linear pointer-events-none rounded-r-2xl"
             style={{ width: `${progressFraction * 100}%` }}
           />
 
-          {/* Text Overlay in Crisp White - No seconds text displayed */}
-          <div className="relative z-10 flex items-center justify-center gap-1.5">
+          {/* Text Overlay in Crisp White - Perfectly centered, no countdown digits */}
+          <div className="relative z-10 flex items-center justify-center gap-1.5 font-bold text-white text-sm">
             {isCurrentAccepting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-white" />

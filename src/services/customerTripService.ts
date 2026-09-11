@@ -339,6 +339,7 @@ export const customerTripService = {
           language_code: languageCode,
           action_when: 'cancel_rent_bid_driver_or_customer_admin',
           bid_uuid: bidUuid,
+          rent_bid_uuid: bidUuid,
           comment: comment || 'system decline',
         }),
       });
