@@ -1,13 +1,13 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { BookingPortal } from '@/components/booking/BookingPortal';
+import { RideBookingGuide } from '@/components/booking/RideBookingGuide';
 
 export const metadata: Metadata = {
-  title: 'Ride Booking & Live Fare Negotiation',
+  title: 'How to Book a Car Step-by-Step | Trippy Bangladesh',
   description:
-    'Book your ride online with Trippy. Propose your own fare, select Sedans, Noah, or Hiace microbus, and receive instant offers from verified drivers in Bangladesh.',
+    'Learn how to book a car with Trippy step-by-step. Choose service, set pickup and dropoff on Google Maps, propose your fare, and connect directly with verified drivers in Bangladesh.',
 };
 
 export default function BookingPage() {
-  return <BookingPortal />;
+  return <RideBookingGuide />;
 }

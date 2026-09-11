@@ -307,7 +307,7 @@ export const Header: React.FC = () => {
                 ) : null}
 
                 <Link
-                  href="/booking"
+                  href="/#home-booking"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="btn btn-secondary w-full py-2.5 text-sm font-semibold rounded-xl text-center"
                 >

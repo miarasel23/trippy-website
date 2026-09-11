@@ -10,7 +10,7 @@ export const HeroSection: React.FC = () => {
       {/* Subtle Monochrome Ambient Depth */}
       <div className="absolute -top-32 left-1/4 w-96 h-96 bg-white/[0.02] rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 mb-6 lg:mb-10">
+      <div id="home-booking" className="relative z-10 mb-6 lg:mb-10 scroll-mt-24">
         {/* Full Interactive Booking Portal on Homepage */}
         <BookingPortal isHero={true} />
       </div>

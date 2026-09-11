@@ -350,7 +350,7 @@ export const FleetCatalog: React.FC<FleetCatalogProps> = ({
                     </div>
 
                     <Link
-                      href={`/booking?service=${key}`}
+                      href="/#home-booking"
                       className="text-xs font-bold text-slate-900 hover:underline flex items-center gap-1.5 self-start sm:self-auto py-1"
                     >
                       {isBn ? 'এই সার্ভিসে সরাসরি বুক করুন' : 'Book this service now'}
@@ -441,7 +441,7 @@ export const FleetCatalog: React.FC<FleetCatalogProps> = ({
                             {/* Footer Action CTA (NO PRICE) */}
                             <div className="pt-3 border-t border-slate-100">
                               <Link
-                                href={`/booking?service=${key}`}
+                                href="/#home-booking"
                                 className="w-full py-2.5 px-4 text-xs font-bold rounded-xl bg-black text-white hover:bg-slate-900 transition-all flex items-center justify-center gap-2 group-hover:shadow-md"
                               >
                                 {isBn ? 'রাইড বুক করুন' : 'Book Ride'}
@@ -462,7 +462,7 @@ export const FleetCatalog: React.FC<FleetCatalogProps> = ({
         {/* Bottom Explore Fleet Button */}
         <div className="text-center pt-4">
           <Link
-            href="/booking"
+            href="/#home-booking"
             className="py-3.5 px-8 rounded-xl font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 bg-black text-white hover:bg-slate-900 shadow-md transition-all"
           >
             {isBn ? 'অনলাইন বুকিং পোর্টালে যান' : 'Go To Booking Portal'}

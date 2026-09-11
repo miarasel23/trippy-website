@@ -44,7 +44,7 @@ export const FleetView: React.FC = () => {
             {t.fleet.roundTripDesc}
           </p>
           <Link
-            href="/booking"
+            href="/#home-booking"
             className="btn btn-primary py-3 px-8 text-sm font-bold rounded-xl bg-black text-white hover:bg-slate-900"
           >
             {t.fleet.roundTripBtn}

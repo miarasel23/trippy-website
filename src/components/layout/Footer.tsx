@@ -45,7 +45,7 @@ export const Footer: React.FC = () => {
               {t.footer.colServices}
             </h4>
             <ul className="space-y-2.5 text-sm text-slate-600">
-              <li><Link href="/booking" className="hover:text-black transition-colors">{t.footer.services.daily}</Link></li>
+              <li><Link href="/#home-booking" className="hover:text-black transition-colors">{t.footer.services.daily}</Link></li>
               <li><Link href="/fleet" className="hover:text-black transition-colors">{t.footer.services.intercity}</Link></li>
               <li><Link href="/fleet" className="hover:text-black transition-colors">{t.footer.services.return}</Link></li>
               <li><Link href="/fleet" className="hover:text-black transition-colors">{t.footer.services.hourly}</Link></li>

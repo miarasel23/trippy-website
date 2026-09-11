@@ -69,7 +69,7 @@ export const IntercityRoutes: React.FC = () => {
                 </div>
 
                 <Link
-                  href={`/booking?from=${route.from}&to=${route.to}`}
+                  href="/#home-booking"
                   className="btn btn-primary w-full py-2.5 px-4 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 bg-black text-white hover:bg-slate-900"
                 >
                   {t.intercity.bookRoute} <ArrowRight className="w-3.5 h-3.5" />
