@@ -17,6 +17,7 @@ import {
   Car,
   ChevronRight,
 } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface LiveBiddingRadarViewProps {
   tripUuid: string;
@@ -38,6 +39,13 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   onCancelTrip,
 }) => {
   const router = useRouter();
+  const { language } = useLanguage();
+  const isBn = language === 'bn';
+  const formatFare = (amount: number | string) => {
+    const num = typeof amount === 'string' ? parseFloat(amount) || 0 : amount;
+    return isBn ? `৳${num.toLocaleString('en-IN')}` : `BDT ${num.toLocaleString('en-IN')}`;
+  };
+
   const [bids, setBids] = useState<RentalDriverBid[]>([]);
   const [isAccepting, setIsAccepting] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -125,15 +133,15 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 mb-1">
             <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-            লাইভ রেডার সক্রিয় • নিকটস্থ চালকদের কাছে আপনার প্রস্তাব পৌঁছেছে
+            {isBn ? 'লাইভ রেডার সক্রিয় • নিকটস্থ চালকদের কাছে আপনার প্রস্তাব পৌঁছেছে' : 'Live Radar Active • Your offer has been sent to nearby drivers'}
           </span>
           <h3 className="text-2xl font-black font-heading text-white">
-            ড্রাইভার বিডিং রাডার (Live Bidding)
+            {isBn ? 'ড্রাইভার বিডিং রাডার (Live Bidding)' : 'Driver Bidding Radar (Live Bidding)'}
           </h3>
           <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
-            <span>গাড়ির ধরণ: <strong>{vehicleName}</strong></span>
+            <span>{isBn ? 'গাড়ির ধরণ:' : 'Vehicle:'} <strong>{vehicleName}</strong></span>
             <span>•</span>
-            <span>প্রস্তাবিত ভাড়া: <strong className="text-emerald-400">৳{proposedFare}</strong></span>
+            <span>{isBn ? 'প্রস্তাবিত ভাড়া:' : 'Offered Fare:'} <strong className="text-emerald-400">{formatFare(proposedFare)}</strong></span>
           </p>
         </div>
 
@@ -143,7 +151,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           disabled={isCancelling}
           className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold transition-colors self-start sm:self-auto"
         >
-          {isCancelling ? 'বাতিল হচ্ছে...' : 'ট্রিপ বাতিল করুন'}
+          {isCancelling ? (isBn ? 'বাতিল হচ্ছে...' : 'Cancelling...') : (isBn ? 'ট্রিপ বাতিল করুন' : 'Cancel Trip')}
         </button>
       </div>
 
@@ -152,14 +160,14 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         <div className="flex items-center gap-2 truncate flex-1 min-w-0">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 flex-shrink-0" />
           <span className="truncate text-slate-300">
-            শুরু: <strong className="text-white">{pickupAddress}</strong>
+            {isBn ? 'শুরু:' : 'Pickup:'} <strong className="text-white">{pickupAddress}</strong>
           </span>
         </div>
         <div className="hidden sm:block text-slate-500">→</div>
         <div className="flex items-center gap-2 truncate flex-1 min-w-0">
           <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
           <span className="truncate text-slate-300">
-            গন্তব্য: <strong className="text-white">{dropoffAddress}</strong>
+            {isBn ? 'গন্তব্য:' : 'Dropoff:'} <strong className="text-white">{dropoffAddress}</strong>
           </span>
         </div>
       </div>
@@ -178,31 +186,53 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
         <h4 className="text-base font-extrabold text-white mt-4">
           {bids.length > 0
-            ? `${bids.length} জন ড্রাইভার তাদের অফার পাঠিয়েছেন!`
-            : 'নিকটস্থ যাচাইকৃত ড্রাইভারদের সন্ধান করা হচ্ছে...'}
+            ? (isBn ? `${bids.length} জন ড্রাইভার তাদের অফার পাঠিয়েছেন!` : `${bids.length} driver(s) sent counter-offers!`)
+            : (isBn ? 'নিকটস্থ যাচাইকৃত ড্রাইভারদের সন্ধান করা হচ্ছে...' : 'Searching for nearby verified drivers...')}
         </h4>
         <p className="text-xs text-slate-400 max-w-sm mt-1">
-          প্রতি ৫ সেকেন্ড পর পর সিস্টেম স্বয়ংক্রিয়ভাবে নতুন অফার চেক করছে। ড্রাইভারের অফার দেখে যেকোনো একটি গ্রহণ করতে পারেন।
+          {isBn
+            ? 'প্রতি ৫ সেকেন্ড পর পর সিস্টেম স্বয়ংক্রিয়ভাবে নতুন অফার চেক করছে। ড্রাইভারের অফার দেখে যেকোনো একটি গ্রহণ করতে পারেন।'
+            : 'The system automatically checks for new bids every 5 seconds. You can review and accept any driver offer.'}
         </p>
+
+        {/* Quick percentage increase chips */}
+        <div className="mt-4 flex items-center justify-center gap-1.5 flex-wrap px-4">
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block w-full text-center mb-1">
+            {isBn ? 'দ্রুত ভাড়া বাড়ানোর অপশন (শতকরা হার):' : 'Quick fare increase options (%):'}
+          </span>
+          {[10, 25, 50, 100].map((pct) => {
+            const val = Math.round(proposedFare * (1 + pct / 100));
+            return (
+              <button
+                key={pct}
+                type="button"
+                onClick={() => setNewOffer(val.toString())}
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold text-emerald-400 border border-emerald-400/30 transition-colors"
+              >
+                +{pct}% ({formatFare(val)})
+              </button>
+            );
+          })}
+        </div>
 
         {/* Update Fare Form */}
         <form
           onSubmit={handleUpdateOffer}
-          className="mt-5 flex items-center gap-2 max-w-xs w-full px-4"
+          className="mt-3 flex items-center gap-2 max-w-xs w-full px-4"
         >
           <input
             type="number"
             value={newOffer}
             onChange={(e) => setNewOffer(e.target.value)}
             className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-400 text-center"
-            placeholder="নতুন ভাড়া লিখুন"
+            placeholder={isBn ? 'নতুন ভাড়া লিখুন' : 'Enter new fare'}
           />
           <button
             type="submit"
             disabled={isUpdatingOffer}
             className="px-4 py-2 bg-white text-black hover:bg-slate-200 text-xs font-bold rounded-xl transition-colors whitespace-nowrap"
           >
-            {isUpdatingOffer ? 'আপডেট...' : 'ভাড়া বাড়ান'}
+            {isUpdatingOffer ? (isBn ? 'আপডেট...' : 'Updating...') : (isBn ? 'ভাড়া বাড়ান' : 'Raise Offer')}
           </button>
         </form>
       </div>
@@ -211,7 +241,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       {bids.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2 mb-3">
-            <span>ড্রাইভারদের পাল্টা অফারসমূহ</span>
+            <span>{isBn ? 'ড্রাইভারদের পাল্টা অফারসমূহ' : 'Driver Offers Received'}</span>
             <span className="bg-emerald-500 text-black text-[10px] font-extrabold px-2 py-0.5 rounded-full">
               {bids.length}
             </span>
@@ -245,7 +275,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-extrabold text-sm text-white">
-                        {bid.driver_name || 'যাচাইকৃত চালক'}
+                        {bid.driver_name || (isBn ? 'যাচাইকৃত চালক' : 'Verified Driver')}
                       </span>
                       <span className="text-[11px] font-bold text-amber-400 flex items-center gap-0.5 bg-amber-400/10 px-1.5 py-0.5 rounded">
                         <Star className="w-3 h-3 fill-current" /> {bid.rating || 4.9}
@@ -253,12 +283,12 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                     </div>
 
                     <div className="text-xs text-slate-300 mt-0.5">
-                      {bid.car_model || vehicleName} • {bid.car_plate || 'ঢাকা মেট্রো'}
+                      {bid.car_model || vehicleName} • {bid.car_plate || (isBn ? 'ঢাকা মেট্রো' : 'Dhaka Metro')}
                     </div>
 
                     <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
                       <Clock className="w-3 h-3 text-emerald-400" />
-                      <span>পৌঁছাতে সময়: {bid.time_away_mins || 5} মিনিট</span>
+                      <span>{isBn ? `পৌঁছাতে সময়: ${bid.time_away_mins || 5} মিনিট` : `Est. Arrival: ${bid.time_away_mins || 5} mins`}</span>
                     </div>
                   </div>
                 </div>
@@ -267,10 +297,10 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                 <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-white/10">
                   <div className="text-left sm:text-right">
                     <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                      ড্রাইভারের প্রস্তাব
+                      {isBn ? 'ড্রাইভারের প্রস্তাব' : 'Driver Offer'}
                     </span>
                     <span className="text-2xl font-black text-emerald-400">
-                      ৳{bid.bid_amount || proposedFare}
+                      {formatFare(bid.bid_amount || proposedFare)}
                     </span>
                   </div>
 
@@ -282,11 +312,11 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                   >
                     {isAccepting === bidId ? (
                       <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> গ্রহণ হচ্ছে...
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> {isBn ? 'গ্রহণ হচ্ছে...' : 'Accepting...'}
                       </>
                     ) : (
                       <>
-                        অফার গ্রহণ করুন <ChevronRight className="w-4 h-4" />
+                        {isBn ? 'অফার গ্রহণ করুন' : 'Accept Offer'} <ChevronRight className="w-4 h-4" />
                       </>
                     )}
                   </button>

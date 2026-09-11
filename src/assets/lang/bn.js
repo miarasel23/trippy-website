@@ -2,7 +2,7 @@
 export const bn = {
   common: {
     brandName: "ট্রিপি",
-    currency: "টাকা",
+    currency: "৳",
     perKm: "/কিমি",
     mins: "মিনিট",
     km: "কিমি",

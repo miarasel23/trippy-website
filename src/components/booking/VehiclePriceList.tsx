@@ -76,6 +76,11 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
 }) => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
+  const currSym = isBn ? '৳' : 'BDT';
+  const formatFare = (amount: number | string) => {
+    const num = typeof amount === 'string' ? parseFloat(amount) || 0 : amount;
+    return isBn ? `৳${num.toLocaleString('en-IN')}` : `BDT ${num.toLocaleString('en-IN')}`;
+  };
 
   const validPickups  = pickupUuids.filter(id => id && id.trim().length > 0 && !id.startsWith('custom-'));
   const validDropoffs = dropoffUuids.filter(id => id && id.trim().length > 0 && !id.startsWith('custom-'));
@@ -170,9 +175,16 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
     return getCarMinFare(car) * 2;
   };
 
-  // Customer offer range: system min − 40 … system min + 100
-  const getOfferMin = (car: CarInfo) => Math.max(50, getCarMinFare(car) - 40);
-  const getOfferMax = (car: CarInfo) => getCarMinFare(car) + 100;
+  // Customer offer range: estimated fare is the minimum, customer can increase up to at least +100%
+  const getOfferMin = (car: CarInfo): number => getCarMinFare(car);
+  const getOfferMax = (car: CarInfo): number => {
+    const minFare = getCarMinFare(car);
+    const maxCalc = car.rent_calculation?.maximum_booking_price
+      ? Math.round(car.rent_calculation.maximum_booking_price)
+      : 0;
+    // Minimum 100% increase (2x estimated fare) or higher if backend maximum_booking_price exists
+    return Math.max(minFare * 2, maxCalc);
+  };
 
   const handleSelect = (car: CarInfo) => {
     const fare = getCarMinFare(car);
@@ -185,6 +197,14 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
     const min = getOfferMin(selectedCar);
     const max = getOfferMax(selectedCar);
     onChangeFare(Math.min(max, Math.max(min, proposedFare + delta)));
+  };
+
+  const handleSetPercentage = (pct: number) => {
+    if (!selectedCar) return;
+    const min = getOfferMin(selectedCar);
+    const max = getOfferMax(selectedCar);
+    const calculated = Math.round(min * (1 + pct / 100));
+    onChangeFare(Math.min(max, Math.max(min, calculated)));
   };
 
   /* ── 1. Placeholder when no locations ───────────────────────────────── */
@@ -447,23 +467,16 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
                     <span className={`text-[9px] font-bold uppercase tracking-wide ${isSelected ? 'text-emerald-400/80' : 'text-emerald-700'}`}>
                       {isBn ? 'সর্বনিম্ন ভাড়া' : 'Min. Booking Price'}
                     </span>
-                    {hasRentCalc && (
-                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
-                        isSelected ? 'bg-emerald-500/25 text-emerald-300' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      }`}>
-                        {isBn ? 'লাইভ API' : 'LIVE API'}
-                      </span>
-                    )}
                   </div>
 
                   {/* Big price number */}
                   <div className="flex items-baseline gap-1.5">
                     <span className={`text-xl font-black font-mono ${isSelected ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                      ৳{minFare.toLocaleString('en-IN')}
+                      {formatFare(minFare)}
                     </span>
                     {hasRentCalc && (
                       <span className={`text-[11px] font-semibold ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
-                        – ৳{maxFare.toLocaleString('en-IN')}
+                        – {formatFare(maxFare)}
                       </span>
                     )}
                   </div>
@@ -471,20 +484,20 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
                   {/* price_per_km */}
                   {car.price_sets?.[0] && (
                     <p className={`text-[9px] mt-0.5 ${isSelected ? 'text-slate-500' : 'text-slate-400'}`}>
-                      ৳{car.price_sets[0].price_per_km}/{isBn ? 'কিমি' : 'km'}
+                      {formatFare(car.price_sets[0].price_per_km)}/{isBn ? 'কিমি' : 'km'}
                       {' · '}
-                      {isBn ? 'ক্যান্সেলেশন' : 'Cancellation'} ৳{car.price_sets[0].cancellation_fee}
+                      {isBn ? 'ক্যান্সেলেশন' : 'Cancellation'} {formatFare(car.price_sets[0].cancellation_fee || 0)}
                     </p>
                   )}
 
                   {/* Offer range hint */}
-                  <div className={`mt-1.5 flex items-center gap-1 text-[9px] ${isSelected ? 'text-slate-500' : 'text-slate-400'}`}>
-                    <TrendingDown className="w-2.5 h-2.5 text-red-400" />
-                    ৳{Math.max(50, minFare - 40)}
-                    <span className="mx-0.5 text-slate-300">–</span>
-                    <TrendingUp className="w-2.5 h-2.5 text-emerald-400" />
-                    ৳{minFare + 100}
-                    <span className="ml-0.5">{isBn ? '(আপনার অফার সীমা)' : '(your offer range)'}</span>
+                  <div className={`mt-1.5 flex items-center gap-1 text-[9px] ${isSelected ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <TrendingUp className="w-2.5 h-2.5 text-emerald-500" />
+                    <span>{isBn ? 'অফার সীমা:' : 'Offer range:'}</span>
+                    <span className="font-mono font-bold">{formatFare(minFare)}</span>
+                    <span className="text-slate-300">–</span>
+                    <span className="font-mono font-bold">{formatFare(getOfferMax(car))}</span>
+                    <span className="text-emerald-600 font-bold">{isBn ? '(সর্বোচ্চ +১০০%)' : '(up to +100%)'}</span>
                   </div>
                 </div>
               </div>
@@ -521,9 +534,11 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
               </div>
               <div className="text-right">
                 <p className="text-[9px] text-slate-400 uppercase tracking-widest">{isBn ? 'আপনার অফার' : 'Your Offer'}</p>
-                <span className="text-2xl font-black text-emerald-400 font-mono">৳{proposedFare.toLocaleString('en-IN')}</span>
-                <p className={`text-[10px] font-bold mt-0.5 ${pct < 0 ? 'text-red-400' : pct === 0 ? 'text-slate-400' : 'text-emerald-400'}`}>
-                  {pct >= 0 ? '+' : ''}{pct}% {isBn ? 'সিস্টেম ভাড়া থেকে' : 'vs system min'}
+                <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">{formatFare(proposedFare)}</span>
+                <p className={`text-[10px] font-bold mt-0.5 ${pct === 0 ? 'text-slate-300' : 'text-emerald-400'}`}>
+                  {pct === 0
+                    ? (isBn ? 'বেস আনুমানিক ভাড়া' : 'Base Est. Fare')
+                    : `+${pct}% ${isBn ? 'আনুমানিক ভাড়া থেকে বেশি' : 'above est. fare'}`}
                 </p>
               </div>
             </div>
@@ -535,11 +550,22 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
                   <ShieldCheck className="w-4 h-4 text-amber-600 flex-shrink-0" />
                   <div>
                     <p className="text-[9px] font-bold text-amber-700 uppercase tracking-wide">
-                      {isBn ? 'সিস্টেম সর্বনিম্ন ভাড়া' : 'System Min. Fare'}
+                      {isBn ? 'আনুমানিক সর্বনিম্ন ভাড়া (বেস)' : 'Estimated Min. Fare (Base)'}
                     </p>
-                    <p className="text-sm font-black text-amber-900">৳{sysMinFare.toLocaleString('en-IN')}</p>
+                    <p className="text-sm font-black text-amber-900 font-mono">{formatFare(sysMinFare)}</p>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex-1">
+                  <TrendingUp className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-wide">
+                      {isBn ? 'সর্বোচ্চ প্রস্তাব সীমা (+১০০%)' : 'Max Allowed Offer (+100%)'}
+                    </p>
+                    <p className="text-sm font-black text-emerald-900 font-mono">{formatFare(offerMax)}</p>
+                  </div>
+                </div>
+
                 {distanceKm > 0 && (
                   <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
                     <Ruler className="w-4 h-4 text-blue-600 flex-shrink-0" />
@@ -547,55 +573,151 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
                       <p className="text-[9px] font-bold text-blue-700 uppercase tracking-wide">
                         {isBn ? 'মোট দূরত্ব' : 'Total Distance'}
                       </p>
-                      <p className="text-sm font-black text-blue-900">{distanceKm} {isBn ? 'কিমি' : 'km'}</p>
+                      <p className="text-sm font-black text-blue-900 font-mono">{distanceKm} {isBn ? 'কিমি' : 'km'}</p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Quick adjust buttons + slider */}
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => handleAdjustFare(-20)}
-                  className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-colors whitespace-nowrap">
-                  {isBn ? '−২০ ৳' : '−20 ৳'}
-                </button>
-                <button type="button" onClick={() => handleAdjustFare(-10)}
-                  className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-colors whitespace-nowrap">
-                  {isBn ? '−১০ ৳' : '−10 ৳'}
-                </button>
-                <div className="flex-1 px-1">
-                  <input
-                    type="range" min={offerMin} max={offerMax} step={5}
-                    value={proposedFare}
-                    onChange={e => onChangeFare(Number(e.target.value))}
-                    className="w-full accent-black cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[9px] text-slate-400 font-medium mt-0.5 px-0.5">
-                    <span>৳{offerMin}</span>
-                    <span>৳{offerMax}</span>
+              {/* Quick Percentage Chips */}
+              <div>
+                <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 block mb-2">
+                  {isBn ? 'দ্রুত ভাড়া বাড়ানোর অপশন (শতকরা হার):' : 'Quick Fare Increase Options:'}
+                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[
+                    { labelBn: 'বেস (০%)', labelEn: 'Base (0%)', pct: 0 },
+                    { labelBn: '+১০%', labelEn: '+10%', pct: 10 },
+                    { labelBn: '+২০%', labelEn: '+20%', pct: 20 },
+                    { labelBn: '+৫০%', labelEn: '+50%', pct: 50 },
+                    { labelBn: '+৭৫%', labelEn: '+75%', pct: 75 },
+                    { labelBn: '+১০০%', labelEn: '+100%', pct: 100 },
+                  ].map((chip) => {
+                    const targetFare = Math.round(sysMinFare * (1 + chip.pct / 100));
+                    const isChipActive = Math.abs(proposedFare - targetFare) < 5;
+                    return (
+                      <button
+                        key={chip.pct}
+                        type="button"
+                        onClick={() => handleSetPercentage(chip.pct)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                          isChipActive
+                            ? 'bg-black text-white border-black shadow-sm'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        <span>{isBn ? chip.labelBn : chip.labelEn}</span>
+                        <span className={`text-[10px] font-mono ${isChipActive ? 'text-emerald-300' : 'text-slate-500'}`}>
+                          {formatFare(targetFare)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Step adjust buttons + slider + editable input */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold text-slate-700">
+                    {isBn ? 'ভাড়া নির্ধারণ করুন (স্লাইডার বা ইনপুট):' : 'Fine-Tune Fare (Slider or Direct Input):'}
+                  </span>
+                  
+                  {/* Direct input */}
+                  <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1 focus-within:border-black focus-within:ring-1 focus-within:ring-black/10 shadow-xs">
+                    <span className="text-xs font-bold text-slate-500">{currSym}</span>
+                    <input
+                      type="number"
+                      min={offerMin}
+                      max={offerMax}
+                      value={proposedFare}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val)) onChangeFare(val);
+                      }}
+                      onBlur={() => {
+                        onChangeFare(Math.min(offerMax, Math.max(offerMin, proposedFare)));
+                      }}
+                      className="w-24 text-xs font-extrabold font-mono text-slate-900 bg-transparent focus:outline-none"
+                    />
                   </div>
                 </div>
-                <button type="button" onClick={() => handleAdjustFare(10)}
-                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-colors whitespace-nowrap">
-                  {isBn ? '+১০ ৳' : '+10 ৳'}
-                </button>
-                <button type="button" onClick={() => handleAdjustFare(20)}
-                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-colors whitespace-nowrap">
-                  {isBn ? '+২০ ৳' : '+20 ৳'}
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleAdjustFare(-50)}
+                    disabled={proposedFare <= offerMin}
+                    title={isBn ? '৫০ টাকা কমান' : 'Decrease 50 BDT'}
+                    className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                  >
+                    {isBn ? '−৫০ ৳' : '−50 BDT'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAdjustFare(-20)}
+                    disabled={proposedFare <= offerMin}
+                    title={isBn ? '২০ টাকা কমান' : 'Decrease 20 BDT'}
+                    className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                  >
+                    {isBn ? '−২০ ৳' : '−20 BDT'}
+                  </button>
+                  
+                  <div className="flex-1 px-1">
+                    <input
+                      type="range"
+                      min={offerMin}
+                      max={offerMax}
+                      step={10}
+                      value={proposedFare}
+                      onChange={(e) => onChangeFare(Number(e.target.value))}
+                      className="w-full accent-black cursor-pointer h-2 bg-slate-200 rounded-lg"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-500 font-semibold mt-1 px-0.5">
+                      <span>{formatFare(offerMin)} ({isBn ? 'বেস' : 'Base'})</span>
+                      <span>{formatFare(Math.round(offerMin * 1.5))} ({isBn ? '+৫০%' : '+50%'})</span>
+                      <span>{formatFare(offerMax)} ({isBn ? '+১০০%' : '+100%'})</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAdjustFare(20)}
+                    disabled={proposedFare >= offerMax}
+                    title={isBn ? '২০ টাকা বাড়ান' : 'Increase 20 BDT'}
+                    className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                  >
+                    {isBn ? '+২০ ৳' : '+20 BDT'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAdjustFare(50)}
+                    disabled={proposedFare >= offerMax}
+                    title={isBn ? '৫০ টাকা বাড়ান' : 'Increase 50 BDT'}
+                    className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                  >
+                    {isBn ? '+৫০ ৳' : '+50 BDT'}
+                  </button>
+                </div>
               </div>
 
               {/* Boundary hint */}
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                {isBn
-                  ? `সিস্টেম ভাড়া থেকে সর্বোচ্চ ৳৪০ কম ও সর্বোচ্চ ৳১০০ বেশি অফার করতে পারবেন।`
-                  : `You can offer up to ৳40 less or ৳100 more than the system minimum fare.`}
+              <div className="flex items-center gap-2 text-[11px] text-emerald-800 bg-emerald-50/90 border border-emerald-200/90 rounded-xl px-3.5 py-2.5">
+                <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>
+                  {isBn
+                    ? `আনুমানিক ভাড়া ${formatFare(sysMinFare)} হলো সর্বনিম্ন সীমা। চালকদের দ্রুত বিড পাওয়ার জন্য আপনি সর্বনিম্ন ভাড়া থেকে সর্বোচ্চ ১০০% বাড়িয়ে (${formatFare(offerMax)}) পর্যন্ত অফার করতে পারবেন।`
+                    : `Estimated fare ${formatFare(sysMinFare)} is the minimum. To attract drivers faster, you can increase your offer up to 100% (max ${formatFare(offerMax)}).`}
+                </span>
               </div>
 
               {/* Submit button */}
-              <button type="button" disabled={isSubmitting} onClick={onSubmitOffer}
-                className="w-full py-4 bg-slate-950 hover:bg-black text-white font-extrabold text-sm rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={onSubmitOffer}
+                className="w-full py-4 bg-slate-950 hover:bg-black text-white font-extrabold text-sm rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
@@ -605,8 +727,8 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
                   <>
                     <Sparkles className="w-4 h-4 text-emerald-400" />
                     {isBn
-                      ? `চালকদের অফার পাঠান — ৳${proposedFare.toLocaleString('en-IN')}`
-                      : `Send Offer to Drivers — ৳${proposedFare.toLocaleString('en-IN')}`}
+                      ? `চালকদের অফার পাঠান — ${formatFare(proposedFare)}`
+                      : `Send Offer to Drivers — ${formatFare(proposedFare)}`}
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
