@@ -44,41 +44,45 @@ export const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex items-center justify-between h-20">
           
-          {/* Logo */}
-          <Link href="/" className="brand-logo flex items-center group py-1" aria-label="Trippy Home">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/trippy_logo.svg"
-              alt="Trippy"
-              width={145}
-              height={40}
-              className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03]"
-            />
-          </Link>
+          {/* Left: Brand Logo + Desktop Navigation */}
+          <div className="flex items-center gap-10 xl:gap-14 flex-shrink-0">
+            {/* Logo */}
+            <Link href="/" className="inline-flex items-center py-1 flex-shrink-0" aria-label="Trippy">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/trippy_logo.svg"
+                alt="Trippy"
+                width={140}
+                height={38}
+                className="h-9 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+                style={{ width: '135px', height: '36px' }}
+              />
+            </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`text-sm font-semibold tracking-wide transition-all duration-200 relative py-2 ${
-                    isActive ? 'text-black font-bold' : 'text-slate-600 hover:text-black'
-                  }`}
-                >
-                  {link.label}
-                  {isActive && (
-                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-black rounded-full" />
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center gap-6 lg:gap-7 xl:gap-8">
+              {navLinks.map((link) => {
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`text-sm tracking-normal transition-all duration-200 relative py-2 whitespace-nowrap ${
+                      isActive ? 'text-black font-extrabold' : 'text-slate-600 hover:text-black font-semibold'
+                    }`}
+                  >
+                    {link.label}
+                    {isActive && (
+                      <span className="absolute bottom-0 left-0 w-full h-0.5 bg-black rounded-full" />
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
 
           {/* Action CTAs, Language Switcher & Authentication */}
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2.5 xl:gap-3 flex-shrink-0">
             {/* Language Switcher Pill */}
             <div className="flex items-center bg-slate-100 border border-slate-200 rounded-xl p-1 gap-1 text-xs">
               <Globe className="w-3.5 h-3.5 ml-1.5 text-slate-500" />
@@ -96,7 +100,7 @@ export const Header: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setLanguage('bn')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all font-heading ${
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
                   language === 'bn'
                     ? 'bg-black text-white shadow-sm'
                     : 'text-slate-600 hover:text-black'
@@ -111,7 +115,7 @@ export const Header: React.FC = () => {
               <button
                 type="button"
                 onClick={() => dispatch(openLoginModal())}
-                className="px-3.5 py-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 transition-all flex items-center gap-1.5 shadow-xs"
+                className="px-3.5 py-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 transition-all flex items-center gap-1.5 shadow-xs whitespace-nowrap"
               >
                 <User className="w-3.5 h-3.5 text-slate-600" />
                 {t.auth.login}
@@ -121,7 +125,7 @@ export const Header: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-2 p-1.5 pr-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 transition-all text-left shadow-xs"
+                  className="flex items-center gap-2 p-1.5 pr-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 transition-all text-left shadow-xs whitespace-nowrap"
                   aria-expanded={isUserMenuOpen}
                 >
                   <div className="w-7 h-7 rounded-lg bg-black text-white text-xs font-bold flex items-center justify-center font-heading flex-shrink-0">
@@ -169,15 +173,15 @@ export const Header: React.FC = () => {
 
             <Link
               href="/booking"
-              className="btn btn-secondary px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl hover:bg-slate-900"
+              className="btn btn-secondary px-3.5 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl hover:bg-slate-900 whitespace-nowrap hidden xl:inline-flex"
             >
               {t.common.onlineBooking}
             </Link>
             <Link
               href="/app"
-              className="btn btn-primary px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl flex items-center gap-2"
+              className="btn btn-primary px-3.5 py-2 text-xs font-bold uppercase tracking-wider rounded-xl flex items-center gap-1.5 whitespace-nowrap"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               {t.common.getTheApp}
             </Link>
           </div>
