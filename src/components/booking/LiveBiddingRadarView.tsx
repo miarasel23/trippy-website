@@ -1,0 +1,301 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { RentalDriverBid, RentalTrip } from '@/types/customerApi';
+import { customerTripService, getImageUrl } from '@/services/customerTripService';
+import {
+  Radio,
+  Clock,
+  Star,
+  Check,
+  X,
+  Shield,
+  Loader2,
+  AlertTriangle,
+  Car,
+  ChevronRight,
+} from 'lucide-react';
+
+interface LiveBiddingRadarViewProps {
+  tripUuid: string;
+  customerUuid: string;
+  proposedFare: number;
+  pickupAddress: string;
+  dropoffAddress: string;
+  vehicleName: string;
+  onCancelTrip: () => void;
+}
+
+export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
+  tripUuid,
+  customerUuid,
+  proposedFare,
+  pickupAddress,
+  dropoffAddress,
+  vehicleName,
+  onCancelTrip,
+}) => {
+  const router = useRouter();
+  const [bids, setBids] = useState<RentalDriverBid[]>([]);
+  const [isAccepting, setIsAccepting] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [newOffer, setNewOffer] = useState(proposedFare.toString());
+  const [isUpdatingOffer, setIsUpdatingOffer] = useState(false);
+  const [activeTab, setActiveTab] = useState<'radar' | 'bids'>('radar');
+
+  // 5-second polling loop matching Flutter Timer.periodic
+  useEffect(() => {
+    let isMounted = true;
+
+    const pollBids = async () => {
+      if (!customerUuid) return;
+      const trips: RentalTrip[] = await customerTripService.fetchBids(
+        customerUuid,
+        'bn',
+        'REQUESTED'
+      );
+
+      if (isMounted && trips.length > 0) {
+        const currentTrip = trips.find((t) => t.uuid === tripUuid) || trips[0];
+        if (currentTrip && currentTrip.drivers && currentTrip.drivers.length > 0) {
+          setBids(currentTrip.drivers);
+          setActiveTab('bids');
+        }
+      }
+    };
+
+    pollBids();
+    const interval = setInterval(pollBids, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [customerUuid, tripUuid]);
+
+  // Accept a driver counter-offer
+  const handleAcceptBid = async (bid: RentalDriverBid) => {
+    const bidUuid = bid.uuid || bid.driver_uuid || '';
+    if (!bidUuid) return;
+
+    setIsAccepting(bidUuid);
+    const res = await customerTripService.acceptBid(
+      customerUuid,
+      bidUuid,
+      tripUuid,
+      'bn'
+    );
+
+    if (res.status) {
+      router.push(`/tracking?trip_uuid=${tripUuid}&driver_uuid=${bid.driver_uuid || ''}`);
+    } else {
+      setIsAccepting(null);
+      alert(res.message || 'ড্রাইভারের অফার গ্রহণে সমস্যা হয়েছে।');
+    }
+  };
+
+  // Update proposed offer
+  const handleUpdateOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOffer || parseFloat(newOffer) <= 0) return;
+    setIsUpdatingOffer(true);
+    await customerTripService.updateOfferAmount(
+      customerUuid,
+      tripUuid,
+      newOffer,
+      'bn'
+    );
+    setIsUpdatingOffer(false);
+  };
+
+  // Cancel trip
+  const handleCancel = async () => {
+    if (!confirm('আপনি কি নিশ্চিত যে ট্রিপ রিকোয়েস্টটি বাতিল করতে চান?')) return;
+    setIsCancelling(true);
+    await customerTripService.cancelTrip(tripUuid, 'ব্যবহারকারী কর্তৃক বাতিল', 'bn');
+    onCancelTrip();
+  };
+
+  return (
+    <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 animate-fade-in max-w-4xl mx-auto mb-10">
+      {/* Top Trip Summary Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6 mb-6">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 mb-1">
+            <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+            লাইভ রেডার সক্রিয় • নিকটস্থ চালকদের কাছে আপনার প্রস্তাব পৌঁছেছে
+          </span>
+          <h3 className="text-2xl font-black font-heading text-white">
+            ড্রাইভার বিডিং রাডার (Live Bidding)
+          </h3>
+          <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+            <span>গাড়ির ধরণ: <strong>{vehicleName}</strong></span>
+            <span>•</span>
+            <span>প্রস্তাবিত ভাড়া: <strong className="text-emerald-400">৳{proposedFare}</strong></span>
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={isCancelling}
+          className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold transition-colors self-start sm:self-auto"
+        >
+          {isCancelling ? 'বাতিল হচ্ছে...' : 'ট্রিপ বাতিল করুন'}
+        </button>
+      </div>
+
+      {/* Origin & Destination Bar */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 flex-shrink-0" />
+          <span className="truncate text-slate-300">
+            শুরু: <strong className="text-white">{pickupAddress}</strong>
+          </span>
+        </div>
+        <div className="hidden sm:block text-slate-500">→</div>
+        <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+          <span className="truncate text-slate-300">
+            গন্তব্য: <strong className="text-white">{dropoffAddress}</strong>
+          </span>
+        </div>
+      </div>
+
+      {/* Radar Animation Area */}
+      <div className="flex flex-col items-center justify-center py-8 text-center relative overflow-hidden rounded-2xl bg-black/40 border border-white/5 mb-6">
+        {/* Concentric Pulsing Radar Rings */}
+        <div className="relative w-48 h-48 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ping" />
+          <div className="absolute inset-4 rounded-full border border-emerald-500/30 animate-pulse" />
+          <div className="absolute inset-10 rounded-full border border-emerald-500/40" />
+          <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/20">
+            <Car className="w-8 h-8" />
+          </div>
+        </div>
+
+        <h4 className="text-base font-extrabold text-white mt-4">
+          {bids.length > 0
+            ? `${bids.length} জন ড্রাইভার তাদের অফার পাঠিয়েছেন!`
+            : 'নিকটস্থ যাচাইকৃত ড্রাইভারদের সন্ধান করা হচ্ছে...'}
+        </h4>
+        <p className="text-xs text-slate-400 max-w-sm mt-1">
+          প্রতি ৫ সেকেন্ড পর পর সিস্টেম স্বয়ংক্রিয়ভাবে নতুন অফার চেক করছে। ড্রাইভারের অফার দেখে যেকোনো একটি গ্রহণ করতে পারেন।
+        </p>
+
+        {/* Update Fare Form */}
+        <form
+          onSubmit={handleUpdateOffer}
+          className="mt-5 flex items-center gap-2 max-w-xs w-full px-4"
+        >
+          <input
+            type="number"
+            value={newOffer}
+            onChange={(e) => setNewOffer(e.target.value)}
+            className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-400 text-center"
+            placeholder="নতুন ভাড়া লিখুন"
+          />
+          <button
+            type="submit"
+            disabled={isUpdatingOffer}
+            className="px-4 py-2 bg-white text-black hover:bg-slate-200 text-xs font-bold rounded-xl transition-colors whitespace-nowrap"
+          >
+            {isUpdatingOffer ? 'আপডেট...' : 'ভাড়া বাড়ান'}
+          </button>
+        </form>
+      </div>
+
+      {/* Driver Bids Incoming Offers */}
+      {bids.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2 mb-3">
+            <span>ড্রাইভারদের পাল্টা অফারসমূহ</span>
+            <span className="bg-emerald-500 text-black text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+              {bids.length}
+            </span>
+          </h4>
+
+          {bids.map((bid, idx) => {
+            const bidId = bid.uuid || bid.driver_uuid || `bid-${idx}`;
+            return (
+              <div
+                key={bidId}
+                className="bg-white/10 border border-white/15 hover:border-emerald-400/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
+              >
+                {/* Driver Profile & Car Details */}
+                <div className="flex items-center gap-3.5">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden bg-slate-700 flex-shrink-0 border-2 border-emerald-400/60">
+                    {bid.driver_photo ? (
+                      <Image
+                        src={getImageUrl(bid.driver_photo)}
+                        alt={bid.driver_name || 'Driver'}
+                        fill
+                        className="object-cover"
+                        sizes="48px"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white font-bold text-sm bg-slate-800">
+                        {(bid.driver_name || 'D').slice(0, 1)}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-sm text-white">
+                        {bid.driver_name || 'যাচাইকৃত চালক'}
+                      </span>
+                      <span className="text-[11px] font-bold text-amber-400 flex items-center gap-0.5 bg-amber-400/10 px-1.5 py-0.5 rounded">
+                        <Star className="w-3 h-3 fill-current" /> {bid.rating || 4.9}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-slate-300 mt-0.5">
+                      {bid.car_model || vehicleName} • {bid.car_plate || 'ঢাকা মেট্রো'}
+                    </div>
+
+                    <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-emerald-400" />
+                      <span>পৌঁছাতে সময়: {bid.time_away_mins || 5} মিনিট</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Offer Price and Accept Action */}
+                <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-white/10">
+                  <div className="text-left sm:text-right">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      ড্রাইভারের প্রস্তাব
+                    </span>
+                    <span className="text-2xl font-black text-emerald-400">
+                      ৳{bid.bid_amount || proposedFare}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAcceptBid(bid)}
+                    disabled={isAccepting === bidId}
+                    className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5"
+                  >
+                    {isAccepting === bidId ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> গ্রহণ হচ্ছে...
+                      </>
+                    ) : (
+                      <>
+                        অফার গ্রহণ করুন <ChevronRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};

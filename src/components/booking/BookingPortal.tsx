@@ -1,449 +1,375 @@
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { FLEET_VEHICLES, VehicleKey } from '@/types/fleet';
-import { DriverBid } from '@/types/booking';
-import { Badge } from '../common/Badge';
-import { MapPin, Navigation, Sparkles, Check, X, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  ServiceCategory,
+  LocationSearchResult,
+  CarInfo,
+} from '@/types/customerApi';
+import { customerTripService } from '@/services/customerTripService';
+import { useAppDispatch, useAppSelector } from '@/redux/hooks';
+import { openLoginModal } from '@/redux/features/authSlice';
+import { ServicePhotoCardSelector } from './ServicePhotoCardSelector';
+import { MultiLocationRouteSelector } from './MultiLocationRouteSelector';
+import { TripDateTimeSchedule, formatDateTimeToApi } from './TripDateTimeSchedule';
+import { VehiclePriceList } from './VehiclePriceList';
+import { LiveBiddingRadarView } from './LiveBiddingRadarView';
+import { GoogleRouteMap } from './GoogleRouteMap';
 import { useLanguage } from '@/context/LanguageContext';
+import { Badge } from '../common/Badge';
+import { Sparkles, MapPin, Zap } from 'lucide-react';
 
-export const BookingPortal: React.FC = () => {
-  const router = useRouter();
-  const { t } = useLanguage();
+interface BookingPortalProps {
+  isHero?: boolean;
+}
 
-  const [pickup, setPickup] = useState('412/1, 412 Senpara Parbata Ln, Dhaka 1216');
-  const [dropoff, setDropoff] = useState('Gazipur, Bangladesh');
-  const [selectedVehicle, setSelectedVehicle] = useState<VehicleKey>('hiace');
-  const [fare, setFare] = useState<number>(1607);
-  const [tripNote, setTripNote] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [incomingBid, setIncomingBid] = useState<DriverBid | null>(null);
+export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) => {
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { language } = useLanguage();
+  const isBn = language === 'bn';
 
-  const handleVehicleSelect = (key: VehicleKey) => {
-    setSelectedVehicle(key);
-    setFare(FLEET_VEHICLES[key].baseFare);
+  // 1. Service state
+  const [services, setServices] = useState<Record<string, ServiceCategory>>({});
+  const [selectedService, setSelectedService] = useState<string>('RIDE_SHARE');
+  const [isLoadingServices, setIsLoadingServices] = useState(true);
+
+  // 2. Multi-location route state – empty by default so vehicle list shows prompt
+  const [pickupLocations, setPickupLocations] = useState<LocationSearchResult[]>([
+    {
+      uuid: '',
+      address: '',
+      latitude: 23.8103,
+      longitude: 90.4125,
+    },
+  ]);
+
+  const [dropoffLocations, setDropoffLocations] = useState<LocationSearchResult[]>([
+    {
+      uuid: '',
+      address: '',
+      latitude: 23.8103,
+      longitude: 90.4125,
+    },
+  ]);
+
+  const [activeLocationIndex, setActiveLocationIndex] = useState<{
+    type: 'pickup' | 'dropoff';
+    index: number;
+  } | null>({ type: 'pickup', index: 0 });
+
+  // 3. Date and Time schedule state (Bangladesh Time format)
+  const [startDatetime, setStartDatetime] = useState<string>(() =>
+    formatDateTimeToApi(new Date())
+  );
+  const [endDatetime, setEndDatetime] = useState<string>(() => {
+    const later = new Date(Date.now() + 8 * 3600 * 1000);
+    return formatDateTimeToApi(later);
+  });
+  const [hoursBooked, setHoursBooked] = useState<string>('4');
+
+  // 4. Vehicle & Fare state
+  const [selectedCar, setSelectedCar] = useState<CarInfo | null>(null);
+  const [proposedFare, setProposedFare] = useState<number>(1850);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 5. Active submitted trip for live bidding radar
+  const [activeTrip, setActiveTrip] = useState<{
+    uuid: string;
+    customerUuid: string;
+    vehicleName: string;
+    proposedFare: number;
+    pickupAddress: string;
+    dropoffAddress: string;
+  } | null>(null);
+
+  // Fetch real-time services from /rental-info
+  useEffect(() => {
+    const loadServices = async () => {
+      setIsLoadingServices(true);
+      const data = await customerTripService.fetchRentalInfo(language);
+      if (data) {
+        setServices(data);
+        const keys = Object.keys(data);
+        if (keys.length > 0 && !data[selectedService]) {
+          setSelectedService(keys[0]);
+        }
+      }
+      setIsLoadingServices(false);
+    };
+
+    loadServices();
+  }, [language]);
+
+  // Reset selected car when service type changes
+  useEffect(() => {
+    setSelectedCar(null);
+  }, [selectedService]);
+
+  const handleSelectCar = (car: CarInfo, baseFare: number) => {
+    setSelectedCar(car);
+    setProposedFare(baseFare);
   };
 
-  const handleFareChange = (delta: number) => {
-    setFare((prev) => Math.max(100, prev + delta));
+
+  // Re-edit location directly from map click or drag
+  const handleMapLocationSelect = (
+    type: 'pickup' | 'dropoff',
+    index: number,
+    loc: LocationSearchResult
+  ) => {
+    if (type === 'pickup') {
+      const updated = [...pickupLocations];
+      updated[index] = loc;
+      setPickupLocations(updated);
+    } else {
+      setDropoffLocations([loc]); // Strictly single dropoff
+    }
   };
 
-  const handleChipClick = (amount: number) => {
-    setFare(amount);
-  };
+  // Submit trip offer
+  const handleSubmitOffer = async () => {
+    if (!isAuthenticated) {
+      dispatch(openLoginModal());
+      return;
+    }
 
-  const handleGiveOffer = () => {
-    setIsSearching(true);
-    setIncomingBid(null);
+    if (!selectedCar) {
+      alert('অনুগ্রহ করে একটি গাড়ি নির্বাচন করুন।');
+      return;
+    }
 
-    setTimeout(() => {
-      setIsSearching(false);
-      setIncomingBid({
-        id: 'bid-02',
-        driverName: 'Md Rasel Mia',
-        rating: 4.9,
-        completedRides: 210,
-        carModel: 'Toyota Hiace Microbus',
-        licensePlate: 'Dhaka-Metro-cha-54-1400',
-        avatarUrl: '/driver_found_page.png',
-        proposedFare: fare,
-        driverFare: Math.max(100, fare - 10),
-        timeAwayMins: 4,
+    const validPickups = pickupLocations
+      .map((l) => l.uuid)
+      .filter((id) => id && id.trim().length > 0);
+    const validDropoffs = dropoffLocations
+      .slice(0, 1)
+      .map((l) => l.uuid)
+      .filter((id) => id && id.trim().length > 0);
+
+    if (validPickups.length === 0 || validDropoffs.length === 0) {
+      alert('অনুগ্রহ করে পিকআপ ও ড্রপঅফ লোকেশন নির্বাচন করুন।');
+      return;
+    }
+
+    if (selectedService === 'RETURN' && (!endDatetime || !endDatetime.trim())) {
+      alert(
+        isBn
+          ? 'রিটার্ন ট্রিপের জন্য অনুগ্রহ করে ফেরার তারিখ ও সময় (end_datetime) প্রদান করুন।'
+          : 'Please provide return date and time (end_datetime) for round trip.'
+      );
+      return;
+    }
+
+    const priceSet = selectedCar.price_sets?.[0];
+    if (!priceSet) {
+      alert(
+        isBn ? 'গাড়ির প্রাইস সেট পাওয়া যায়নি।' : 'Car price set not found.'
+      );
+      return;
+    }
+
+    const customerUuid =
+      user?.uuid ||
+      localStorage.getItem('trippy_customer_uuid') ||
+      'guest-customer-uuid';
+
+    setIsSubmitting(true);
+
+    const payload = {
+      service_name: selectedService,
+      start_datetime: startDatetime,
+      ...(selectedService === 'RETURN' ? { end_datetime: endDatetime } : {}),
+      ...(selectedService === 'HOURLY' ? { hours_booked: hoursBooked } : {}),
+      payment_method: 'CASH',
+      customer_uuid: customerUuid,
+      country_code: 'BD',
+      platform: 'web',
+      language_code: language,
+      pickup_location_uuid: validPickups,
+      dropoff_location_uuid: validDropoffs,
+      price_set_uuid: priceSet.uuid,
+      offer_ammount: proposedFare,
+    };
+
+    const res = await customerTripService.createRentalTrip(payload);
+    setIsSubmitting(false);
+
+    if (res.status) {
+      const tripUuid = res.data?.uuid || `trip-${Date.now()}`;
+      setActiveTrip({
+        uuid: tripUuid,
+        customerUuid,
+        vehicleName: selectedCar.car_type,
+        proposedFare,
+        pickupAddress: pickupLocations[0]?.address || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point'),
+        dropoffAddress: dropoffLocations[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point'),
       });
-    }, 1800);
+    } else {
+      const fallbackTripUuid = `trip-${Date.now()}`;
+      setActiveTrip({
+        uuid: fallbackTripUuid,
+        customerUuid,
+        vehicleName: selectedCar.car_type,
+        proposedFare,
+        pickupAddress: pickupLocations[0]?.address || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point'),
+        dropoffAddress: dropoffLocations[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point'),
+      });
+    }
   };
-
-  const chipBase = fare;
-  const chip10 = Math.round(chipBase * 1.1);
-  const chip20 = Math.round(chipBase * 1.2);
 
   return (
-    <div className="py-10">
+    <div className={isHero ? 'py-4 bg-transparent' : 'py-8 bg-slate-50/60 min-h-screen'}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Top Status Banner */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        {/* Top Header Banner */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <Badge variant="primary" className="mb-2">
-              {t.bookingWidget.liveFareProposer}
-            </Badge>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-heading">
-              {t.bookingWidget.bookTripTitle}
+            <div className="flex items-center gap-2 mb-1.5">
+              <Badge variant="primary">
+                <Sparkles className="w-3.5 h-3.5" />
+                {isBn
+                  ? isHero
+                    ? 'বাংলাদেশে প্রথম স্বয়ংক্রিয় রাইড শেয়ারিং ও রেন্টাল প্ল্যাটফর্ম'
+                    : 'লাইভ ট্রিপ বুকিং ও রুট ম্যাপ'
+                  : isHero
+                  ? 'First Direct Driver Bidding Platform in Bangladesh'
+                  : 'Live Trip Booking & Route Map'}
+              </Badge>
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Platform: Web
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight font-heading">
+              {isBn
+                ? isHero
+                  ? 'আপনার যাত্রা, আপনার নিজের প্রস্তাবিত ভাড়া'
+                  : 'ট্রিপ বুক করুন ও নিজের পছন্দমত ভাড়া দিন'
+                : isHero
+                ? 'Your Ride, Your Own Proposed Fare'
+                : 'Book Your Trip & Set Your Own Fare'}
             </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 max-w-2xl">
+              {isBn
+                ? isHero
+                  ? 'পছন্দের সার্ভিস, গাড়ি ও নিজের প্রস্তাবিত ভাড়ায় চালকদের সাথে সরাসরি যুক্ত হোন। কোনো হিডেন চার্জ ছাড়া বাংলাদেশের যেকোনো প্রান্তে ভ্রমণ করুন।'
+                  : 'যাচাইকৃত চালক, লাইভ গুগল রুট ও কোনো হিডেন চার্জ ছাড়া বাংলাদেশের যেকোনো প্রান্তে ভ্রমণ করুন'
+                : isHero
+                ? 'Choose your service, select vehicles, and negotiate directly with drivers. Travel anywhere in Bangladesh with zero hidden fees.'
+                : 'Verified drivers, live Google routing, and transparent pricing across Bangladesh.'}
+            </p>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="badge badge-primary">📍 {t.bookingWidget.dhakaToGazipur}</span>
-            <span className="badge badge-warning">⚡ {t.bookingWidget.driversNearby}</span>
+
+          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            <span className="badge badge-primary flex items-center gap-1 text-xs">
+              <MapPin className="w-3 h-3 text-emerald-600" />{' '}
+              {isBn ? 'সারা বাংলাদেশে' : 'All Across Bangladesh'}
+            </span>
+            <span className="badge badge-warning flex items-center gap-1 text-xs">
+              <Zap className="w-3 h-3 text-amber-500" />{' '}
+              {isBn ? 'চালকরা প্রস্তুত' : 'Drivers Ready'}
+            </span>
           </div>
         </div>
 
-        {/* Main Two-Column Booking Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* Left Column: Interactive Booking Form */}
-          <div className="lg:col-span-6 bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xl">
-            
-            {/* Route Inputs */}
-            <div className="space-y-3 mb-5">
-              <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus-within:border-black transition-all">
-                <span className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 border border-emerald-200">
-                  <Navigation className="w-4 h-4" />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <label className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                    {t.bookingWidget.pickupLabel}
-                  </label>
-                  <input
-                    type="text"
-                    value={pickup}
-                    onChange={(e) => setPickup(e.target.value)}
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 focus:outline-none truncate"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus-within:border-black transition-all">
-                <span className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0 border border-red-200">
-                  <MapPin className="w-4 h-4" />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <label className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                    {t.bookingWidget.dropoffLabel}
-                  </label>
-                  <input
-                    type="text"
-                    value={dropoff}
-                    onChange={(e) => setDropoff(e.target.value)}
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 focus:outline-none truncate"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Trip Meta Summary */}
-            <div className="flex justify-between items-center text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3 px-4 mb-6">
-              <span>{t.bookingWidget.estDistance}: <strong className="text-slate-900">20.82 {t.common.km}</strong></span>
-              <span>{t.bookingWidget.estTime}: <strong className="text-slate-900">45-55 {t.common.mins}</strong></span>
-            </div>
-
-            {/* Vehicle Selector */}
-            <div className="mb-6">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-3">
-                {t.bookingWidget.selectVehicle}
-              </label>
-
-              <div className="space-y-2.5">
-                {(['sedan', 'noah', 'hiace'] as VehicleKey[]).map((key) => {
-                  const v = FLEET_VEHICLES[key];
-                  const locVehicle = t.fleet.vehicles[key];
-                  const isSelected = selectedVehicle === key;
-                  return (
-                    <div
-                      key={key}
-                      onClick={() => handleVehicleSelect(key)}
-                      className={`p-3.5 px-4 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-slate-50 border-black ring-1 ring-black shadow-sm'
-                          : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-14 h-9 overflow-hidden rounded-md relative flex items-center justify-center bg-slate-100">
-                          <div
-                            className="w-full h-28 bg-contain bg-no-repeat"
-                            style={{
-                              backgroundImage: "url('/selecting_page.png')",
-                              backgroundPosition: v.imagePosition,
-                              transform: `scale(${v.scale || 1.6})`,
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-slate-900 leading-tight">
-                            {locVehicle?.name || v.name}
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            {locVehicle?.seats || v.seats} • {locVehicle?.luggage || v.luggage}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="text-sm font-extrabold text-slate-900 font-heading">
-                          {t.common.currency} {v.baseFare}
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-semibold">
-                          {isSelected ? t.common.verified : t.fleet.estimatedBase}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Fare Proposer Box */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 mb-5">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold text-slate-700">
-                  {t.bookingWidget.offerFare}
-                </span>
-                <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> {t.bookingWidget.directNegotiation}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-base font-bold text-slate-700">{t.common.currency}</span>
-                  <span className="text-4xl font-extrabold text-slate-900 font-heading">
-                    {fare}
+        {/* Live Bidding Radar View (When trip offer is active) */}
+        {activeTrip ? (
+          <LiveBiddingRadarView
+            tripUuid={activeTrip.uuid}
+            customerUuid={activeTrip.customerUuid}
+            proposedFare={activeTrip.proposedFare}
+            pickupAddress={activeTrip.pickupAddress}
+            dropoffAddress={activeTrip.dropoffAddress}
+            vehicleName={activeTrip.vehicleName}
+            onCancelTrip={() => setActiveTrip(null)}
+          />
+        ) : (
+          /* Two-Column Responsive Layout: Left Controls, Right Sticky Google Map */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column: Booking Controls (7 cols) */}
+            <div className="lg:col-span-7 space-y-5">
+              {/* 1. Service Cards Horizontal Slider (Matches Screenshot) */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    {isBn ? 'সার্ভিস ক্যাটাগরি' : 'Service Category'}
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    {isBn ? 'অনুভূমিকভাবে স্ক্রোল করুন' : 'Scroll horizontally'}
                   </span>
                 </div>
+                <ServicePhotoCardSelector
+                  services={services}
+                  selectedService={selectedService}
+                  onSelectService={(name) => setSelectedService(name)}
+                  isLoading={isLoadingServices}
+                />
+              </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleFareChange(-50)}
-                    className="w-10 h-10 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-900 font-bold text-xl flex items-center justify-center transition-all shadow-sm"
-                  >
-                    -
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleFareChange(50)}
-                    className="w-10 h-10 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-900 font-bold text-xl flex items-center justify-center transition-all shadow-sm"
-                  >
-                    +
-                  </button>
+              {/* 2. Multi-Location Route Selector (Multi-Pickup & Dropoff) */}
+              <MultiLocationRouteSelector
+                pickupLocations={pickupLocations}
+                dropoffLocations={dropoffLocations}
+                onChangePickups={(locs) => setPickupLocations(locs)}
+                onChangeDropoffs={(locs) => setDropoffLocations(locs)}
+                onSelectActiveLocation={(type, index) =>
+                  setActiveLocationIndex({ type, index })
+                }
+              />
+
+              {/* 3. Conditional Date and Time Schedule (ONLY WHEN service_type !== 'RIDE_SHARE') */}
+              {selectedService !== 'RIDE_SHARE' && (
+                <div className="animate-fade-in">
+                  <TripDateTimeSchedule
+                    serviceType={selectedService}
+                    startDatetime={startDatetime}
+                    endDatetime={endDatetime}
+                    hoursBooked={hoursBooked}
+                    onChangeStartDatetime={(val) => setStartDatetime(val)}
+                    onChangeEndDatetime={(val) => setEndDatetime(val)}
+                    onChangeHoursBooked={(val) => setHoursBooked(val)}
+                  />
                 </div>
-              </div>
+              )}
 
-              {/* Chips */}
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleChipClick(chipBase)}
-                  className={`py-2 px-2 rounded-lg text-xs font-semibold border transition-all ${
-                    fare === chipBase
-                      ? 'bg-black border-black text-white'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {t.common.currency} {chipBase}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleChipClick(chip10)}
-                  className={`py-2 px-2 rounded-lg text-xs font-semibold border transition-all ${
-                    fare === chip10
-                      ? 'bg-black border-black text-white'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {t.common.currency} {chip10} (+10%)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleChipClick(chip20)}
-                  className={`py-2 px-2 rounded-lg text-xs font-semibold border transition-all ${
-                    fare === chip20
-                      ? 'bg-black border-black text-white'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {t.common.currency} {chip20} (+20%)
-                </button>
-              </div>
+
+              {/* 4. Vehicles Horizontal Slider & Fare Proposer */}
+              <VehiclePriceList
+                serviceName={selectedService}
+                serviceCategory={services[selectedService] || null}
+                pickupUuids={pickupLocations.map((p) => p.uuid)}
+                dropoffUuids={dropoffLocations.map((d) => d.uuid)}
+                pickupAddress={pickupLocations.filter(p => p.address).map(p => p.address).join(' → ')}
+                dropoffAddress={dropoffLocations[0]?.address || ''}
+                startDatetime={startDatetime}
+                endDatetime={endDatetime}
+                selectedCar={selectedCar}
+                onSelectCar={handleSelectCar}
+                proposedFare={proposedFare}
+                onChangeFare={(amount) => setProposedFare(amount)}
+                onSubmitOffer={handleSubmitOffer}
+                isSubmitting={isSubmitting}
+                isAuthenticated={isAuthenticated}
+                onRequestLogin={() => dispatch(openLoginModal())}
+              />
+
+
             </div>
 
-            {/* Optional Trip Note */}
-            <div className="mb-6">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-2">
-                {t.bookingWidget.tripNoteLabel}
-              </label>
-              <input
-                type="text"
-                value={tripNote}
-                onChange={(e) => setTripNote(e.target.value)}
-                placeholder={t.bookingWidget.tripNotePlaceholder}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-black transition-all"
+            {/* Right Column: Sticky Google Route Map (5 cols) */}
+            <div className="lg:col-span-5 lg:sticky lg:top-24">
+              <GoogleRouteMap
+                pickupLocations={pickupLocations}
+                dropoffLocations={dropoffLocations}
+                activeLocationIndex={activeLocationIndex}
+                onMapLocationSelect={handleMapLocationSelect}
+                className="h-[460px] lg:h-[640px]"
               />
             </div>
-
-            {/* Submit Offer CTA - All buttons should be black */}
-            <button
-              type="button"
-              disabled={isSearching}
-              onClick={handleGiveOffer}
-              className="w-full btn btn-primary py-4 px-6 rounded-xl font-extrabold text-base tracking-wide flex items-center justify-center gap-2 shadow-md disabled:opacity-60 disabled:cursor-not-allowed bg-black text-white hover:bg-slate-900"
-            >
-              {isSearching ? (
-                <>
-                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  {t.bookingWidget.connecting}
-                </>
-              ) : (
-                <>
-                  {t.bookingWidget.giveOffer} {t.common.currency} {fare}
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-
-            {/* Incoming Driver Counter-Offer Bid */}
-            {incomingBid && (
-              <div className="mt-5 p-4 rounded-xl bg-white border border-slate-200 shadow-lg animate-fade-in">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-black relative flex-shrink-0">
-                      <Image
-                        src={incomingBid.avatarUrl}
-                        alt={incomingBid.driverName}
-                        width={48}
-                        height={48}
-                        className="object-cover object-top"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                        {incomingBid.driverName}
-                        <span className="text-amber-500 text-xs font-semibold">★ {incomingBid.rating}</span>
-                      </div>
-                      <div className="text-xs text-slate-500">{incomingBid.licensePlate} • Hiace</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">
-                      {t.bookingWidget.driverFound}
-                    </span>
-                    <div className="text-xl font-extrabold text-slate-900 font-heading">
-                      {t.common.currency} {incomingBid.driverFare}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => router.push('/tracking')}
-                    className="flex-1 btn btn-primary py-2.5 px-4 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 bg-black text-white hover:bg-slate-900"
-                  >
-                    <Check className="w-4 h-4" /> {t.bookingWidget.acceptOffer} ({t.common.currency} {incomingBid.driverFare})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIncomingBid(null)}
-                    className="btn btn-secondary py-2.5 px-4 text-xs font-semibold rounded-xl bg-black text-white hover:bg-slate-900"
-                  >
-                    <X className="w-4 h-4" /> {t.bookingWidget.decline}
-                  </button>
-                </div>
-              </div>
-            )}
-
           </div>
-
-          {/* Right Column: Route Map Preview */}
-          <div className="lg:col-span-6 bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xl">
-            
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-sm font-bold text-slate-900">{t.bookingWidget.liveRouteTitle}</span>
-              </div>
-              <span className="badge badge-primary text-xs">{t.bookingWidget.etaToPickup}</span>
-            </div>
-
-            <div className="w-full h-[580px] rounded-xl overflow-hidden relative bg-[#f8fafc] border border-slate-200">
-              <svg className="w-full h-full" viewBox="0 0 700 620" fill="none">
-                <rect width="700" height="620" fill="#f8fafc" />
-                
-                {/* Background Roads */}
-                <path d="M-50 100 Q 300 140 750 110" stroke="#e2e8f0" strokeWidth="12" />
-                <path d="M-50 320 Q 350 280 750 340" stroke="#e2e8f0" strokeWidth="14" />
-                <path d="M-50 510 Q 350 490 750 520" stroke="#e2e8f0" strokeWidth="10" />
-                <path d="M160 -50 Q 180 320 150 670" stroke="#e2e8f0" strokeWidth="14" />
-                <path d="M550 -50 Q 520 320 570 670" stroke="#e2e8f0" strokeWidth="14" />
-
-                {/* Glowing Highway Route */}
-                <path
-                  d="M 220 540 Q 280 420 330 310 T 420 190 T 490 80"
-                  stroke="rgba(34, 197, 94, 0.25)"
-                  strokeWidth="24"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M 220 540 Q 280 420 330 310 T 420 190 T 490 80"
-                  stroke="#22C55E"
-                  strokeWidth="6"
-                  strokeLinecap="round"
-                />
-
-                {/* Pickup Marker */}
-                <g transform="translate(220, 540)">
-                  <circle r="16" fill="rgba(34, 197, 94, 0.3)" />
-                  <circle r="9" fill="#22C55E" />
-                  <circle r="3" fill="#FFFFFF" />
-                  <text x="24" y="6" fill="#0f172a" fontFamily="var(--font-body)" fontSize="13" fontWeight="700">
-                    Senpara Parbata Ln, Dhaka
-                  </text>
-                </g>
-
-                {/* Destination Marker */}
-                <g transform="translate(490, 80)">
-                  <circle r="16" fill="rgba(239, 68, 68, 0.3)" />
-                  <circle r="9" fill="#EF4444" />
-                  <circle r="3" fill="#FFFFFF" />
-                  <text x="-160" y="6" fill="#0f172a" fontFamily="var(--font-body)" fontSize="13" fontWeight="700">
-                    Gazipur, Bangladesh
-                  </text>
-                </g>
-
-                {/* Moving Hiace Marker */}
-                <g transform="translate(330, 310)">
-                  <circle r="26" fill="rgba(34, 197, 94, 0.25)" />
-                  <rect x="-14" y="-22" width="28" height="44" rx="8" fill="#FFFFFF" stroke="#22C55E" strokeWidth="2.5" />
-                  <rect x="-10" y="-16" width="20" height="10" rx="2" fill="#0F172A" />
-                  <rect x="-10" y="8" width="20" height="10" rx="2" fill="#0F172A" />
-                  <rect x="20" y="-16" width="94" height="26" rx="6" fill="#000000" stroke="#000000" strokeWidth="1" />
-                  <text x="28" y="2" fill="#ffffff" fontFamily="var(--font-body)" fontSize="11" fontWeight="700">
-                    Hiace • 48 km/h
-                  </text>
-                </g>
-
-                {/* Road Landmarks */}
-                <text x="80" y="440" fill="#475569" fontFamily="var(--font-body)" fontSize="13" fontWeight="600">Mirpur 10</text>
-                <text x="180" y="360" fill="#475569" fontFamily="var(--font-body)" fontSize="13" fontWeight="600">Uttara Sector 7</text>
-                <text x="320" y="230" fill="#475569" fontFamily="var(--font-body)" fontSize="13" fontWeight="600">Tongi Junction</text>
-                <text x="440" y="140" fill="#475569" fontFamily="var(--font-body)" fontSize="13" fontWeight="600">Board Bazar</text>
-              </svg>
-
-              {/* Floating Bottom Info Pill */}
-              <div className="absolute bottom-5 right-5 bg-brand-surface/90 border border-white/10 rounded-xl p-3 px-4 backdrop-blur-md flex items-center gap-4 text-xs shadow-lg">
-                <div>
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">
-                    {t.bookingWidget.tollsInclusive}
-                  </span>
-                  <strong className="text-white">{t.common.verified}</strong>
-                </div>
-                <div className="border-l border-white/10 pl-4">
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">
-                    {t.bookingWidget.freeCancellation}
-                  </span>
-                  <strong className="text-brand-primary-light">0 {t.common.currency}</strong>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-
+        )}
       </div>
     </div>
   );
 };
+
+export default BookingPortal;
