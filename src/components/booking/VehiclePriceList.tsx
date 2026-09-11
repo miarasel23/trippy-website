@@ -397,13 +397,13 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
               {/* Car Image Area */}
               <div className={`h-28 w-full flex items-center justify-center relative overflow-hidden ${isSelected ? 'bg-white/5' : 'bg-slate-50'}`}>
                 {car.car_avatar ? (
-                  <div className="relative w-36 h-24 transition-transform duration-300 group-hover:scale-105">
+                  <div className="relative w-44 h-24 transition-transform duration-300 group-hover:scale-105">
                     <Image
                       src={getImageUrl(car.car_avatar)}
                       alt={isBn ? meta.bn : meta.en}
                       fill
                       className="object-contain"
-                      sizes="144px"
+                      sizes="176px"
                     />
                   </div>
                 ) : (
