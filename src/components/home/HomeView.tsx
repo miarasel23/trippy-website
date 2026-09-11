@@ -24,8 +24,7 @@ export const HomeView: React.FC = () => {
 
       {/* Vehicle Catalog Showcase */}
       <FleetCatalog
-        showFilterBar={false}
-        limit={4}
+        showFilterBar={true}
         title={t.fleet.title}
         subtitle={t.fleet.subtitle}
       />
