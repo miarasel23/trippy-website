@@ -32,6 +32,7 @@ export const AppUrls = {
     tripPriceDetails: '/api/v1/rental-trip/trip-price-details-customer',
     createRentalTrip: '/api/v1/rental-trip/create-rental-trip',
     rentalBids: '/api/v1/rental-trip/rental-bid-trip-list_for_customer',
+    rentalBidTripSingle: '/api/v1/rental-trip/rental-bid-trip-single_for_customer',
     acceptTrip: '/api/v1/rental-trip/accept_trip_for_customer',
     cancelTrip: '/api/v1/rental-trip/cancel-trip-driver-or-customer-admin',
     cancelRentBid: '/api/v1/rental-trip/cancel-rent-bid-driver-or-customer-admin',

@@ -37,6 +37,87 @@ interface ActiveTripContextType {
 
 const ActiveTripContext = createContext<ActiveTripContextType | undefined>(undefined);
 
+/**
+ * Compares two RentalTrip states.
+ * Returns true ONLY IF:
+ * - New data is found (new trip, new driver bid, fare changed, driver count increased, seen driver added, status changed)
+ * - Any data was lost (trip deleted/completed, driver bid removed/withdrawn, count decreased)
+ * Returns false if the data is semantically identical, PREVENTING any React re-renders.
+ */
+export function hasTripDataChanged(
+  prev: RentalTrip | null,
+  next: RentalTrip | null
+): boolean {
+  if (!prev && !next) return false;
+  if (!prev && next) return true; // Found new trip!
+  if (prev && !next) return true; // Lost trip!
+
+  const p = prev!;
+  const n = next!;
+
+  if (p.uuid !== n.uuid) return true;
+  if ((p.trip_status || '').toUpperCase() !== (n.trip_status || '').toUpperCase()) return true;
+  if (Number(p.offer_amount || 0) !== Number(n.offer_amount || 0)) return true;
+  if (p.accepted_bid_uuid !== n.accepted_bid_uuid) return true;
+
+  const pTotalBids = p.total_bids ?? p.bid_summary?.total_bids ?? p.drivers?.length ?? 0;
+  const nTotalBids = n.total_bids ?? n.bid_summary?.total_bids ?? n.drivers?.length ?? 0;
+  if (pTotalBids !== nTotalBids) return true;
+
+  const pSeenCount = p.seen_driver_count ?? p.seen_drivers?.length ?? 0;
+  const nSeenCount = n.seen_driver_count ?? n.seen_drivers?.length ?? 0;
+  if (pSeenCount !== nSeenCount) return true;
+
+  const pDrivers = p.drivers || [];
+  const nDrivers = n.drivers || [];
+  if (pDrivers.length !== nDrivers.length) return true;
+
+  for (let i = 0; i < nDrivers.length; i++) {
+    const nd = nDrivers[i];
+    const nId =
+      nd.rent_bid_uuid ||
+      nd.rentBidUuid ||
+      nd.uuid ||
+      nd.driver_uuid ||
+      nd.driverUuid ||
+      `driver-${i}`;
+    const pd = pDrivers.find((d) => {
+      const pId =
+        d.rent_bid_uuid ||
+        d.rentBidUuid ||
+        d.uuid ||
+        d.driver_uuid ||
+        d.driverUuid ||
+        '';
+      return pId === nId;
+    });
+
+    if (!pd) return true; // New driver bid found!
+
+    if (Number(pd.bid_amount || 0) !== Number(nd.bid_amount || 0)) return true;
+    if (Number(pd.total_amount || 0) !== Number(nd.total_amount || 0)) return true;
+    if (Number(pd.insurance_charge_amount || 0) !== Number(nd.insurance_charge_amount || 0)) return true;
+    if (Number(pd.customer_discount_amount || 0) !== Number(nd.customer_discount_amount || 0)) return true;
+    if (pd.bid_status !== nd.bid_status) return true;
+    if (Number(pd.average_rating || 0) !== Number(nd.average_rating || 0)) return true;
+    if ((pd.total_completed_trips || 0) !== (nd.total_completed_trips || 0)) return true;
+    if ((pd.car_photos?.length || 0) !== (nd.car_photos?.length || 0)) return true;
+    if ((pd.rating_list?.length || 0) !== (nd.rating_list?.length || 0)) return true;
+    if (pd.car_reg_number !== nd.car_reg_number) return true;
+  }
+
+  const pSeen = p.seen_drivers || [];
+  const nSeen = n.seen_drivers || [];
+  if (pSeen.length !== nSeen.length) return true;
+  for (let i = 0; i < nSeen.length; i++) {
+    const ns = nSeen[i];
+    const ps = pSeen.find((s) => s.driver_uuid === ns.driver_uuid);
+    if (!ps) return true; // New seen driver found
+  }
+
+  return false;
+}
+
 export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -51,40 +132,103 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isRadarModalOpen, setIsRadarModalOpen] = useState<boolean>(false);
   const [isRadarOnPage, setIsRadarOnPage] = useState<boolean>(false);
 
+  // Stable reference to current activeTrip to prevent interval churn
+  const activeTripRef = React.useRef<RentalTrip | null>(activeTrip);
+  useEffect(() => {
+    activeTripRef.current = activeTrip;
+  }, [activeTrip]);
+
   const customerUuid = user?.uuid || getActiveCustomerUuid();
 
+  /**
+   * Refreshes active trip via /api/v1/rental-trip/rental-bid-trip-list_for_customer
+   * ONLY updates React state and re-renders if new data is found or data is lost.
+   */
   const refreshActiveTrip = useCallback(async (): Promise<RentalTrip | null> => {
     try {
-      const trip = await customerTripService.fetchActiveRequestedTrip(
+      // 1. Query /api/v1/rental-trip/rental-bid-trip-list_for_customer
+      const trips = await customerTripService.fetchBids(
         customerUuid,
         language,
+        'REQUESTED',
         token || undefined
       );
 
-      if (trip && trip.trip_status === 'REQUESTED') {
-        setActiveTrip(trip);
-        const count =
-          trip.drivers?.length ??
-          trip.total_bids ??
-          (trip as any).bid_summary?.total_bids ??
-          0;
-        setBidsCount(count);
-        return trip;
-      } else {
-        // If trip was completed/cancelled on backend
-        if (activeTrip && activeTrip.trip_status === 'REQUESTED') {
-          setActiveTrip(null);
+      let nextTrip: RentalTrip | null = null;
+      if (trips && trips.length > 0) {
+        const currentTargetUuid = activeTripRef.current?.uuid;
+        const matched = currentTargetUuid
+          ? trips.find((t) => t.uuid === currentTargetUuid)
+          : null;
+        nextTrip =
+          matched ||
+          trips.find((t) => (t.trip_status || '').toUpperCase() === 'REQUESTED') ||
+          trips[0] ||
+          null;
+
+        if (nextTrip) {
+          const status = (nextTrip.trip_status || '').toUpperCase();
+          if (
+            status === 'CANCELLED' ||
+            status === 'CANCELED' ||
+            status === 'TRIP_CANCELLED' ||
+            status === 'COMPLETED' ||
+            status === 'TRIP_COMPLETED' ||
+            status === 'FINISHED'
+          ) {
+            nextTrip = null;
+          }
+        }
+      }
+
+      // If activeTrip exists but wasn't in REQUESTED list, check single trip endpoint
+      if (!nextTrip && activeTripRef.current?.uuid) {
+        const singleRes = await customerTripService.fetchSingleTripBids(
+          customerUuid,
+          activeTripRef.current.uuid,
+          language,
+          'ALL',
+          token || undefined
+        );
+        if (singleRes.status && singleRes.data) {
+          const sTrip = singleRes.data;
+          const status = (sTrip.trip_status || '').toUpperCase();
+          if (
+            status !== 'CANCELLED' &&
+            status !== 'CANCELED' &&
+            status !== 'TRIP_CANCELLED' &&
+            status !== 'COMPLETED' &&
+            status !== 'TRIP_COMPLETED' &&
+            status !== 'FINISHED'
+          ) {
+            nextTrip = sTrip;
+          }
+        }
+      }
+
+      // 2. ONLY re-render if new data is found OR data was lost
+      if (hasTripDataChanged(activeTripRef.current, nextTrip)) {
+        setActiveTrip(nextTrip);
+        if (nextTrip) {
+          const count =
+            nextTrip.drivers?.length ??
+            nextTrip.total_bids ??
+            (nextTrip as any).bid_summary?.total_bids ??
+            0;
+          setBidsCount(count);
+        } else {
           setBidsCount(0);
         }
-        return null;
       }
+
+      return nextTrip;
     } catch (err) {
       console.error('Error refreshing active trip:', err);
-      return null;
+      return activeTripRef.current;
     }
-  }, [customerUuid, language, token, activeTrip]);
+  }, [customerUuid, language, token]);
 
-  // Initial load + interval polling every 8 seconds
+  // Initial load + interval polling every 10 seconds (10000ms)
   useEffect(() => {
     let isMounted = true;
 
@@ -99,11 +243,12 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
 
     check();
 
+    // Call API every 10 seconds
     const interval = setInterval(() => {
       if (isMounted) {
         refreshActiveTrip();
       }
-    }, 8000);
+    }, 10000);
 
     return () => {
       isMounted = false;
@@ -135,16 +280,20 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const setActiveTripManually = (trip: RentalTrip | null) => {
-    setActiveTrip(trip);
-    if (trip) {
-      setIsOverlayVisible(true);
-      setIsMinimized(false);
-      const count =
-        trip.drivers?.length ??
-        trip.total_bids ??
-        (trip as any).bid_summary?.total_bids ??
-        0;
-      setBidsCount(count);
+    if (hasTripDataChanged(activeTripRef.current, trip)) {
+      setActiveTrip(trip);
+      if (trip) {
+        setIsOverlayVisible(true);
+        setIsMinimized(false);
+        const count =
+          trip.drivers?.length ??
+          trip.total_bids ??
+          (trip as any).bid_summary?.total_bids ??
+          0;
+        setBidsCount(count);
+      } else {
+        setBidsCount(0);
+      }
     }
   };
 

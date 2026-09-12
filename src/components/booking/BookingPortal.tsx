@@ -6,7 +6,10 @@ import {
   LocationSearchResult,
   CarInfo,
 } from '@/types/customerApi';
-import { customerTripService } from '@/services/customerTripService';
+import {
+  customerTripService,
+  getActiveCustomerUuid,
+} from '@/services/customerTripService';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { openLoginModal } from '@/redux/features/authSlice';
 import { ServicePhotoCardSelector } from './ServicePhotoCardSelector';
@@ -26,7 +29,7 @@ interface BookingPortalProps {
 
 export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) => {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, user, token } = useAppSelector((state) => state.auth);
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
@@ -118,7 +121,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
         customerUuid:
           user?.uuid ||
           localStorage.getItem('trippy_customer_uuid') ||
-          '3810b347-ab60-4004-891d-81060cf4135c',
+          getActiveCustomerUuid(),
         serviceName: globalActiveTrip.service_name || 'RIDE_SHARE',
         vehicleName: globalActiveTrip.car_category?.car_type || 'Vehicle',
         proposedFare: globalActiveTrip.offer_amount || 0,
@@ -263,7 +266,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     const customerUuid =
       user?.uuid ||
       localStorage.getItem('trippy_customer_uuid') ||
-      'guest-customer-uuid';
+      getActiveCustomerUuid();
 
     setIsSubmitting(true);
 
@@ -295,8 +298,13 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     const formattedDropoff =
       dropoffLocations[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
 
+    const createdTripUuid =
+      res.status && (res.data?.uuid || res.data?.trip_uuid || res.data?.rental_trip_uuid || res.data?.trip?.uuid)
+        ? res.data.uuid || res.data.trip_uuid || res.data.rental_trip_uuid || res.data?.trip?.uuid
+        : `trip-${Date.now()}`;
+
     const tripData = {
-      uuid: res.status && res.data?.uuid ? res.data.uuid : `trip-${Date.now()}`,
+      uuid: createdTripUuid,
       customerUuid,
       serviceName: selectedService,
       vehicleName: selectedCar.car_type,
@@ -313,6 +321,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     // Sync globally so the global overlay and active trip context reflect the new request
     setActiveTripManually({
       uuid: tripData.uuid,
+      customer_uuid: customerUuid,
       service_name: selectedService,
       offer_amount: proposedFare,
       trip_status: 'REQUESTED',
@@ -324,6 +333,18 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       created_at: tripData.createdAt,
       drivers: [],
     } as any);
+
+    // Call /v1/rental-trip/rental-bid-trip-single_for_customer immediately after trip creation
+    customerTripService
+      .fetchSingleTripBids(customerUuid, createdTripUuid, language, 'ALL', token || undefined)
+      .then((singleRes) => {
+        if (singleRes.status && singleRes.data) {
+          setActiveTripManually(singleRes.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Initial single trip polling call:', err);
+      });
 
     // Automatically scroll to driver finding radar view so user immediately sees next step without scrolling up
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -429,6 +450,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
               hoursBooked={activeTrip.hoursBooked}
               note={activeTrip.note}
               createdAt={activeTrip.createdAt}
+              initialBids={globalActiveTrip?.drivers || []}
               onCancelTrip={() => {
                 setActiveTrip(null);
                 clearGlobalActiveTrip();

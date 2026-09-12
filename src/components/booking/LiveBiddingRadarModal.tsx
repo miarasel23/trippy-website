@@ -81,6 +81,7 @@ export const LiveBiddingRadarModal: React.FC = () => {
             hoursBooked={activeTrip.hours_booked || undefined}
             note={activeTrip.note || undefined}
             createdAt={activeTrip.created_at}
+            initialBids={activeTrip.drivers || []}
             isModal={true}
             onCancelTrip={() => {
               clearActiveTrip();

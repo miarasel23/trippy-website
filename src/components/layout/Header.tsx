@@ -112,20 +112,43 @@ export const Header: React.FC = () => {
               </button>
             </div>
 
-            {/* Active Trip Pill in Header if an active requested trip exists */}
-            {activeTrip && activeTrip.trip_status === 'REQUESTED' && (
+            {/* Active Trip Pill in Header for all trip lifecycle states */}
+            {activeTrip && (
               <Link
-                href={`/trips?trip_uuid=${activeTrip.uuid}`}
+                href={
+                  activeTrip.trip_status === 'REQUESTED'
+                    ? `/trips?trip_uuid=${activeTrip.uuid}`
+                    : `/tracking?trip_uuid=${activeTrip.uuid}`
+                }
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold transition-all shadow-xs animate-pulse"
-                title={language === 'bn' ? 'চলমান ট্রিপ রাডার দেখুন' : 'View live bidding radar'}
+                title={
+                  activeTrip.trip_status === 'REQUESTED'
+                    ? language === 'bn'
+                      ? 'চলমান ট্রিপ রাডার দেখুন'
+                      : 'View live bidding radar'
+                    : language === 'bn'
+                    ? 'লাইভ ট্রিপ ট্র্যাকিং দেখুন'
+                    : 'View live trip tracking'
+                }
               >
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                 </span>
                 <span>
-                  {language === 'bn' ? 'চলমান ট্রিপ' : 'Active Trip'}
-                  {bidsCount > 0 ? ` (${bidsCount})` : ''}
+                  {activeTrip.trip_status === 'REQUESTED'
+                    ? language === 'bn'
+                      ? 'চলমান ট্রিপ'
+                      : 'Active Trip'
+                    : activeTrip.trip_status === 'COMPLETED' ||
+                      activeTrip.trip_status === 'FINISHED'
+                    ? language === 'bn'
+                      ? 'রিভিউ দিন'
+                      : 'Rate Driver'
+                    : language === 'bn'
+                    ? 'লাইভ ট্র্যাকিং'
+                    : 'Live Tracking'}
+                  {activeTrip.trip_status === 'REQUESTED' && bidsCount > 0 ? ` (${bidsCount})` : ''}
                 </span>
               </Link>
             )}
@@ -279,6 +302,43 @@ export const Header: React.FC = () => {
                     {t.auth.logout}
                   </button>
                 </div>
+              )}
+
+              {/* Active Trip Banner for Mobile */}
+              {activeTrip && (
+                <Link
+                  href={
+                    activeTrip.trip_status === 'REQUESTED'
+                      ? `/trips?trip_uuid=${activeTrip.uuid}`
+                      : `/tracking?trip_uuid=${activeTrip.uuid}`
+                  }
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl mb-2 flex items-center justify-between text-emerald-950 font-bold text-xs animate-pulse"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span>
+                      {activeTrip.trip_status === 'REQUESTED'
+                        ? language === 'bn'
+                          ? 'চলমান ট্রিপ রাডার'
+                          : 'Live Trip Radar'
+                        : activeTrip.trip_status === 'COMPLETED' ||
+                          activeTrip.trip_status === 'FINISHED'
+                        ? language === 'bn'
+                          ? 'ট্রিপ সম্পন্ন • রিভিউ দিন'
+                          : 'Trip Completed • Rate Driver'
+                        : language === 'bn'
+                        ? 'লাইভ ট্রিপ ট্র্যাকিং'
+                        : 'Live Trip Tracking'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-emerald-700 font-extrabold underline">
+                    {language === 'bn' ? 'দেখুন →' : 'View →'}
+                  </span>
+                </Link>
               )}
 
               {navLinks.map((link) => {

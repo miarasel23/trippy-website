@@ -152,14 +152,38 @@ export interface RentalDriverBid {
   customer_discount_amount?: number;
   time_away_mins?: number;
   created_at?: string;
+  rating_list?: Array<{
+    uuid?: string;
+    rating: number;
+    comments?: string | null;
+    customer_uuid?: string;
+    customer_name?: string;
+    customer_photo?: string;
+    created_at?: string;
+  }>;
 }
 
 export interface RentalTrip {
   id?: number;
   uuid?: string;
+  customer_uuid?: string;
+  customerUuid?: string;
   service_name?: string;
   offer_amount?: number;
   total_bids?: number;
+  seen_driver_count?: number;
+  seen_drivers?: Array<{
+    driver_uuid?: string;
+    name?: string;
+    profile_picture?: string;
+    created_at?: string;
+  }>;
+  seen_driver_photos?: string[];
+  bid_summary?: {
+    lowest_bid_amount?: number;
+    highest_bid_amount?: number;
+    total_bids?: number;
+  };
   trip_status?: string;
   payment_method?: string;
   start_datetime?: string;
@@ -170,6 +194,7 @@ export interface RentalTrip {
   note?: string | null;
   accepted_bid_uuid?: string | null;
   accepted_driver?: RentalDriverBid | null;
+  given_review?: boolean;
   pickup_locations?: LocationModel[];
   dropoff_locations?: LocationModel[];
   drivers?: RentalDriverBid[];

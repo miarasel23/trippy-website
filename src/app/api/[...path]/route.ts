@@ -26,6 +26,8 @@ function resolveBackendUrl(pathSegments: string[], reqMethod: string): string {
       return AppUrls.backend.createRentalTrip;
     case 'rental/bids':
       return AppUrls.backend.rentalBidTripListForCustomer;
+    case 'rental/single-bid':
+      return AppUrls.backend.rentalBidTripSingleForCustomer;
     case 'rental/accept-bid':
       return AppUrls.backend.acceptTripForCustomer;
     case 'rental/cancel-trip':
@@ -63,6 +65,9 @@ function getDefaultActionWhen(pathStr: string): string {
   }
   if (pathStr.includes('create-rental-trip') || pathStr.includes('create-trip')) {
     return 'create_rental_trip';
+  }
+  if (pathStr.includes('rental-bid-trip-single') || pathStr.includes('rental/single-bid')) {
+    return 'rental_bid_trip_single_for_customer';
   }
   if (pathStr.includes('rental-bid-trip-list') || pathStr.includes('rental/bids')) {
     return 'rental_bid_trip_list_for_customer';
@@ -186,6 +191,24 @@ export async function POST(
     }
     if (bodyObj.offerAmount !== undefined && bodyObj.offer_ammount === undefined) {
       bodyObj.offer_ammount = bodyObj.offerAmount;
+    }
+    if (bodyObj.offer_amount !== undefined && bodyObj.offer_ammount === undefined) {
+      bodyObj.offer_ammount = bodyObj.offer_amount;
+    }
+    if (bodyObj.offer_ammount !== undefined && bodyObj.offer_amount === undefined) {
+      bodyObj.offer_amount = bodyObj.offer_ammount;
+    }
+    if (bodyObj.trip_uuid && !bodyObj.rental_trip_uuid) {
+      bodyObj.rental_trip_uuid = bodyObj.trip_uuid;
+    }
+    if (bodyObj.rental_trip_uuid && !bodyObj.trip_uuid) {
+      bodyObj.trip_uuid = bodyObj.rental_trip_uuid;
+    }
+    if (bodyObj.bid_uuid && !bodyObj.rent_bid_uuid) {
+      bodyObj.rent_bid_uuid = bodyObj.bid_uuid;
+    }
+    if (bodyObj.rent_bid_uuid && !bodyObj.bid_uuid) {
+      bodyObj.bid_uuid = bodyObj.rent_bid_uuid;
     }
 
     // Format into URLSearchParams as required by the backend API
