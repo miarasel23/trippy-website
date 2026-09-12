@@ -25,6 +25,10 @@ import {
   ChevronRight,
   Loader2,
   Luggage,
+  Image as ImageIcon,
+  ZoomIn,
+  Eye,
+  CameraOff,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useActiveTrip } from '@/context/ActiveTripContext';
@@ -34,8 +38,14 @@ import {
   getImageUrl,
   getActiveCustomerUuid,
 } from '@/services/customerTripService';
-import { RentalTrip, RentalDriverBid } from '@/types/customerApi';
+import {
+  RentalTrip,
+  RentalDriverBid,
+  DriverTrackingRecord,
+} from '@/types/customerApi';
 import { TripReviewModal } from '@/components/booking/TripReviewModal';
+import { CarPhotoGalleryModal } from '@/components/booking/CarPhotoGalleryModal';
+import { TrackingGoogleMap } from '@/components/tracking/TrackingGoogleMap';
 
 // Sample default trip structure matching the live backend API response provided by the user
 const DEFAULT_API_TRIP: RentalTrip = {
@@ -174,6 +184,24 @@ export const TrackingPortal: React.FC = () => {
   const [chatInput, setChatInput] = useState<string>('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Photo Gallery Modal state
+  const [isCarGalleryOpen, setIsCarGalleryOpen] = useState<boolean>(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0);
+
+  // Live Driver Tracking Telemetry (/v1/customer-driver-track/get)
+  const [driverTrackingRecords, setDriverTrackingRecords] = useState<DriverTrackingRecord[]>([]);
+  const [latestDriverLocation, setLatestDriverLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    address: string;
+    updated_at?: string;
+  }>({
+    latitude: 23.8013563,
+    longitude: 90.3763409,
+    address: '3 Senpara Parbata Lane, Dhaka, Bangladesh',
+    updated_at: '2026-09-12T13:10:27',
+  });
+
   // ── 1. Real-time Trip Polling from Backend API (Every 10 seconds) ──────────
   useEffect(() => {
     let isMounted = true;
@@ -292,40 +320,156 @@ export const TrackingPortal: React.FC = () => {
     trip?.offer_amount ||
     747;
 
-  // Car photos list from driver info
-  const carPhotos =
-    activeDriver?.car_photos ||
-    DEFAULT_API_TRIP.accepted_driver?.car_photos ||
-    [];
+  // Driver UUID for live GPS tracking: URL param > activeDriver > accepted_driver > user sample driver UUID
+  const effectiveDriverUuid =
+    driverUuidParam ||
+    activeDriver?.driver_uuid ||
+    trip?.accepted_driver?.driver_uuid ||
+    (trip?.drivers && trip.drivers.length > 0 ? trip.drivers[0].driver_uuid : null) ||
+    'fcfa9476-27c5-4f67-8c30-59940d4b2fff';
 
   // ── 3. Step-by-Step Lifecycle Status Logic (Website Way) ───────────────────
-  const rawStatus = (trip?.trip_status || 'COMPLETED').toUpperCase();
-  const isCompleted =
-    rawStatus === 'COMPLETED' ||
-    rawStatus === 'FINISHED' ||
-    rawStatus === 'TRIP_COMPLETED';
-  const isFirstCompleted = rawStatus === 'FIRST_COMPLETED';
-  const isRideStarted = rawStatus === 'RIDE_STARTED' || isFirstCompleted;
+  const statusParam = searchParams.get('status')?.toUpperCase();
+  const rawStatus = (statusParam || trip?.trip_status || 'COMPLETED').toUpperCase();
+
+  // Active trip statuses explicitly identified by the user:
+  // accepted, in_progress, ride_started (or on_the_way), first_completed
+  const isActiveTrip =
+    rawStatus === 'ACCEPTED' ||
+    rawStatus === 'ACCEPT' ||
+    rawStatus === 'IN_PROGRESS' ||
+    rawStatus === 'INPROGRESS' ||
+    rawStatus === 'ON_THE_WAY' ||
+    rawStatus === 'ONTHEWAY' ||
+    rawStatus === 'RIDE_STARTED' ||
+    rawStatus === 'RIDESTARTED' ||
+    rawStatus === 'STARTED' ||
+    rawStatus === 'FIRST_COMPLETED' ||
+    rawStatus === 'FIRSTCOMPLETED' ||
+    rawStatus === 'PICKUP_ARRIVED';
+
+  const isCompleted = !isActiveTrip;
+  const isFirstCompleted =
+    rawStatus === 'FIRST_COMPLETED' || rawStatus === 'FIRSTCOMPLETED';
+  const isRideStarted =
+    rawStatus === 'RIDE_STARTED' ||
+    rawStatus === 'RIDESTARTED' ||
+    rawStatus === 'STARTED' ||
+    isFirstCompleted;
   const isInProgress =
     rawStatus === 'IN_PROGRESS' ||
+    rawStatus === 'INPROGRESS' ||
     rawStatus === 'ACCEPTED' ||
-    rawStatus === 'ON_THE_WAY';
+    rawStatus === 'ACCEPT' ||
+    rawStatus === 'ON_THE_WAY' ||
+    rawStatus === 'ONTHEWAY';
+
+  // ── 2.b Live Driver Location Polling (/v1/customer-driver-track/get) ──────────
+  useEffect(() => {
+    // Only poll live driver GPS tracking when there is an active running trip!
+    if (!effectiveDriverUuid || !isActiveTrip) return;
+    let isMounted = true;
+
+    const pollDriverLocation = async () => {
+      try {
+        const records = await customerTripService.fetchDriverLocation(
+          effectiveDriverUuid,
+          language,
+          token || undefined
+        );
+
+        if (!isMounted) return;
+
+        if (Array.isArray(records) && records.length > 0) {
+          setDriverTrackingRecords(records);
+          const latest = records[0];
+          if (latest?.geolocation?.latitude && latest?.geolocation?.longitude) {
+            const lat =
+              typeof latest.geolocation.latitude === 'string'
+                ? parseFloat(latest.geolocation.latitude)
+                : Number(latest.geolocation.latitude);
+            const lng =
+              typeof latest.geolocation.longitude === 'string'
+                ? parseFloat(latest.geolocation.longitude)
+                : Number(latest.geolocation.longitude);
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+              setLatestDriverLocation({
+                latitude: lat,
+                longitude: lng,
+                address:
+                  latest.geolocation.address || '3 Senpara Parbata Lane, Dhaka, Bangladesh',
+                updated_at: latest.created_at || latest.updated_at,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error polling driver GPS location:', err);
+      }
+    };
+
+    pollDriverLocation();
+    const interval = setInterval(pollDriverLocation, 10000); // 10s polling interval
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [effectiveDriverUuid, language, token, isActiveTrip]);
+
+  // Car photos list from driver info (Strictly use real photos; do not fall back to fake demo photos if driver has none)
+  const noPhotosParam = searchParams.get('no_photos') === 'true';
+  const rawCarPhotos = activeDriver?.car_photos;
+  const carPhotos: string[] = noPhotosParam
+    ? []
+    : Array.isArray(rawCarPhotos)
+    ? rawCarPhotos.filter((p) => Boolean(p && typeof p === 'string' && p.trim().length > 0))
+    : [];
 
   // Return trip logic: If service is return & first_completed, flip locations
-  const isReturnService =
-    trip?.service_name?.toUpperCase().includes('RETURN') ||
-    (trip as any)?.servive_type?.toUpperCase().includes('RETURN');
+  const serviceTypeParam = searchParams.get('service_type')?.toUpperCase();
+  const serviceNameParam = searchParams.get('service_name')?.toUpperCase();
+  const rawService = (
+    serviceTypeParam ||
+    serviceNameParam ||
+    trip?.service_name ||
+    (trip as any)?.service_type ||
+    (trip as any)?.servive_type ||
+    ''
+  ).toUpperCase();
 
-  const basePickup =
-    trip?.pickup_locations?.[0]?.address ||
-    'Senpara Porbota, Mirpur 10., Dhaka, Bangladesh';
-  const baseDropoff =
-    trip?.dropoff_locations?.[0]?.address || 'Gulshan 2, Dhaka, Bangladesh';
+  const isReturnService =
+    rawService.includes('RETURN') ||
+    rawService.includes('ROUND') ||
+    rawService.includes('TWO_WAY');
+
+  const basePickupLocation = trip?.pickup_locations?.[0] || {
+    uuid: 'pickup',
+    latitude: '23.8014',
+    longitude: '90.3763',
+    address: 'Senpara Porbota, Mirpur 10., Dhaka, Bangladesh',
+  };
+  const baseDropoffLocation = trip?.dropoff_locations?.[0] || {
+    uuid: 'dropoff',
+    latitude: '23.7925',
+    longitude: '90.4078',
+    address: 'Gulshan 2, Dhaka, Bangladesh',
+  };
+
+  const shouldSwapLocations = isFirstCompleted && isReturnService;
+
+  const activePickupLocation = shouldSwapLocations
+    ? baseDropoffLocation
+    : basePickupLocation;
+  const activeDropoffLocation = shouldSwapLocations
+    ? basePickupLocation
+    : baseDropoffLocation;
 
   const pickupAddress =
-    isFirstCompleted && isReturnService ? baseDropoff : basePickup;
+    activePickupLocation.address || 'Senpara Porbota, Mirpur 10., Dhaka, Bangladesh';
   const dropoffAddress =
-    isFirstCompleted && isReturnService ? basePickup : baseDropoff;
+    activeDropoffLocation.address || 'Gulshan 2, Dhaka, Bangladesh';
 
   // Calculate active step number for stepper
   const getStepIndex = () => {
@@ -363,7 +507,7 @@ export const TrackingPortal: React.FC = () => {
     }
     if (isRideStarted) {
       return {
-        badge: isBn ? 'যাত্রা চলমান' : 'Ride In Progress',
+        badge: isBn ? 'যাত্রা চলমান' : 'Ride Ongoing',
         title: isBn
           ? 'গন্তব্যের উদ্দেশ্যে গাড়ি এগিয়ে চলেছে'
           : 'Heading towards your destination',
@@ -406,6 +550,16 @@ export const TrackingPortal: React.FC = () => {
     trip?.review_status === 1 ||
     activeDriver?.review_status === true ||
     hasReviewed;
+
+  // ── Auto-open review popup when trip is completed and review not given ────
+  useEffect(() => {
+    if (isCompleted && !isReviewed && !hasReviewed) {
+      const timer = setTimeout(() => {
+        setIsReviewModalOpen(true);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [isCompleted, isReviewed, hasReviewed]);
 
   // Send message handler
   const handleSendMessage = (textToSend?: string) => {
@@ -651,402 +805,690 @@ export const TrackingPortal: React.FC = () => {
           </div>
         )}
 
-        {/* ── 4. Main Two-Column Portal Layout (Driver Card & Map) ──────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* Left Column: Driver Info, Route, Vehicle Photos & Safety */}
-          <div className="lg:col-span-4 space-y-5">
+        {/* ── 4. Main Section: Active Live Tracking vs Completed Step-by-Step ── */}
+        {isActiveTrip ? (
+          /* ═══════════════════════════════════════════════════════════════════
+             ACTIVE TRIP VIEW: Live Telemetry, Driver Controls & Google Map
+             ═══════════════════════════════════════════════════════════════════ */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             
-            {/* Driver Profile Card (With Real Name, Phone, Photo, Plate, Total Fare) */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-emerald-500 bg-slate-100 flex-shrink-0 relative shadow-2xs">
-                  <Image
-                    src={getImageUrl(driverPhoto)}
-                    alt={driverName}
-                    fill
-                    className="object-cover"
-                    sizes="56px"
-                  />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="text-base font-bold text-slate-900 truncate">
-                      {driverName}
-                    </h3>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      ✓
-                    </span>
+            {/* Left Column: Driver Info, Route, Vehicle Photos & Safety */}
+            <div className="lg:col-span-4 space-y-5">
+              
+              {/* Driver Profile Card (With Real Name, Phone, Photo, Plate, Total Fare) */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-emerald-500 bg-slate-100 flex-shrink-0 relative shadow-2xs">
+                    <Image
+                      src={getImageUrl(driverPhoto)}
+                      alt={driverName}
+                      fill
+                      className="object-cover"
+                      sizes="56px"
+                    />
                   </div>
-                  <div className="flex items-center gap-2 text-xs mt-0.5">
-                    <span className="flex items-center gap-1 font-bold text-amber-500">
-                      <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                      {driverRating}
-                    </span>
-                    <span className="text-slate-400 font-medium">
-                      ({completedRides} {isBn ? 'ট্রিপ' : 'rides'})
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Vehicle Model & Registration Plate */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 px-4 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    {isBn ? 'গাড়ির বিবরণ' : 'Vehicle & Model'}
-                  </span>
-                  <div className="text-xs font-bold text-slate-800 capitalize">
-                    {carType}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-base font-bold text-slate-900 truncate">
+                        {driverName}
+                      </h3>
+                      <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        ✓
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs mt-0.5">
+                      <span className="flex items-center gap-1 font-bold text-amber-500">
+                        <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                        {driverRating}
+                      </span>
+                      <span className="text-slate-400 font-medium">
+                        ({completedRides} {isBn ? 'ট্রিপ' : 'rides'})
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <span className="text-xs font-mono font-bold bg-white text-slate-900 border border-slate-300 px-2.5 py-1 rounded-lg shadow-2xs">
-                  {carPlate}
-                </span>
-              </div>
 
-              {/* Always Display Total Amount in Front of Customer */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 px-4 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    {isBn ? 'সর্বমোট ভাড়া' : 'TOTAL FARE'}
+                {/* Vehicle Model & Registration Plate */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 px-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      {isBn ? 'গাড়ির বিবরণ' : 'Vehicle & Model'}
+                    </span>
+                    <div className="text-xs font-bold text-slate-800 capitalize">
+                      {carType}
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-bold bg-white text-slate-900 border border-slate-300 px-2.5 py-1 rounded-lg shadow-2xs">
+                    {carPlate}
                   </span>
-                  <span className="text-xs text-slate-500">
-                    {isBn ? 'ক্যাশে পরিশোধ' : 'Paid via CASH'}
+                </div>
+
+                {/* Always Display Total Amount in Front of Customer */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 px-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      {isBn ? 'সর্বমোট ভাড়া' : 'TOTAL FARE'}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {isBn ? 'ক্যাশে পরিশোধ' : 'Paid via CASH'}
+                    </span>
+                  </div>
+                  <span className="text-xl font-black text-slate-900 font-heading">
+                    BDT {totalAmount}
                   </span>
                 </div>
-                <span className="text-xl font-black text-slate-900 font-heading">
-                  BDT {totalAmount}
-                </span>
+
+                {/* Action Buttons: Phone Call & In-App Chat */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsCallModalOpen(true)}
+                    className="w-full py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    <Phone className="w-4 h-4 fill-white" />
+                    <span>{isBn ? 'কল করুন' : 'Call Driver'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsChatModalOpen(true)}
+                    className="w-full py-3 px-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-white" />
+                    <span>{isBn ? 'চ্যাট করুন' : 'Driver Chat'}</span>
+                  </button>
+                </div>
+
+                {/* Cancel Trip Button (Allowed only before RIDE_STARTED) vs Ongoing Until Complete */}
+                {isRideStarted ? (
+                  <div className="w-full py-3 px-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600" />
+                    </span>
+                    <span>
+                      {isFirstCompleted
+                        ? (isBn ? 'ফিরতি যাত্রা চলমান (সম্পন্ন না হওয়া পর্যন্ত)' : 'Return Leg Ongoing...')
+                        : (isBn ? 'যাত্রা চলমান (সম্পন্ন না হওয়া পর্যন্ত)' : 'Ride Ongoing Until Complete')}
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsCancelModalOpen(true)}
+                    className="w-full py-2.5 px-4 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    {isBn ? 'ট্রিপ বাতিল করুন' : 'Cancel Trip'}
+                  </button>
+                )}
               </div>
 
-              {/* Action Buttons: Phone Call & In-App Chat (Matching App Function) */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                {/* Green Call Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsCallModalOpen(true)}
-                  className="w-full py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                >
-                  <Phone className="w-4 h-4 fill-white" />
-                  <span>{isBn ? 'কল করুন' : 'Call Driver'}</span>
-                </button>
-
-                {/* Blue Chat Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsChatModalOpen(true)}
-                  className="w-full py-3 px-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                >
-                  <MessageCircle className="w-4 h-4 fill-white" />
-                  <span>{isBn ? 'চ্যাট করুন' : 'Driver Chat'}</span>
-                </button>
-              </div>
-
-              {/* Cancellation or Review Button depending on state */}
-              {isInProgress ? (
-                <button
-                  type="button"
-                  onClick={() => setIsCancelModalOpen(true)}
-                  className="w-full py-2.5 px-4 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  {isBn ? 'ট্রিপ বাতিল করুন' : 'Cancel Trip'}
-                </button>
-              ) : isCompleted ? (
-                <button
-                  type="button"
-                  onClick={() => setIsReviewModalOpen(true)}
-                  className="w-full py-3 px-4 rounded-xl bg-black hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span>{isReviewed ? (isBn ? 'রিভিউ দেখুন / আপডেট' : 'View / Update Review') : (isBn ? 'রিভিউ ও রেটিং দিন' : 'Rate Driver & Review')}</span>
-                </button>
-              ) : null}
-            </div>
-
-            {/* Route Points & Luggage Note Card */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3.5">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 font-heading block">
-                {isBn ? 'রুট ও বুকিং বিবরণ' : 'Route & Booking Details'}
-              </span>
-
-              {/* Pickup */}
-              <div className="flex items-start gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
-                  A
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    {isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point'}
-                  </span>
-                  <p className="text-xs font-semibold text-slate-800 line-clamp-2">
-                    {pickupAddress}
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-l-2 border-dashed border-slate-200 h-4 ml-3" />
-
-              {/* Dropoff */}
-              <div className="flex items-start gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-red-50 border border-red-200 text-red-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
-                  B
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    {isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point'}
-                  </span>
-                  <p className="text-xs font-semibold text-slate-800 line-clamp-2">
-                    {dropoffAddress}
-                  </p>
-                </div>
-              </div>
-
-              {/* Trip Note from API */}
-              {trip?.note && (
-                <div className="pt-2 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-700">
-                  <Luggage className="w-4 h-4 text-slate-500" />
-                  <span className="font-semibold">{trip.note}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Vehicle Photos Gallery from API car_photos */}
-            {carPhotos.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
+              {/* Route Points & Luggage Note Card */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3.5">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 font-heading block">
-                  {isBn ? 'গাড়ির ছবিসমূহ' : 'Verified Vehicle Photos'}
+                  {isBn ? 'রুট ও বুকিং বিবরণ' : 'Route & Booking Details'}
                 </span>
-                <div className="grid grid-cols-3 gap-2">
-                  {carPhotos.slice(0, 3).map((photo, idx) => (
-                    <div
-                      key={idx}
-                      className="relative h-20 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-2xs"
-                    >
+
+                {/* Pickup */}
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
+                    A
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      {isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point'}
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800 line-clamp-2">
+                      {pickupAddress}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-l-2 border-dashed border-slate-200 h-4 ml-3" />
+
+                {/* Dropoff */}
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-full bg-red-50 border border-red-200 text-red-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
+                    B
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      {isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point'}
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800 line-clamp-2">
+                      {dropoffAddress}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Trip Note from API */}
+                {trip?.note && (
+                  <div className="pt-2 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-700">
+                    <Luggage className="w-4 h-4 text-slate-500" />
+                    <span className="font-semibold">{trip.note}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Vehicle Photos Gallery Preview with Click-to-View & No-Image Fallback */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 font-heading block">
+                    {isBn ? 'গাড়ির ছবিসমূহ' : 'Verified Vehicle Photos'}
+                  </span>
+                  {carPhotos.length > 0 && (
+                    <span className="text-[11px] font-bold text-slate-400">
+                      {carPhotos.length} {isBn ? 'টি ছবি' : 'photos'}
+                    </span>
+                  )}
+                </div>
+
+                {carPhotos.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {carPhotos.slice(0, 3).map((photo, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPhotoIndex(idx);
+                          setIsCarGalleryOpen(true);
+                        }}
+                        className="group relative h-20 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-2xs cursor-pointer focus:outline-hidden"
+                      >
+                        <Image
+                          src={getImageUrl(photo)}
+                          alt={`Vehicle Photo ${idx + 1}`}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          sizes="120px"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors flex items-center justify-center">
+                          <div className="w-7 h-7 rounded-full bg-white/90 text-slate-900 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+                            <Eye className="w-3.5 h-3.5" />
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5 py-6">
+                    <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                      <CameraOff className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-600">
+                      {isBn ? 'কোন ছবি নেই' : 'No image'}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      {isBn ? 'চালক গাড়ির ছবি আপলোড করেননি' : 'Driver has not uploaded vehicle photos'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Telemetry Stats */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    {isBn ? 'গতি' : 'Speed'}
+                  </span>
+                  <strong className="text-sm sm:text-base font-extrabold text-slate-900 font-mono">
+                    {speed} km/h
+                  </strong>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    {isBn ? 'দূরত্ব' : 'Remaining'}
+                  </span>
+                  <strong className="text-sm sm:text-base font-extrabold text-slate-900 font-mono">
+                    4.8 km
+                  </strong>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    {isBn ? 'জিপিএস' : 'GPS'}
+                  </span>
+                  <strong className="text-sm sm:text-base font-extrabold text-emerald-700 font-mono">
+                    ± 3m
+                  </strong>
+                </div>
+              </div>
+
+              {/* Safety & Hotline */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2.5">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 font-heading block">
+                  {isBn ? 'যাত্রীর নিরাপত্তা ও সহায়তা' : 'Passenger Safety & Hotline'}
+                </span>
+
+                <a
+                  href="tel:16223"
+                  className="w-full py-3 px-4 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white transition-colors"
+                >
+                  <Phone className="w-4 h-4 text-emerald-400" />
+                  <span>{isBn ? 'জরুরি হটলাইন: ১৬২২৩' : '24/7 Hotline: 16223'}</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    alert(
+                      isBn
+                        ? 'জরুরি এসওএস সিগন্যাল পাঠানো হয়েছে।'
+                        : 'Emergency SOS alert sent.'
+                    )
+                  }
+                  className="w-full py-2.5 px-4 text-xs font-bold rounded-2xl flex items-center justify-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors cursor-pointer"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>{isBn ? 'জরুরি এসওএস (SOS)' : 'Emergency SOS'}</span>
+                </button>
+              </div>
+
+            </div>
+
+            {/* Right Column: Real Google Tracking Map with Live GPS Updates */}
+            <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl overflow-hidden relative shadow-xs min-h-[580px] lg:h-[640px]">
+              <TrackingGoogleMap
+                pickupLocation={activePickupLocation}
+                dropoffLocation={activeDropoffLocation}
+                driverLocation={latestDriverLocation}
+                driverName={driverName}
+                carType={carType}
+                carPlate={carPlate}
+                serviceName={trip?.service_name || 'RIDE_SHARE'}
+                tripStatus={rawStatus}
+                speed={speed}
+                etaMinutes={etaMinutes}
+                totalFare={totalAmount}
+                onCallDriver={() => setIsCallModalOpen(true)}
+                onChatDriver={() => setIsChatModalOpen(true)}
+                className="w-full h-full min-h-[580px] lg:h-[640px]"
+              />
+            </div>
+
+          </div>
+        ) : (
+          /* ═══════════════════════════════════════════════════════════════════
+             COMPLETED TRIP VIEW: Step-by-Step Completion Details & Receipt
+             (Live map and tracking telemetry are completely hidden as requested)
+             ═══════════════════════════════════════════════════════════════════ */
+          <div className="space-y-6">
+            {/* Step-by-step Detailed Journey Timeline Card */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      {isBn ? 'যাত্রা সম্পন্ন বিবরণ' : 'Trip Completion Journey'}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-400">
+                      {displayTripId}
+                    </span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 font-heading">
+                    {isBn ? 'ধাপে ধাপে ট্রিপ সম্পন্নের বিবরণ' : 'How Your Trip Was Completed Step by Step'}
+                  </h2>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">
+                    {isBn ? 'পরিশোধিত ভাড়া:' : 'Total Paid:'}
+                  </span>
+                  <span className="text-lg font-black text-slate-900 font-heading">
+                    BDT {totalAmount}
+                  </span>
+                </div>
+              </div>
+
+              {/* 4 Step-by-Step Completion Milestones */}
+              <div className="pt-6 relative">
+                {/* Connecting Vertical Line */}
+                <div className="absolute left-4 sm:left-5 top-10 bottom-10 w-0.5 bg-emerald-200" />
+
+                <div className="space-y-8 relative">
+                  {/* Step 1: Trip Accepted */}
+                  <div className="flex items-start gap-4 sm:gap-5">
+                    <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs sm:text-sm ring-4 ring-emerald-100 z-10 shadow-sm">
+                      <Check className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                    </div>
+                    <div className="flex-1 bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1.5">
+                        <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
+                          {isBn ? 'ধাপ ১: রাইড নিশ্চিত ও চালক বরাদ্দ' : 'Step 1: Ride Accepted & Driver Assigned'}
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-400 font-medium">
+                          {trip?.created_at ? new Date(trip.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '07:56 PM'}
+                        </span>
+                      </div>
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900">
+                        {isBn
+                          ? `${driverName} আপনার বুকিং গ্রহণ করেছেন`
+                          : `${driverName} accepted your ride request`}
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {isBn
+                          ? `গাড়ির মডেল: ${carType} (${carPlate})। অফারকৃত মোট ভাড়া BDT ${totalAmount} চালক কর্তৃক গৃহীত হয়।`
+                          : `Vehicle: ${carType} (${carPlate}). Agreed fare of BDT ${totalAmount} was confirmed by driver.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Step 2: Driver Arrived at Pickup */}
+                  <div className="flex items-start gap-4 sm:gap-5">
+                    <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs sm:text-sm ring-4 ring-emerald-100 z-10 shadow-sm">
+                      <Check className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                    </div>
+                    <div className="flex-1 bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1.5">
+                        <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
+                          {isBn ? 'ধাপ ২: পিকআপে পৌঁছানো ও আরোহণ' : 'Step 2: Pickup Arrival & Passenger Boarded'}
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-400 font-medium">
+                          {trip?.start_datetime ? new Date(trip.start_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '08:15 PM'}
+                        </span>
+                      </div>
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900">
+                        {isBn ? 'চালক সঠিক সময়ে পিকআপ পয়েন্টে পৌঁছান' : 'Driver arrived at pickup location on time'}
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-1">
+                        <span className="font-semibold text-slate-800">{isBn ? 'পিকআপ স্থান:' : 'Pickup Location:'} </span>
+                        {pickupAddress}
+                      </p>
+                      {trip?.note && (
+                        <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white border border-slate-200 text-xs text-slate-700 font-medium">
+                          <Luggage className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{trip.note}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Step 3: Journey & Route Traversed */}
+                  <div className="flex items-start gap-4 sm:gap-5">
+                    <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs sm:text-sm ring-4 ring-emerald-100 z-10 shadow-sm">
+                      <Check className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                    </div>
+                    <div className="flex-1 bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1.5">
+                        <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
+                          {isBn ? 'ধাপ ৩: নিরাপদ মহাসড়ক যাত্রা পরিচালিত' : 'Step 3: Safe Highway Journey Traversed'}
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-400 font-medium">
+                          {isBn ? 'রুট সম্পন্ন' : 'Route Verified'}
+                        </span>
+                      </div>
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900">
+                        {isBn ? 'নিরাপদ গতি ও সম্পূর্ণ সুরক্ষা নজরদারিতে যাত্রা' : 'Comfortable ride with safety protocols'}
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {isBn
+                          ? 'পিকআপ থেকে ড্রপঅফ পয়েন্ট পর্যন্ত ট্রিপ্পি সার্বক্ষণিক লাইভ জিপিএস এবং যাত্রী সুরক্ষা নিশ্চিত করেছে।'
+                          : 'Traversed safely across designated route with Trippy 24/7 security and live telemetry.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Step 4: Safely Reached Destination */}
+                  <div className="flex items-start gap-4 sm:gap-5">
+                    <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs sm:text-sm ring-4 ring-emerald-100 z-10 shadow-sm">
+                      <Check className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                    </div>
+                    <div className="flex-1 bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 sm:p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1.5">
+                        <span className="text-xs font-bold text-emerald-800 uppercase tracking-wide">
+                          {isBn ? 'ধাপ ৪: নিরাপদে গন্তব্যে পৌঁছানো ও ট্রিপ সমাপ্ত' : 'Step 4: Destination Reached & Completed'}
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                          {isBn ? 'সম্পন্ন ✓' : 'COMPLETED ✓'}
+                        </span>
+                      </div>
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900">
+                        {isBn ? 'যাত্রী নিরাপদে গন্তব্যে পৌঁছেছেন' : 'Safely arrived at destination'}
+                      </h4>
+                      <p className="text-xs text-slate-700 mt-1">
+                        <span className="font-semibold text-slate-900">{isBn ? 'গন্তব্য স্থান:' : 'Dropoff Location:'} </span>
+                        {dropoffAddress}
+                      </p>
+                      <div className="mt-3 flex items-center gap-3 pt-2 border-t border-emerald-200/60 text-xs text-emerald-900">
+                        <span className="font-semibold">{isBn ? 'বিল পরিশোধ:' : 'Payment Status:'}</span>
+                        <span className="font-bold text-emerald-800 bg-white px-2.5 py-1 rounded-lg border border-emerald-200">
+                          BDT {totalAmount} ({trip?.payment_method || 'CASH'} - {isBn ? 'পরিশোধিত' : 'PAID'})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2-Column Grid: Left Driver & Vehicle (with Photos / No Image), Right Receipt & Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Driver & Vehicle Information */}
+              <div className="lg:col-span-5 space-y-5">
+                {/* Driver Card */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 font-heading block">
+                    {isBn ? 'চালকের তথ্য' : 'Assigned Driver'}
+                  </span>
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-emerald-500 bg-slate-100 flex-shrink-0 relative shadow-2xs">
                       <Image
-                        src={getImageUrl(photo)}
-                        alt={`Car Photo ${idx + 1}`}
+                        src={getImageUrl(driverPhoto)}
+                        alt={driverName}
                         fill
                         className="object-cover"
-                        sizes="100px"
+                        sizes="64px"
                       />
                     </div>
-                  ))}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-base font-bold text-slate-900 truncate">
+                          {driverName}
+                        </h3>
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          ✓ Verified
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs mt-1">
+                        <span className="flex items-center gap-1 font-bold text-amber-500">
+                          <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                          {driverRating}
+                        </span>
+                        <span className="text-slate-400">
+                          ({completedRides} {isBn ? 'ট্রিপ সম্পন্ন' : 'trips completed'})
+                        </span>
+                      </div>
+                      <div className="text-xs font-mono text-slate-500 mt-1">
+                        📞 {driverPhone}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Vehicle Badge */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        {isBn ? 'গাড়ির বিবরণ' : 'Vehicle Model'}
+                      </span>
+                      <span className="text-xs font-bold text-slate-800 capitalize">
+                        {carType}
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono font-bold bg-white text-slate-900 border border-slate-300 px-3 py-1 rounded-lg shadow-2xs">
+                      {carPlate}
+                    </span>
+                  </div>
+
+                  {/* Vehicle Photos Gallery or "No Image" Fallback */}
+                  <div className="space-y-2 pt-1 border-t border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700">
+                        {isBn ? 'গাড়ির ছবিসমূহ' : 'Vehicle Photos'}
+                      </span>
+                      {carPhotos.length > 0 && (
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {carPhotos.length} {isBn ? 'টি ছবি' : 'photos'} • {isBn ? 'ক্লিক করে বড় দেখুন' : 'Click to view'}
+                        </span>
+                      )}
+                    </div>
+
+                    {carPhotos.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {carPhotos.map((photo, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPhotoIndex(idx);
+                              setIsCarGalleryOpen(true);
+                            }}
+                            className="group relative h-20 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-2xs cursor-pointer focus:outline-hidden"
+                          >
+                            <Image
+                              src={getImageUrl(photo)}
+                              alt={`Vehicle ${idx + 1}`}
+                              fill
+                              className="object-cover group-hover:scale-105 transition-transform duration-300"
+                              sizes="120px"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors flex items-center justify-center">
+                              <div className="w-7 h-7 rounded-full bg-white/90 text-slate-900 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+                                <Eye className="w-3.5 h-3.5" />
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-1 py-5">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                          <CameraOff className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-600">
+                          {isBn ? 'কোন ছবি নেই' : 'No image'}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {isBn ? 'চালক গাড়ির কোন ছবি সংযুক্ত করেননি' : 'Driver has no vehicle photos uploaded'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Telemetry Stats */}
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center shadow-2xs">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                  {isBn ? 'গতি' : 'Speed'}
-                </span>
-                <strong className="text-sm sm:text-base font-extrabold text-slate-900 font-mono">
-                  {isCompleted ? '0' : speed} km/h
-                </strong>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center shadow-2xs">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                  {isBn ? 'দূরত্ব' : 'Remaining'}
-                </span>
-                <strong className="text-sm sm:text-base font-extrabold text-slate-900 font-mono">
-                  {isCompleted ? '0 km' : '4.8 km'}
-                </strong>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center shadow-2xs">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                  {isBn ? 'জিপিএস' : 'GPS'}
-                </span>
-                <strong className="text-sm sm:text-base font-extrabold text-emerald-700 font-mono">
-                  ± 3m
-                </strong>
-              </div>
-            </div>
-
-            {/* Safety & Hotline */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2.5">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 font-heading block">
-                {isBn ? 'যাত্রীর নিরাপত্তা ও সহায়তা' : 'Passenger Safety & Hotline'}
-              </span>
-
-              <a
-                href="tel:16223"
-                className="w-full py-3 px-4 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white transition-colors"
-              >
-                <Phone className="w-4 h-4 text-emerald-400" />
-                <span>{isBn ? 'জরুরি হটলাইন: ১৬২২৩' : '24/7 Hotline: 16223'}</span>
-              </a>
-
-              <button
-                type="button"
-                onClick={() =>
-                  alert(
-                    isBn
-                      ? 'জরুরি এসওএস সিগন্যাল পাঠানো হয়েছে।'
-                      : 'Emergency SOS alert sent.'
-                  )
-                }
-                className="w-full py-2.5 px-4 text-xs font-bold rounded-2xl flex items-center justify-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors cursor-pointer"
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />
-                <span>{isBn ? 'জরুরি এসওএস (SOS)' : 'Emergency SOS'}</span>
-              </button>
-            </div>
-
-          </div>
-
-          {/* Right Column: Interactive Live Route Map Viewport */}
-          <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl overflow-hidden relative shadow-xs h-[640px]">
-            <svg className="w-full h-full" viewBox="0 0 900 680" fill="none">
-              <rect width="900" height="680" fill="#f8fafc" />
-
-              {/* Highways */}
-              <path d="M-100 120 Q 400 180 1000 140" stroke="#e2e8f0" strokeWidth="18" />
-              <path d="M-100 360 Q 450 320 1000 390" stroke="#e2e8f0" strokeWidth="22" />
-              <path d="M-100 580 Q 450 540 1000 600" stroke="#e2e8f0" strokeWidth="16" />
-              <path d="M220 -80 Q 250 360 210 760" stroke="#e2e8f0" strokeWidth="20" />
-              <path d="M720 -80 Q 690 360 740 760" stroke="#e2e8f0" strokeWidth="20" />
-
-              {/* Glowing Route Polyline */}
-              <path
-                d="M 280 610 Q 360 480 430 350 T 560 210 T 660 90"
-                stroke="rgba(34, 197, 94, 0.25)"
-                strokeWidth="32"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 280 610 Q 360 480 430 350 T 560 210 T 660 90"
-                stroke="#22C55E"
-                strokeWidth="8"
-                strokeLinecap="round"
-              />
-
-              {/* Origin Pin (A) */}
-              <g transform="translate(280, 610)">
-                <circle r="18" fill="rgba(34, 197, 94, 0.3)" />
-                <circle r="10" fill="#22C55E" />
-                <circle r="4" fill="#FFFFFF" />
-                <text
-                  x="24"
-                  y="6"
-                  fill="#0f172a"
-                  fontFamily="var(--font-heading)"
-                  fontSize="13"
-                  fontWeight="700"
-                >
-                  {pickupAddress.slice(0, 30)}
-                </text>
-              </g>
-
-              {/* Destination Pin (B) */}
-              <g transform="translate(660, 90)">
-                <circle r="20" fill="rgba(239, 68, 68, 0.3)" />
-                <circle r="11" fill="#EF4444" />
-                <circle r="4" fill="#FFFFFF" />
-                <text
-                  x="-165"
-                  y="6"
-                  fill="#0f172a"
-                  fontFamily="var(--font-heading)"
-                  fontSize="13"
-                  fontWeight="700"
-                >
-                  {dropoffAddress.slice(0, 30)}
-                </text>
-              </g>
-
-              {/* Live Vehicle Marker */}
-              <g transform={isCompleted ? 'translate(660, 90)' : 'translate(520, 250)'}>
-                <circle r="30" fill="rgba(34, 197, 94, 0.28)">
-                  <animate attributeName="r" values="24;36;24" dur="2s" repeatCount="indefinite" />
-                </circle>
-                <rect
-                  x="-16"
-                  y="-26"
-                  width="32"
-                  height="52"
-                  rx="10"
-                  fill="#FFFFFF"
-                  stroke="#22C55E"
-                  strokeWidth="3"
-                />
-                <rect x="-12" y="-18" width="24" height="12" rx="2" fill="#0F172A" />
-                <rect x="-12" y="10" width="24" height="12" rx="2" fill="#0F172A" />
-                <polygon points="-12,-26 -26,-56 26,-56 12,-26" fill="rgba(234, 179, 8, 0.35)" />
-                <rect
-                  x="26"
-                  y="-20"
-                  width="130"
-                  height="30"
-                  rx="6"
-                  fill="#000000"
-                  stroke="#000000"
-                  strokeWidth="1.5"
-                />
-                <text
-                  x="36"
-                  y="0"
-                  fill="#ffffff"
-                  fontFamily="var(--font-mono)"
-                  fontSize="12"
-                  fontWeight="700"
-                >
-                  {isCompleted ? 'Arrived ✓' : `${speed} km/h • Live`}
-                </text>
-              </g>
-
-              {/* Road Landmarks */}
-              <text x="130" y="520" fill="#64748B" fontSize="12" fontWeight="600">Airport Road</text>
-              <text x="240" y="420" fill="#64748B" fontSize="12" fontWeight="600">Mohakhali Flyover</text>
-              <text x="410" y="300" fill="#64748B" fontSize="12" fontWeight="600">Banani</text>
-              <text x="540" y="180" fill="#64748B" fontSize="12" fontWeight="600">Gulshan Circle</text>
-            </svg>
-
-            {/* Bottom Floating Map Banner */}
-            <div className="absolute bottom-5 left-5 right-5 z-10 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 shadow-lg flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shadow-xs">
-                  <Car className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-slate-900 block">
-                    {carType} • {carPlate}
+              {/* Right Column: Route Details, Payment Receipt & Post-Trip CTAs */}
+              <div className="lg:col-span-7 space-y-5">
+                {/* Route & Booking Card */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 font-heading block">
+                    {isBn ? 'রুট ও ভ্রমণ তথ্য' : 'Route Details'}
                   </span>
-                  <span className="text-[11px] text-slate-500">
-                    {driverName} ({driverRating}★)
-                  </span>
+
+                  {/* Pickup */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">
+                      A
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        {isBn ? 'পিকআপ স্থান' : 'Pickup Point'}
+                      </span>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-800">
+                        {pickupAddress}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-l-2 border-dashed border-slate-200 h-5 ml-3.5" />
+
+                  {/* Dropoff */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-full bg-red-50 border border-red-200 text-red-600 flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">
+                      B
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        {isBn ? 'গন্তব্য স্থান' : 'Dropoff Point'}
+                      </span>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-800">
+                        {dropoffAddress}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Receipt Breakdown */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 font-heading">
+                      {isBn ? 'ভাড়ার বিবরণী ও রসিদ' : 'Fare Breakdown & Receipt'}
+                    </span>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                      {isBn ? 'পরিশোধিত' : 'Paid in Full'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between text-slate-600">
+                      <span>{isBn ? 'মৌলিক ভাড়া (ড্রাইভার বিড):' : 'Driver Bid Amount:'}</span>
+                      <span className="font-semibold text-slate-900">
+                        BDT {activeDriver?.bid_amount || (totalAmount > 50 ? totalAmount - 12 : totalAmount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>{isBn ? 'ইনস্যুরেন্স ও সার্ভিস চার্জ:' : 'Insurance & Safety Fee:'}</span>
+                      <span className="font-semibold text-slate-900">
+                        BDT {activeDriver?.insurance_charge_amount || 12}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>{isBn ? 'ডিসকাউন্ট / ছাড়:' : 'Customer Discount:'}</span>
+                      <span className="font-semibold text-emerald-600">
+                        - BDT {activeDriver?.customer_discount_amount || 0}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-sm font-bold">
+                      <span className="text-slate-900 font-heading">
+                        {isBn ? 'সর্বমোট পরিশোধিত ভাড়া:' : 'Total Amount Paid:'}
+                      </span>
+                      <span className="text-xl font-black text-slate-900 font-heading">
+                        BDT {totalAmount}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 text-right">
+                      {isBn ? 'পেমেন্ট পদ্ধতি: ক্যাশ' : `Payment Method: ${trip?.payment_method || 'CASH'}`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Review & Next Ride CTAs */}
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsReviewModalOpen(true)}
+                    className="w-full sm:flex-1 py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                  >
+                    <Star className="w-4 h-4 fill-amber-300 text-amber-300" />
+                    <span>
+                      {isReviewed
+                        ? (isBn ? 'রিভিউ দেখুন / আপডেট' : 'View / Update Review')
+                        : (isBn ? 'চালকের রিভিউ ও রেটিং দিন' : 'Rate Driver & Leave Review')}
+                    </span>
+                  </button>
+
+                  <Link
+                    href="/booking"
+                    onClick={() => clearActiveTrip()}
+                    className="w-full sm:w-auto py-3.5 px-6 rounded-2xl bg-black hover:bg-slate-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <span>{isBn ? 'নতুন রাইড বুক করুন' : 'Book Another Ride'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-slate-900 font-heading mr-2">
-                  BDT {totalAmount}
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => setIsCallModalOpen(true)}
-                  className="p-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs cursor-pointer"
-                  title="Call Driver"
-                >
-                  <Phone className="w-4 h-4 fill-white" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsChatModalOpen(true)}
-                  className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
-                  title="Chat Driver"
-                >
-                  <MessageCircle className="w-4 h-4 fill-white" />
-                </button>
-              </div>
             </div>
-
           </div>
-
-        </div>
+        )}
 
       </div>
 
@@ -1295,12 +1737,12 @@ export const TrackingPortal: React.FC = () => {
       {/* ────────────────────────────────────────────────────────────────── */}
       {/* ── MODAL 4: TRIP REVIEW MODAL (Matching Image 4) ────────────────── */}
       {/* ────────────────────────────────────────────────────────────────── */}
-      {activeDriver?.driver_uuid && effectiveTripUuid && (
+      {(activeDriver?.driver_uuid || effectiveDriverUuid) && effectiveTripUuid && (
         <TripReviewModal
           isOpen={isReviewModalOpen}
           onClose={() => setIsReviewModalOpen(false)}
           tripUuid={effectiveTripUuid}
-          driverUuid={activeDriver.driver_uuid}
+          driverUuid={activeDriver?.driver_uuid || effectiveDriverUuid}
           driverName={driverName}
           driverPhoto={driverPhoto}
           carType={carType}
@@ -1314,9 +1756,24 @@ export const TrackingPortal: React.FC = () => {
           onReviewSubmitted={() => {
             setHasReviewed(true);
             setIsReviewModalOpen(false);
+            clearActiveTrip();
+            // Redirect to home page for new trip booking as requested
+            router.push('/');
           }}
         />
       )}
+
+      {/* ────────────────────────────────────────────────────────────────── */}
+      {/* ── MODAL 5: VEHICLE PHOTO GALLERY MODAL ─────────────────────────── */}
+      {/* ────────────────────────────────────────────────────────────────── */}
+      <CarPhotoGalleryModal
+        isOpen={isCarGalleryOpen}
+        onClose={() => setIsCarGalleryOpen(false)}
+        images={carPhotos}
+        initialIndex={selectedPhotoIndex}
+        carName={`${carType} (${carPlate})`}
+        regNumber={carPlate}
+      />
 
     </div>
   );

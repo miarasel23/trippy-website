@@ -6,6 +6,8 @@ import {
   TripPriceDetailsRequest,
   CreateRentalTripPayload,
   RentalTrip,
+  DriverTrackingRecord,
+  DriverTrackingResponse,
 } from '@/types/customerApi';
 import { AppUrls, getImageUrl, IMAGE_BASE_URL } from '@/config/appUrls';
 
@@ -462,6 +464,48 @@ export const customerTripService = {
     } catch (err: any) {
       console.error('giveReview error:', err);
       return { status: false, message: err?.message || 'Failed to submit review' };
+    }
+  },
+
+  /**
+   * Fetches real-time driver GPS tracking records
+   * Endpoint: /v1/customer-driver-track/get
+   * Required payload: platform, language_code, action_when: 'track_location_get', driver_uuid
+   */
+  async fetchDriverLocation(
+    driverUuid: string,
+    languageCode = 'bn',
+    token?: string
+  ): Promise<DriverTrackingRecord[]> {
+    if (!driverUuid) return [];
+    const authToken = token || getStoredAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (authToken) {
+      headers.Authorization = authToken.startsWith('Bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
+    }
+
+    try {
+      const res = await fetch(AppUrls.proxy.driverLocation, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          platform: 'web',
+          language_code: languageCode,
+          action_when: 'track_location_get',
+          driver_uuid: driverUuid,
+        }),
+      });
+
+      if (!res.ok) return [];
+      const json: DriverTrackingResponse = await res.json();
+      return json.status && Array.isArray(json.data) ? json.data : [];
+    } catch (err) {
+      console.error('fetchDriverLocation error:', err);
+      return [];
     }
   },
 };

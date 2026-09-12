@@ -210,6 +210,12 @@ export async function POST(
     if (bodyObj.rent_bid_uuid && !bodyObj.bid_uuid) {
       bodyObj.bid_uuid = bodyObj.rent_bid_uuid;
     }
+    if (bodyObj.driverUuid && !bodyObj.driver_uuid) {
+      bodyObj.driver_uuid = bodyObj.driverUuid;
+    }
+    if (bodyObj.driver_id && !bodyObj.driver_uuid) {
+      bodyObj.driver_uuid = bodyObj.driver_id;
+    }
     if (
       (fullPathStr.includes('give-review') || fullPathStr.includes('customer/review')) &&
       !bodyObj.given_by

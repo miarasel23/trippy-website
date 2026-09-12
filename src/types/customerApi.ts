@@ -222,3 +222,30 @@ export interface RentalTrip {
   };
 }
 
+export interface DriverGeolocation {
+  uuid: string;
+  place_id?: string;
+  latitude: string | number;
+  longitude: string | number;
+  address: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DriverTrackingRecord {
+  id: number;
+  uuid: string;
+  geolocation_uuid: string;
+  customer_uuid?: string | null;
+  driver_uuid: string;
+  created_at: string;
+  updated_at: string;
+  geolocation: DriverGeolocation;
+}
+
+export interface DriverTrackingResponse {
+  status: boolean;
+  message: string;
+  data: DriverTrackingRecord[];
+}
+
