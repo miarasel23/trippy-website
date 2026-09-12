@@ -428,6 +428,7 @@ export const customerTripService = {
     customerUuid?: string;
     languageCode?: string;
     token?: string;
+    given_by?: string;
   }): Promise<{ status: boolean; message: string; data?: any }> {
     const authToken = params.token || getStoredAuthToken();
     const headers: Record<string, string> = {
@@ -453,6 +454,7 @@ export const customerTripService = {
           driver_uuid: params.driverUuid,
           rating: params.rating,
           comments: params.comments || '',
+          given_by: 'CUSTOMER',
         }),
       });
 

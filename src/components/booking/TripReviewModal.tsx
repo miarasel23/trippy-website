@@ -14,9 +14,14 @@ export interface TripReviewModalProps {
   driverUuid: string;
   driverName?: string;
   driverPhoto?: string;
+  carType?: string;
   carPlate?: string;
   serviceName?: string;
   totalFare?: number | string;
+  pickupAddress?: string;
+  dropoffAddress?: string;
+  startTime?: string;
+  paymentMethod?: string;
   onReviewSubmitted?: () => void;
 }
 
@@ -25,11 +30,16 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
   onClose,
   tripUuid,
   driverUuid,
-  driverName = 'Driver',
+  driverName = 'Md Rasel Mia',
   driverPhoto,
+  carType = 'Hiace',
   carPlate,
-  serviceName,
-  totalFare,
+  serviceName = 'Ride share',
+  totalFare = 1597,
+  pickupAddress = 'Senpara Parbata, Mirpur 10, Dhaka',
+  dropoffAddress = 'Gazipur, Bangladesh',
+  startTime,
+  paymentMethod = 'CASH',
   onReviewSubmitted,
 }) => {
   const { language } = useLanguage();
@@ -38,7 +48,7 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
 
   const [rating, setRating] = useState<number>(5);
   const [hoverRating, setHoverRating] = useState<number | null>(null);
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set(['Great music']));
   const [commentText, setCommentText] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
@@ -47,12 +57,12 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
   if (!isOpen) return null;
 
   const complimentChips = [
-    { en: 'Great music', bn: 'চমৎকার গান', icon: '🎵' },
-    { en: 'Professional driver', bn: 'পেশাদার চালক', icon: '👔' },
-    { en: 'Polite & friendly', bn: 'বিনয়ী আচরণ', icon: '🤝' },
-    { en: 'Clean & fresh car', bn: 'পরিচ্ছন্ন গাড়ি', icon: '🚗' },
-    { en: 'On time', bn: 'সঠিক সময়ে আগমন', icon: '⏱️' },
-    { en: 'Safe driving', bn: 'নিরাপদ ড্রাইভিং', icon: '🛡️' },
+    { en: 'Clean car', bn: 'পরিচ্ছন্ন গাড়ি' },
+    { en: 'Great music', bn: 'চমৎকার গান' },
+    { en: 'Professional driver', bn: 'পেশাদার চালক' },
+    { en: 'Polite & friendly', bn: 'বিনয়ী আচরণ' },
+    { en: 'Safe driving', bn: 'নিরাপদ ড্রাইভিং' },
+    { en: 'On time', bn: 'সঠিক সময়ে আগমন' },
   ];
 
   const toggleTag = (tagText: string) => {
@@ -67,22 +77,42 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
     });
   };
 
-  const getRatingLabel = (r: number) => {
-    switch (r) {
-      case 5:
-        return isBn ? 'অসাধারণ অভিজ্ঞতা!' : 'Excellent Ride!';
-      case 4:
-        return isBn ? 'খুব ভালো' : 'Very Good';
-      case 3:
-        return isBn ? 'মোটামুটি' : 'Average';
-      case 2:
-        return isBn ? 'সন্তোষজনক নয়' : 'Below Average';
-      case 1:
-        return isBn ? 'খুবই অসন্তোষজনক' : 'Poor Experience';
-      default:
-        return '';
+  const formattedDate = (() => {
+    if (!startTime) {
+      const now = new Date();
+      return now.toLocaleDateString(isBn ? 'bn-BD' : 'en-US', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
     }
-  };
+    try {
+      const d = new Date(startTime);
+      return d.toLocaleDateString(isBn ? 'bn-BD' : 'en-US', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return '12 Sep, 2026';
+    }
+  })();
+
+  const formattedTime = (() => {
+    if (!startTime) {
+      return '12:55 PM';
+    }
+    try {
+      const d = new Date(startTime);
+      return d.toLocaleTimeString(isBn ? 'bn-BD' : 'en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return '12:55 PM';
+    }
+  })();
 
   const handleSubmitReview = async () => {
     if (!tripUuid || !driverUuid) {
@@ -104,10 +134,11 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
       tripUuid,
       driverUuid,
       rating,
-      comments: combinedComments || 'Good ride',
+      comments: combinedComments || 'Excellent trip experience',
       customerUuid: user?.uuid,
       languageCode: language,
       token: token || undefined,
+      given_by: 'CUSTOMER',
     });
 
     setIsSubmitting(false);
@@ -124,12 +155,12 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 relative overflow-hidden border border-slate-100">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+      <div className="bg-white rounded-[32px] max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 my-auto relative overflow-hidden border border-slate-100">
         
         {/* Success celebratory screen */}
         {isSuccess ? (
-          <div className="py-10 text-center space-y-3 animate-scaleUp">
+          <div className="py-12 text-center space-y-3 animate-scaleUp">
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
               <CheckCircle2 className="w-9 h-9 text-emerald-600 animate-bounce" />
             </div>
@@ -144,72 +175,121 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
           </div>
         ) : (
           <>
-            {/* Top Close Button */}
-            <button
-              type="button"
-              onClick={onClose}
-              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {/* Top Bar: Back/Close & Trip Details Header */}
+            <div className="flex items-center justify-between pb-1">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Back"
+              >
+                <X className="w-5 h-5" />
+              </button>
 
-            {/* Header: Trip Completed Badge & Title */}
-            <div className="text-center space-y-1 pt-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold mb-1 shadow-2xs">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{isBn ? 'ট্রিপ সফলভাবে সম্পন্ন হয়েছে' : 'Trip Completed Successfully'}</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-heading">
-                {isBn ? 'আপনার রাইড কেমন ছিল?' : 'How Was Your Ride?'}
+              <span className="text-sm font-black text-slate-900 font-heading">
+                {isBn ? 'ট্রিপ বিবরণ' : 'Trip Details'}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => alert(isBn ? 'সহায়তার জন্য কল করুন: ১৬২২৩' : 'Help & Support: 16223')}
+                className="w-8 h-8 rounded-full border border-slate-300 text-slate-600 flex items-center justify-center text-xs font-bold hover:bg-slate-100 transition-colors"
+                title="Help"
+              >
+                ?
+              </button>
+            </div>
+
+            {/* Trip Completed Heading */}
+            <div className="text-center pt-1 pb-1">
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight font-heading">
+                {isBn ? 'ট্রিপ সম্পন্ন হয়েছে' : 'Trip Completed'}
               </h2>
-              <p className="text-xs text-slate-500">
-                {isBn ? 'চালকের সাথে আপনার অভিজ্ঞতা রেট করুন' : 'Rate your experience with your driver'}
+              <p className="text-xs text-slate-500 mt-0.5">
+                {isBn ? 'আশা করি আপনার যাত্রাটি ভালো লেগেছে!' : 'Hope you enjoyed the ride!'}
               </p>
             </div>
 
-            {/* Driver Profile Summary Pill */}
-            <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-2xs">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-emerald-500 bg-slate-200 flex-shrink-0 relative shadow-xs">
-                  <Image
-                    src={getImageUrl(driverPhoto)}
-                    alt={driverName}
-                    fill
-                    className="object-cover"
-                    sizes="48px"
-                  />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h4 className="text-sm font-bold text-slate-900 truncate">
-                      {driverName}
-                    </h4>
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      ✓
-                    </span>
-                  </div>
-                  <p className="text-xs font-mono font-medium text-slate-500 truncate">
-                    {carPlate || 'Verified Vehicle'}
-                  </p>
-                </div>
+            {/* Card 1: Final Fare (Matches Image 4) */}
+            <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl p-4 text-center space-y-1.5 shadow-2xs">
+              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">
+                {isBn ? 'সর্বমোট ভাড়া' : 'FINAL FARE'}
+              </span>
+              <div className="text-3xl font-black text-slate-900 tracking-tight font-heading">
+                BDT {totalFare}
               </div>
-
-              {totalFare ? (
-                <div className="text-right flex-shrink-0">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    {isBn ? 'পরিশোধিত' : 'Paid'}
-                  </span>
-                  <span className="text-sm font-extrabold text-slate-900 font-heading">
-                    {typeof totalFare === 'number' ? `৳ ${totalFare}` : totalFare}
-                  </span>
-                </div>
-              ) : null}
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-200/80 text-slate-700 text-[11px] font-bold">
+                  <span>💳 {isBn ? 'ক্যাশে পরিশোধিত' : `Paid via ${paymentMethod}`}</span>
+                </span>
+              </div>
             </div>
 
-            {/* Interactive 5-Star Rating Section */}
-            <div className="text-center space-y-2 py-1">
-              <div className="flex items-center justify-center gap-2">
+            {/* Card 2: Date & Route (Matches Image 4) */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-800 pb-2 border-b border-slate-100">
+                <span className="flex items-center gap-1.5">
+                  <span>📅</span> {formattedDate}
+                </span>
+                <span className="flex items-center gap-1.5 text-slate-600">
+                  <span>🕒</span> {formattedTime}
+                </span>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                {/* Pickup */}
+                <div className="flex items-start gap-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-400 mt-1 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-semibold text-slate-400 block uppercase">
+                      {isBn ? 'পিকআপ' : 'Pickup'}
+                    </span>
+                    <p className="text-xs font-bold text-slate-800 line-clamp-1" title={pickupAddress}>
+                      {pickupAddress}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Connecting Line */}
+                <div className="border-l border-slate-300 ml-1 h-3" />
+
+                {/* Destination */}
+                <div className="flex items-start gap-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-black mt-1 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-semibold text-slate-400 block uppercase">
+                      {isBn ? 'গন্তব্য' : 'Destination'}
+                    </span>
+                    <p className="text-xs font-bold text-slate-800 line-clamp-1" title={dropoffAddress}>
+                      {dropoffAddress}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Driver Profile & 5-Star Compliments (Matches Image 4) */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-2xs text-center">
+              {/* Driver Avatar */}
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-200 bg-slate-100 mx-auto relative shadow-sm">
+                <Image
+                  src={getImageUrl(driverPhoto)}
+                  alt={driverName}
+                  fill
+                  className="object-cover"
+                  sizes="64px"
+                />
+              </div>
+
+              <div>
+                <h4 className="text-base font-bold text-slate-900">{driverName}</h4>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  {carType} • {rating ? `${rating}.0` : '5.0'}★
+                </p>
+              </div>
+
+              {/* 5 Big Stars */}
+              <div className="flex items-center justify-center gap-2 pt-1">
                 {[1, 2, 3, 4, 5].map((starIdx) => {
                   const isFilled = (hoverRating !== null ? hoverRating : rating) >= starIdx;
                   return (
@@ -219,14 +299,14 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
                       onClick={() => setRating(starIdx)}
                       onMouseEnter={() => setHoverRating(starIdx)}
                       onMouseLeave={() => setHoverRating(null)}
-                      className="p-1 text-slate-300 hover:scale-125 transition-transform duration-150 active:scale-95 focus:outline-hidden"
+                      className="p-1 hover:scale-125 transition-transform duration-150 active:scale-95 cursor-pointer focus:outline-hidden"
                       aria-label={`${starIdx} Star`}
                     >
                       <Star
-                        className={`w-9 h-9 transition-colors ${
+                        className={`w-8 h-8 transition-colors ${
                           isFilled
-                            ? 'fill-amber-400 text-amber-400 filter drop-shadow-sm'
-                            : 'text-slate-300'
+                            ? 'fill-black text-black'
+                            : 'text-slate-300 stroke-[1.5]'
                         }`}
                       />
                     </button>
@@ -234,88 +314,72 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
                 })}
               </div>
 
-              {/* Rating Label text (e.g. "Excellent Ride!") */}
-              <p className="text-xs font-bold text-amber-600 transition-all font-heading">
-                {getRatingLabel(hoverRating !== null ? hoverRating : rating)}
-              </p>
-            </div>
+              {/* GIVE A COMPLIMENT Header */}
+              <div className="pt-2">
+                <span className="text-[10px] uppercase font-extrabold tracking-widest text-slate-500 block mb-2">
+                  {isBn ? 'প্রশংসা দিন' : 'GIVE A COMPLIMENT'}
+                </span>
 
-            {/* Preset Compliment Chips */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-slate-600 block">
-                {isBn ? 'আপনার যা ভালো লেগেছে (নির্বাচন করুন):' : 'What went great? (Select tags)'}
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {complimentChips.map((chip, idx) => {
-                  const label = isBn ? chip.bn : chip.en;
-                  const isSelected = selectedTags.has(chip.en);
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => toggleTag(chip.en)}
-                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
-                        isSelected
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span>{chip.icon}</span>
-                      <span>{label}</span>
-                    </button>
-                  );
-                })}
+                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                  {complimentChips.map((chip, idx) => {
+                    const label = isBn ? chip.bn : chip.en;
+                    const isSelected = selectedTags.has(chip.en);
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => toggleTag(chip.en)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
+                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-400'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Additional Comments Textarea */}
+              <div className="pt-1">
+                <textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder={
+                    isBn
+                      ? 'অতিরিক্ত মন্তব্য লিখুন (ঐচ্ছিক)...'
+                      : 'Add additional comments (optional)...'
+                  }
+                  rows={2}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-black resize-none"
+                />
               </div>
             </div>
 
-            {/* Written Comments Textarea */}
-            <div className="space-y-1">
-              <textarea
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder={
-                  isBn
-                    ? 'আপনার চালক বা রাইড সম্পর্কে অতিরিক্ত মন্তব্য লিখুন (ঐচ্ছিক)...'
-                    : 'Add extra comments or suggestions for the driver (optional)...'
-                }
-                rows={2}
-                maxLength={300}
-                className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-black/10 transition-all resize-none"
-              />
-            </div>
-
+            {/* Error Message if any */}
             {errorMessage && (
-              <p className="text-xs text-red-600 text-center font-medium bg-red-50 p-2 rounded-xl border border-red-200">
+              <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs text-center font-semibold">
                 {errorMessage}
-              </p>
+              </div>
             )}
 
-            {/* Action Buttons: Submit & Skip */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
-              >
-                {isBn ? 'এখন নয়' : 'Skip for Now'}
-              </button>
-
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={handleSubmitReview}
-                className="py-3 px-4 rounded-xl bg-black hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>{isBn ? 'জমা হচ্ছে...' : 'Submitting...'}</span>
-                  </>
-                ) : (
-                  <span>{isBn ? 'রিভিউ জমা দিন' : 'Submit Review'}</span>
-                )}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleSubmitReview}
+              disabled={isSubmitting}
+              className="w-full py-3.5 px-4 rounded-2xl bg-black hover:bg-slate-800 disabled:opacity-60 text-white font-black text-sm shadow-xl shadow-black/15 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>{isBn ? 'জমা দেওয়া হচ্ছে...' : 'Submitting Review...'}</span>
+                </>
+              ) : (
+                <span>{isBn ? 'রিভিউ জমা দিন' : 'Submit Review'}</span>
+              )}
+            </button>
           </>
         )}
 

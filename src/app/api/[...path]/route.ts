@@ -210,6 +210,12 @@ export async function POST(
     if (bodyObj.rent_bid_uuid && !bodyObj.bid_uuid) {
       bodyObj.bid_uuid = bodyObj.rent_bid_uuid;
     }
+    if (
+      (fullPathStr.includes('give-review') || fullPathStr.includes('customer/review')) &&
+      !bodyObj.given_by
+    ) {
+      bodyObj.given_by = 'CUSTOMER';
+    }
 
     // Format into URLSearchParams as required by the backend API
     const formParams = new URLSearchParams();

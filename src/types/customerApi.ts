@@ -134,6 +134,7 @@ export interface RentalDriverBid {
   is_active?: string | boolean;
   bid_status?: string;
   has_bid?: boolean;
+  review_status?: boolean | number | string;
   car_photos?: string[];
   carPhotos?: string[];
   total_completed_trips?: number;
@@ -195,6 +196,8 @@ export interface RentalTrip {
   accepted_bid_uuid?: string | null;
   accepted_driver?: RentalDriverBid | null;
   given_review?: boolean;
+  review_status?: boolean | number | string;
+  total_amount?: number;
   pickup_locations?: LocationModel[];
   dropoff_locations?: LocationModel[];
   drivers?: RentalDriverBid[];

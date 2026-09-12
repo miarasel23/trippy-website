@@ -25,6 +25,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Star,
+  CheckCircle2,
 } from 'lucide-react';
 import { Badge } from '@/components/common/Badge';
 
@@ -364,7 +365,305 @@ const TripsContent: React.FC = () => {
     );
   }
 
-  // ── 2. No Active Trip View ────────────────────────────────────────────────
+  // ── 2. All Trips List View with Review Status Check & Total Amount ───────
+  const [customerTrips, setCustomerTrips] = useState<RentalTrip[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState<boolean>(false);
+  const [selectedReviewTrip, setSelectedReviewTrip] = useState<RentalTrip | null>(null);
+
+  useEffect(() => {
+    if (!isTripRequested && !isTripActive && !isTripCompleted) {
+      setIsLoadingList(true);
+      customerTripService
+        .fetchBids(effectiveCustomerUuid, language, 'ALL', token || undefined)
+        .then((trips) => {
+          if (Array.isArray(trips)) {
+            setCustomerTrips(trips);
+          }
+        })
+        .finally(() => {
+          setIsLoadingList(false);
+        });
+    }
+  }, [effectiveCustomerUuid, language, token, isTripRequested, isTripActive, isTripCompleted]);
+
+  if (isLoadingList) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center py-20 px-4">
+        <div className="relative flex h-10 w-10 mb-4">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-10 w-10 bg-emerald-500 items-center justify-center text-white">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+          </span>
+        </div>
+        <p className="text-sm font-semibold text-slate-600">
+          {isBn ? 'আপনার ট্রিপসমূহ লোড হচ্ছে...' : 'Loading your trips...'}
+        </p>
+      </div>
+    );
+  }
+
+  // If customer has trips in ALL list, render them
+  if (customerTrips.length > 0) {
+    return (
+      <div className="py-10 bg-slate-50 min-h-screen">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-6">
+          
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <Badge variant="primary">{isBn ? 'ট্রিপ হিস্ট্রি' : 'Trip History'}</Badge>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading mt-1">
+                {isBn ? 'আমার ট্রিপসমূহ' : 'My Trips & Bookings'}
+              </h1>
+            </div>
+
+            <Link
+              href="/booking"
+              className="px-5 py-2.5 rounded-2xl bg-black hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+            >
+              <span>{isBn ? 'নতুন রাইড' : 'New Ride'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {/* Trips Cards Grid */}
+          <div className="space-y-4">
+            {customerTrips.map((tripItem) => {
+              const status = (tripItem.trip_status || '').toUpperCase();
+              const isItemCompleted =
+                status === 'COMPLETED' || status === 'FINISHED' || status === 'TRIP_COMPLETED';
+              const isItemActive =
+                status === 'IN_PROGRESS' ||
+                status === 'RIDE_STARTED' ||
+                status === 'FIRST_COMPLETED' ||
+                status === 'ACCEPTED' ||
+                status === 'ON_THE_WAY';
+              const isItemRequested = status === 'REQUESTED';
+
+              const activeDriver =
+                tripItem.accepted_driver ||
+                (tripItem.drivers && tripItem.drivers.length > 0 ? tripItem.drivers[0] : null);
+
+              const fare =
+                tripItem.total_amount ||
+                activeDriver?.total_amount ||
+                activeDriver?.bid_amount ||
+                tripItem.offer_amount ||
+                0;
+
+              const pickup =
+                tripItem.pickup_locations?.[0]?.address || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point');
+              const dropoff =
+                tripItem.dropoff_locations?.[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
+
+              // Review check: review_status value is false should show option for review
+              const needsReview =
+                isItemCompleted &&
+                (tripItem.review_status === false ||
+                  tripItem.review_status === 'false' ||
+                  tripItem.review_status === 0 ||
+                  !tripItem.given_review);
+
+              return (
+                <div
+                  key={tripItem.uuid || tripItem.id}
+                  className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 hover:shadow-md transition-all"
+                >
+                  {/* Top Row: Service name, Date & Total Fare */}
+                  <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-extrabold text-slate-900 font-heading">
+                          {tripItem.service_name || 'RIDE_SHARE'}
+                        </span>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            isItemCompleted
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : isItemActive
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse'
+                              : isItemRequested
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {status}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-mono mt-0.5 block">
+                        {tripItem.created_at || tripItem.start_datetime || 'Recently booked'}
+                      </span>
+                    </div>
+
+                    {/* Always show total_amount in front of customer */}
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                        {isBn ? 'সর্বমোট ভাড়া' : 'TOTAL FARE'}
+                      </span>
+                      <span className="text-base sm:text-lg font-black text-slate-900 font-heading">
+                        BDT {fare}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Route Row */}
+                  <div className="space-y-2 bg-slate-50 rounded-2xl p-3.5 text-xs">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                          {isBn ? 'পিকআপ' : 'PICKUP'}
+                        </span>
+                        <p className="text-xs font-semibold text-slate-800 truncate" title={pickup}>
+                          {pickup}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="border-l border-slate-300 ml-1 h-2" />
+
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-500 mt-1 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                          {isBn ? 'ড্রপঅফ' : 'DROPOFF'}
+                        </span>
+                        <p className="text-xs font-semibold text-slate-800 truncate" title={dropoff}>
+                          {dropoff}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Driver & Action Button Row */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                    {activeDriver ? (
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-300 bg-slate-100 relative flex-shrink-0">
+                          <Image
+                            src={getImageUrl(activeDriver.profile_picture || activeDriver.profilePicture)}
+                            alt={activeDriver.name || 'Driver'}
+                            fill
+                            className="object-cover"
+                            sizes="40px"
+                          />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">
+                            {activeDriver.name || activeDriver.driver_name || 'Driver'}
+                          </div>
+                          <div className="text-[11px] text-slate-500 font-mono">
+                            {activeDriver.car_reg_number || activeDriver.carRegNumber || 'Vehicle'}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-500 italic">
+                        {isBn ? 'কোনো চালক নির্ধারিত হয়নি' : 'Driver not assigned yet'}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      {/* Review Option if Completed and review_status is false */}
+                      {needsReview && activeDriver?.driver_uuid && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedReviewTrip(tripItem)}
+                          className="py-2.5 px-4 rounded-xl bg-black hover:bg-slate-800 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                          <span>{isBn ? 'রিভিউ দিন' : 'Rate Driver'}</span>
+                        </button>
+                      )}
+
+                      {isItemCompleted && !needsReview && (
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{isBn ? 'রিভিউ সম্পন্ন' : 'Reviewed ★ 5.0'}</span>
+                        </span>
+                      )}
+
+                      {isItemActive && (
+                        <Link
+                          href={`/tracking?trip_uuid=${tripItem.uuid}`}
+                          className="py-2.5 px-4 rounded-xl bg-black hover:bg-slate-800 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
+                        >
+                          <span>{isBn ? 'লাইভ ট্র্যাকিং' : 'Live Tracking'}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      )}
+
+                      {isItemRequested && (
+                        <Link
+                          href={`/trips?trip_uuid=${tripItem.uuid}`}
+                          className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
+                        >
+                          <span>{isBn ? 'বিডিং রাডার' : 'Bidding Radar'}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Modal for selected review trip */}
+          {selectedReviewTrip && (
+            <TripReviewModal
+              isOpen={Boolean(selectedReviewTrip)}
+              onClose={() => setSelectedReviewTrip(null)}
+              tripUuid={selectedReviewTrip.uuid || ''}
+              driverUuid={
+                selectedReviewTrip.accepted_driver?.driver_uuid ||
+                selectedReviewTrip.drivers?.[0]?.driver_uuid ||
+                ''
+              }
+              driverName={
+                selectedReviewTrip.accepted_driver?.name ||
+                selectedReviewTrip.drivers?.[0]?.name ||
+                'Driver'
+              }
+              driverPhoto={
+                selectedReviewTrip.accepted_driver?.profile_picture ||
+                selectedReviewTrip.drivers?.[0]?.profile_picture
+              }
+              carPlate={
+                selectedReviewTrip.accepted_driver?.car_reg_number ||
+                selectedReviewTrip.drivers?.[0]?.car_reg_number
+              }
+              totalFare={
+                selectedReviewTrip.total_amount ||
+                selectedReviewTrip.offer_amount ||
+                0
+              }
+              pickupAddress={
+                selectedReviewTrip.pickup_locations?.[0]?.address || 'Pickup'
+              }
+              dropoffAddress={
+                selectedReviewTrip.dropoff_locations?.[0]?.address || 'Dropoff'
+              }
+              onReviewSubmitted={() => {
+                setSelectedReviewTrip(null);
+                // Refresh trips
+                customerTripService
+                  .fetchBids(effectiveCustomerUuid, language, 'ALL', token || undefined)
+                  .then((trips) => {
+                    if (Array.isArray(trips)) setCustomerTrips(trips);
+                  });
+              }}
+            />
+          )}
+
+        </div>
+      </div>
+    );
+  }
+
+  // ── 3. No Active Trip View (Empty State) ───────────────────────────────────
   return (
     <div className="py-16 bg-slate-50 min-h-[85vh] flex items-center">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
