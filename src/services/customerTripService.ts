@@ -39,6 +39,85 @@ export function getActiveCustomerUuid(): string {
   );
 }
 
+/**
+ * Removes all trip, date, and booking cached data from localStorage,
+ * while safely preserving user auth session tokens and language preference.
+ */
+export function clearTripDataFromLocalStorage(): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const preservedKeys = new Set([
+      'trippy_auth_token',
+      'tripyy_auth_token',
+      'trippy_auth_user',
+      'tripyy_auth_user',
+      'trippy_customer_uuid',
+      'trippy_language_preference',
+      'tripyy_language_preference',
+      'trippy_last_login_prompt',
+      'tripyy_last_login_prompt',
+    ]);
+
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (preservedKeys.has(key)) continue;
+
+      const lower = key.toLowerCase();
+      if (
+        lower.includes('trip') ||
+        lower.includes('date') ||
+        lower.includes('book') ||
+        lower.includes('rent') ||
+        lower.includes('offer') ||
+        lower.includes('bid') ||
+        lower.includes('fare')
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+
+    const explicitKeys = [
+      'trip_date',
+      'tripDate',
+      'trip_dates',
+      'tripDates',
+      'pickup_date',
+      'dropoff_date',
+      'start_datetime',
+      'end_datetime',
+      'booking_date',
+      'rental_trip',
+      'active_trip',
+      'activeTrip',
+      'current_trip',
+      'currentTrip',
+      'trippy_trip',
+      'trippy_active_trip',
+      'trippy_trip_data',
+      'trippy_booking_data',
+      'trip_data',
+      'booking_data',
+      'trip_offer',
+      'trip_fare',
+    ];
+
+    for (const k of explicitKeys) {
+      if (!preservedKeys.has(k)) {
+        keysToRemove.push(k);
+      }
+    }
+
+    for (const key of keysToRemove) {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    }
+  } catch (err) {
+    console.warn('Failed to clear trip data from localStorage:', err);
+  }
+}
 
 export const customerTripService = {
   /**
@@ -340,6 +419,7 @@ export const customerTripService = {
 
   /**
    * Updates customer proposed offer amount
+   * Calls /v1/rental-trip/update-trip-offer-amount
    */
   async updateOfferAmount(
     customerUuid: string,
@@ -347,7 +427,10 @@ export const customerTripService = {
     offerAmount: number | string,
     languageCode = 'bn',
     token?: string
-  ): Promise<{ status: boolean; message: string }> {
+  ): Promise<{ status: boolean; message: string; data?: any }> {
+    // 1. Remove all trip and date data from local storage before calling API
+    clearTripDataFromLocalStorage();
+
     const authToken = token || getStoredAuthToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -365,13 +448,13 @@ export const customerTripService = {
         headers,
         body: JSON.stringify({
           platform: 'web',
-          customer_uuid: targetCustomerUuid,
+          language_code: languageCode,
+          action_when: 'update_trip_offer_amount',
           trip_uuid: tripUuid,
           rental_trip_uuid: tripUuid,
           offer_ammount: numAmount,
           offer_amount: numAmount,
-          language_code: languageCode,
-          action_when: 'update_trip_offer_amount',
+          customer_uuid: targetCustomerUuid,
         }),
       });
 
@@ -383,13 +466,14 @@ export const customerTripService = {
 
   /**
    * Declines / cancels a driver's bid
+   * Calls /v1/rental-trip/cancel-rent-bid-driver-or-customer-admin
    */
   async cancelRentBid(
     bidUuid: string,
-    comment = 'system decline',
+    comment = 'cancel_rent_bid_driver_or_customer_admin',
     languageCode = 'bn',
     token?: string
-  ): Promise<{ status: boolean; message: string }> {
+  ): Promise<{ status: boolean; message: string; data?: any }> {
     const authToken = token || getStoredAuthToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -408,7 +492,7 @@ export const customerTripService = {
           action_when: 'cancel_rent_bid_driver_or_customer_admin',
           bid_uuid: bidUuid,
           rent_bid_uuid: bidUuid,
-          comment: comment || 'system decline',
+          comment: comment || 'cancel_rent_bid_driver_or_customer_admin',
         }),
       });
 

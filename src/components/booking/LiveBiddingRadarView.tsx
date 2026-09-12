@@ -8,6 +8,7 @@ import {
   customerTripService,
   getImageUrl,
   getActiveCustomerUuid,
+  clearTripDataFromLocalStorage,
 } from '@/services/customerTripService';
 import { CarPhotoGalleryModal } from './CarPhotoGalleryModal';
 import { RaiseOfferModal } from './RaiseOfferModal';
@@ -15,6 +16,10 @@ import { TripReviewModal } from './TripReviewModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { useActiveTrip, hasTripDataChanged } from '@/context/ActiveTripContext';
 import { useAppSelector } from '@/redux/hooks';
+import {
+  formatTripServiceType,
+  parseAsiaBangladeshTimestamp,
+} from '@/utils/serviceFormat';
 import {
   ArrowLeft,
   Clock,
@@ -99,6 +104,7 @@ interface LiveBiddingRadarViewProps {
   createdAt?: string;
   initialBids?: RentalDriverBid[];
   isModal?: boolean;
+  onTripUuidUpdated?: (newUuid: string) => void;
   onCancelTrip: () => void;
 }
 
@@ -115,6 +121,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   createdAt: initialCreatedAt,
   initialBids,
   isModal = false,
+  onTripUuidUpdated,
   onCancelTrip,
 }) => {
   const router = useRouter();
@@ -122,6 +129,33 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   const isBn = language === 'bn';
   const { user, token } = useAppSelector((state) => state.auth);
   const { setIsRadarOnPage, activeTrip, setActiveTripManually } = useActiveTrip();
+
+  // Dynamic active trip UUID state: when offer amount is updated, backend creates a new trip
+  const [currentTripUuid, setCurrentTripUuid] = useState<string>(tripUuid);
+  const currentTripUuidRef = useRef<string>(tripUuid);
+
+  // Dynamic service name and hours booked state
+  const [internalServiceName, setInternalServiceName] = useState<string>(serviceName);
+  const [internalHoursBooked, setInternalHoursBooked] = useState<string | number | undefined>(hoursBooked);
+
+  useEffect(() => {
+    if (serviceName) setInternalServiceName(serviceName);
+  }, [serviceName]);
+
+  useEffect(() => {
+    if (hoursBooked) setInternalHoursBooked(hoursBooked);
+  }, [hoursBooked]);
+
+  useEffect(() => {
+    if (tripUuid && tripUuid !== currentTripUuidRef.current) {
+      setCurrentTripUuid(tripUuid);
+      currentTripUuidRef.current = tripUuid;
+    }
+  }, [tripUuid]);
+
+  useEffect(() => {
+    currentTripUuidRef.current = currentTripUuid;
+  }, [currentTripUuid]);
 
   useEffect(() => {
     if (!isModal && setIsRadarOnPage) {
@@ -176,20 +210,29 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     ) {
       setBids(activeTrip.drivers);
     }
-    if (
-      activeTrip?.seen_drivers &&
-      Array.isArray(activeTrip.seen_drivers) &&
-      hasSeenDriversChanged(seenDriversRef.current, activeTrip.seen_drivers)
-    ) {
-      setSeenDrivers(activeTrip.seen_drivers);
+    const newSeen = Array.isArray(activeTrip?.seen_drivers) ? activeTrip.seen_drivers : [];
+    if (hasSeenDriversChanged(seenDriversRef.current, newSeen)) {
+      setSeenDrivers(newSeen);
     }
-    if (
-      typeof activeTrip?.seen_driver_count === 'number' &&
-      seenDriverCountRef.current !== activeTrip.seen_driver_count
-    ) {
-      setSeenDriverCount(activeTrip.seen_driver_count);
+    const newSeenCount =
+      typeof activeTrip?.seen_driver_count === 'number'
+        ? activeTrip.seen_driver_count
+        : (activeTrip?.seen_drivers?.length ?? 0);
+    if (seenDriverCountRef.current !== newSeenCount) {
+      setSeenDriverCount(newSeenCount);
     }
-  }, [activeTrip?.drivers, activeTrip?.seen_drivers, activeTrip?.seen_driver_count]);
+    const tripOffer = Number(activeTrip?.offer_amount || (activeTrip as any)?.offer_ammount || 0);
+    if (tripOffer > 0 && tripOffer !== proposedFare) {
+      setProposedFare(tripOffer);
+      setBottomOfferPrice(tripOffer);
+    }
+  }, [
+    activeTrip?.drivers,
+    activeTrip?.seen_drivers,
+    activeTrip?.seen_driver_count,
+    activeTrip?.offer_amount,
+    (activeTrip as any)?.offer_ammount,
+  ]);
 
   // Sync with initialBids prop if passed (only if bids changed)
   useEffect(() => {
@@ -250,16 +293,46 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     return isBn ? `৳ ${toBanglaDigits(formatted)}` : `BDT ${formatted}`;
   };
 
-  // ── 1. Finding Driver Countdown Timer (2 minutes / 120 seconds) ────────────
-  const maxTimerSeconds = 120;
-  const [cycleStartTs, setCycleStartTs] = useState<number>(() => Date.now());
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(maxTimerSeconds);
-  const [topProgressPct, setTopProgressPct] = useState<number>(0);
+  const serviceInfo = formatTripServiceType(
+    internalServiceName,
+    internalHoursBooked,
+    language
+  );
+  const isRideShare = serviceInfo.isRideShare;
 
-  // Smoothly re-calculate remaining seconds and progress every 100ms
+  // ── 1. Finding Driver Countdown Timer (2 mins for RIDE_SHARE, 1 hour for other services) ────────────
+  // Counts down strictly from trip created_at timestamp in Asia/Dhaka (Bangladesh) time
+  const maxTimerSeconds = isRideShare ? 2 * 60 : 1 * 3600;
+
+  const initialStartTs = parseAsiaBangladeshTimestamp(tripCreatedAt || initialCreatedAt);
+  const [cycleStartTs, setCycleStartTs] = useState<number>(initialStartTs);
+
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(() => {
+    const now = Date.now();
+    const elapsedSecs = Math.max(0, Math.floor((now - initialStartTs) / 1000));
+    return Math.max(0, maxTimerSeconds - elapsedSecs);
+  });
+
+  const [topProgressPct, setTopProgressPct] = useState<number>(() => {
+    const now = Date.now();
+    const elapsedSecs = Math.max(0, Math.floor((now - initialStartTs) / 1000));
+    return Math.min(100, Math.max(0, (elapsedSecs / maxTimerSeconds) * 100));
+  });
+
+  // Sync cycle start when tripCreatedAt or initialCreatedAt updates
+  useEffect(() => {
+    const activeDate = tripCreatedAt || initialCreatedAt;
+    if (activeDate) {
+      const ts = parseAsiaBangladeshTimestamp(activeDate);
+      setCycleStartTs(ts);
+    }
+  }, [tripCreatedAt, initialCreatedAt]);
+
+  // Smoothly re-calculate remaining seconds and progress every 100ms from Asia/Dhaka created_at time
   useEffect(() => {
     const check = () => {
-      const elapsedMs = Math.max(0, Date.now() - cycleStartTs);
+      const now = Date.now();
+      const elapsedMs = Math.max(0, now - cycleStartTs);
       const totalMs = maxTimerSeconds * 1000;
       const remSecs = Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
       const pct = Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100));
@@ -269,23 +342,33 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
       if (elapsedMs >= totalMs) {
         setIsTimerExpired(true);
+      } else {
+        setIsTimerExpired(false);
       }
     };
 
     check();
     const interval = setInterval(check, 100);
     return () => clearInterval(interval);
-  }, [cycleStartTs]);
+  }, [cycleStartTs, maxTimerSeconds]);
 
-  // Format MM:SS (e.g. 00:40)
+  // Format HH:MM:SS (e.g. 03:59:40) or MM:SS (e.g. 01:40)
   const formatCountdown = () => {
     if (remainingSeconds <= 0) {
       return isBn ? '০০:০০' : '00:00';
     }
-    const mins = Math.floor(remainingSeconds / 60);
+    const hours = Math.floor(remainingSeconds / 3600);
+    const mins = Math.floor((remainingSeconds % 3600) / 60);
     const secs = remainingSeconds % 60;
     const mStr = String(mins).padStart(2, '0');
     const sStr = String(secs).padStart(2, '0');
+
+    if (hours > 0) {
+      const hStr = String(hours).padStart(2, '0');
+      const timeStr = `${hStr}:${mStr}:${sStr}`;
+      return isBn ? toBanglaDigits(timeStr) : timeStr;
+    }
+
     const timeStr = `${mStr}:${sStr}`;
     return isBn ? toBanglaDigits(timeStr) : timeStr;
   };
@@ -300,11 +383,15 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     setBottomOfferPrice((prev) => prev + 10);
   };
 
+  const [offerUpdatedNotice, setOfferUpdatedNotice] = useState<boolean>(false);
+
   const handleBottomRaiseFare = async () => {
     setIsUpdatingBottomOffer(true);
-    const effectiveTripUuid =
-      tripUuid ||
+    const targetOldTripUuid =
+      currentTripUuidRef.current ||
+      currentTripUuid ||
       activeTrip?.uuid ||
+      tripUuid ||
       (bids[0] as any)?.trip_uuid ||
       (bids[0] as any)?.rental_trip_uuid ||
       '';
@@ -313,17 +400,106 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       activeTrip?.customer_uuid ||
       (activeTrip as any)?.customerUuid ||
       user?.uuid ||
-      '';
+      getActiveCustomerUuid();
 
-    // Calls /v1/rental-trip/update-trip-offer-amount
-    await customerTripService.updateOfferAmount(
+    // 1. Remove all old trip and date data from local storage
+    clearTripDataFromLocalStorage();
+
+    // 2. Calls /v1/rental-trip/update-trip-offer-amount with the current trip ID
+    const res = await customerTripService.updateOfferAmount(
       effectiveCustomerUuid,
-      effectiveTripUuid,
+      targetOldTripUuid,
       bottomOfferPrice,
-      language
+      language,
+      token || undefined
     );
-    setIsUpdatingBottomOffer(false);
+
+    // 3. Extract the NEW trip UUID from the successful API response
+    let newTripUuid = '';
+    if (res && res.status !== false) {
+      if (res.data && typeof res.data === 'object') {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          newTripUuid = res.data[0]?.uuid || res.data[0]?.trip_uuid || '';
+        } else {
+          newTripUuid = res.data.uuid || res.data.trip_uuid || res.data.rental_trip_uuid || '';
+        }
+      }
+      if (!newTripUuid) {
+        newTripUuid = (res as any).uuid || (res as any).trip_uuid || '';
+      }
+    }
+
+    const effectiveNewTripUuid = newTripUuid || targetOldTripUuid;
+
+    // 4. Update trip UUID references so subsequent calls, polling, and modals use the new trip ID
+    setCurrentTripUuid(effectiveNewTripUuid);
+    currentTripUuidRef.current = effectiveNewTripUuid;
+    if (onTripUuidUpdated && newTripUuid) {
+      onTripUuidUpdated(effectiveNewTripUuid);
+    }
+
+    // 5. Clean old trip data (reset old bids and seen drivers because old trip is deleted by backend)
+    setBids([]);
+    setSeenDrivers([]);
+    setHiddenBidUuids(new Set());
+
+    // 6. Immediately show edit data
     setProposedFare(bottomOfferPrice);
+    setBottomOfferPrice(bottomOfferPrice);
+    setOfferUpdatedNotice(true);
+    setTimeout(() => setOfferUpdatedNotice(false), 4000);
+
+    // 7. Call /v1/rental-trip/rental-bid-trip-single_for_customer with NEW trip ID
+    if (effectiveNewTripUuid) {
+      try {
+        const singleRes = await customerTripService.fetchSingleTripBids(
+          effectiveCustomerUuid,
+          effectiveNewTripUuid,
+          language,
+          'ALL',
+          token || undefined
+        );
+        if (singleRes.status && singleRes.data) {
+          const trip = singleRes.data;
+          const freshFare = Number(
+            trip.offer_amount || (trip as any).offer_ammount || bottomOfferPrice
+          );
+          setProposedFare(freshFare);
+          setBottomOfferPrice(freshFare);
+          if (trip.created_at) {
+            setTripCreatedAt(trip.created_at);
+          }
+          if (trip.drivers && Array.isArray(trip.drivers)) {
+            setBids(trip.drivers);
+          }
+          if (trip.seen_drivers && Array.isArray(trip.seen_drivers)) {
+            setSeenDrivers(trip.seen_drivers);
+          }
+          const freshSeenCount =
+            typeof trip.seen_driver_count === 'number'
+              ? trip.seen_driver_count
+              : (trip.seen_drivers?.length ?? 0);
+          setSeenDriverCount(freshSeenCount);
+          setActiveTripManually(trip);
+        } else {
+          setActiveTripManually({
+            uuid: effectiveNewTripUuid,
+            customer_uuid: effectiveCustomerUuid,
+            service_name: serviceName,
+            offer_amount: bottomOfferPrice,
+            trip_status: 'REQUESTED',
+            pickup_locations: [{ address: pickupAddress }],
+            dropoff_locations: [{ address: dropoffAddress }],
+            drivers: [],
+            created_at: new Date().toISOString(),
+          } as any);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch updated trip data after raise fare:', err);
+      }
+    }
+
+    setIsUpdatingBottomOffer(false);
     // Restart 2-minute cycle
     setCycleStartTs(Date.now());
     setIsTimerExpired(false);
@@ -345,6 +521,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         user?.uuid ||
         getActiveCustomerUuid();
       const effectiveTrip =
+        currentTripUuidRef.current ||
+        currentTripUuid ||
         tripUuid ||
         activeTrip?.uuid ||
         (bids[0] as any)?.trip_uuid ||
@@ -368,8 +546,31 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         if (singleRes.status && singleRes.data) {
           const trip = singleRes.data;
 
+          if (trip.uuid && trip.uuid !== currentTripUuidRef.current) {
+            setCurrentTripUuid(trip.uuid);
+            currentTripUuidRef.current = trip.uuid;
+            if (onTripUuidUpdated) {
+              onTripUuidUpdated(trip.uuid);
+            }
+          }
+
           if (trip.created_at && trip.created_at !== tripCreatedAt) {
             setTripCreatedAt(trip.created_at);
+          }
+          const polledService =
+            trip.service_name ||
+            (trip as any).service_type ||
+            (trip as any).servive_type ||
+            trip.car_service?.service_name;
+          if (polledService && polledService !== internalServiceName) {
+            setInternalServiceName(polledService);
+          }
+          const polledHours =
+            trip.hours_booked ||
+            (trip as any).hours ||
+            (trip as any).rental_duration;
+          if (polledHours && polledHours !== internalHoursBooked) {
+            setInternalHoursBooked(polledHours);
           }
           if (trip.offer_amount && trip.offer_amount !== proposedFare) {
             setProposedFare(trip.offer_amount);
@@ -380,8 +581,12 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           if (trip.seen_drivers && Array.isArray(trip.seen_drivers) && hasSeenDriversChanged(seenDriversRef.current, trip.seen_drivers)) {
             setSeenDrivers(trip.seen_drivers);
           }
-          if (typeof trip.seen_driver_count === 'number' && seenDriverCountRef.current !== trip.seen_driver_count) {
-            setSeenDriverCount(trip.seen_driver_count);
+          const polledSeenCount =
+            typeof trip.seen_driver_count === 'number'
+              ? trip.seen_driver_count
+              : (trip.seen_drivers?.length ?? 0);
+          if (seenDriverCountRef.current !== polledSeenCount) {
+            setSeenDriverCount(polledSeenCount);
           }
 
           // Sync with active trip global context (only if trip data changed)
@@ -445,6 +650,21 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           if (currentTrip.created_at && currentTrip.created_at !== tripCreatedAt) {
             setTripCreatedAt(currentTrip.created_at);
           }
+          const polledFallbackService =
+            currentTrip.service_name ||
+            (currentTrip as any).service_type ||
+            (currentTrip as any).servive_type ||
+            currentTrip.car_service?.service_name;
+          if (polledFallbackService && polledFallbackService !== internalServiceName) {
+            setInternalServiceName(polledFallbackService);
+          }
+          const polledFallbackHours =
+            currentTrip.hours_booked ||
+            (currentTrip as any).hours ||
+            (currentTrip as any).rental_duration;
+          if (polledFallbackHours && polledFallbackHours !== internalHoursBooked) {
+            setInternalHoursBooked(polledFallbackHours);
+          }
           if (currentTrip.offer_amount && currentTrip.offer_amount !== proposedFare) {
             setProposedFare(currentTrip.offer_amount);
           }
@@ -454,8 +674,12 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           if (currentTrip.seen_drivers && Array.isArray(currentTrip.seen_drivers) && hasSeenDriversChanged(seenDriversRef.current, currentTrip.seen_drivers)) {
             setSeenDrivers(currentTrip.seen_drivers);
           }
-          if (typeof currentTrip.seen_driver_count === 'number' && seenDriverCountRef.current !== currentTrip.seen_driver_count) {
-            setSeenDriverCount(currentTrip.seen_driver_count);
+          const fallbackSeenCount =
+            typeof currentTrip.seen_driver_count === 'number'
+              ? currentTrip.seen_driver_count
+              : (currentTrip.seen_drivers?.length ?? 0);
+          if (seenDriverCountRef.current !== fallbackSeenCount) {
+            setSeenDriverCount(fallbackSeenCount);
           }
           setActiveTripManually(currentTrip);
         }
@@ -504,8 +728,13 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
   // Decline / Hide a Driver Bid (Calls /v1/rental-trip/cancel-rent-bid-driver-or-customer-admin)
   const handleDeclineBid = useCallback(
-    async (bid: RentalDriverBid, comment = 'Customer declined bid') => {
+    async (
+      bid: RentalDriverBid,
+      comment = 'cancel_rent_bid_driver_or_customer_admin'
+    ) => {
       const bidUuid =
+        bid.bid_uuid ||
+        (bid as any).bidUuid ||
         bid.rent_bid_uuid ||
         bid.rentBidUuid ||
         bid.uuid ||
@@ -513,8 +742,22 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         bid.driverUuid ||
         '';
 
+      const allIds = [
+        bid.bid_uuid,
+        (bid as any).bidUuid,
+        bid.rent_bid_uuid,
+        bid.rentBidUuid,
+        bid.uuid,
+        bid.driver_uuid,
+        bid.driverUuid,
+      ].filter(Boolean) as string[];
+
       if (bidUuid) {
-        setHiddenBidUuids((prev) => new Set(prev).add(bidUuid));
+        setHiddenBidUuids((prev) => {
+          const next = new Set(prev);
+          allIds.forEach((id) => next.add(id));
+          return next;
+        });
         await customerTripService.cancelRentBid(
           bidUuid,
           comment,
@@ -528,8 +771,17 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
   // Filter out hidden bids
   const visibleBids = bids.filter((b) => {
-    const id = b.rent_bid_uuid || b.rentBidUuid || b.uuid || b.driver_uuid || b.driverUuid || '';
-    return !hiddenBidUuids.has(id);
+    const ids = [
+      b.bid_uuid,
+      (b as any).bidUuid,
+      b.rent_bid_uuid,
+      b.rentBidUuid,
+      b.uuid,
+      b.driver_uuid,
+      b.driverUuid,
+    ].filter(Boolean) as string[];
+
+    return !ids.some((id) => hiddenBidUuids.has(id));
   });
 
   // When timer expires: ONLY prompt raise offer modal if NO driver bids were found
@@ -555,16 +807,18 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
     setIsAccepting(bidUuid);
 
+    const activeCurrentUuid = currentTripUuidRef.current || currentTripUuid || tripUuid;
+
     const res = await customerTripService.acceptBid(
       customerUuid,
       bidUuid,
-      tripUuid,
+      activeCurrentUuid,
       language
     );
 
     if (res.status) {
       const driverId = bidToAccept.driver_uuid || bidToAccept.driverUuid || '';
-      router.push(`/tracking?trip_uuid=${tripUuid}&driver_uuid=${driverId}`);
+      router.push(`/tracking?trip_uuid=${activeCurrentUuid}&driver_uuid=${driverId}`);
     } else {
       setIsAccepting(null);
       setBidToAccept(null);
@@ -578,30 +832,20 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   // Cancel Entire Trip Request
   const handleConfirmCancelTrip = async () => {
     setIsCancellingTrip(true);
-    await customerTripService.cancelTrip(tripUuid, cancelReason, language);
+    const activeCurrentUuid = currentTripUuidRef.current || currentTripUuid || tripUuid;
+    await customerTripService.cancelTrip(activeCurrentUuid, cancelReason, language);
     setIsCancellingTrip(false);
     setShowCancelDialog(false);
     onCancelTrip();
   };
 
-  // Format Service Subtitle (Matching screenshot: "Inter city renter")
+  // Format Service Subtitle (Supports Intercity, Ride share, Hourly with duration hours)
   const getFormattedServiceName = () => {
-    switch (serviceName) {
-      case 'RIDE_SHARE':
-        return isBn ? 'রাইড শেয়ার' : 'Ride share';
-      case 'INTER_CITY_RENTER':
-        return isBn ? 'ইন্টারসিটি রেন্টার' : 'Inter city renter';
-      case 'RETURN':
-        return isBn ? 'রিটার্ন ট্রিপ' : 'Return trip';
-      case 'HOURLY':
-        return isBn
-          ? `ঘন্টায় রেন্টাল (${hoursBooked || 4} ঘন্টা)`
-          : `Hourly rental (${hoursBooked || 4} hours)`;
-      case 'AIRPORT_RENTER':
-        return isBn ? 'এয়ারপোর্ট ট্রান্সফার' : 'Airport transfer';
-      default:
-        return serviceName.replace(/_/g, ' ').toLowerCase();
-    }
+    return formatTripServiceType(
+      internalServiceName,
+      internalHoursBooked,
+      language
+    ).name;
   };
 
 
@@ -755,7 +999,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
               <DriverBidCardItem
                 key={bidKey}
                 bid={bid}
-                serviceName={serviceName}
+                serviceName={internalServiceName}
                 tripCreatedAt={tripCreatedAt}
                 isBn={isBn}
                 isCurrentAccepting={Boolean(isCurrentAccepting)}
@@ -801,11 +1045,20 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         {/* Header line above card: Drivers Viewed & Timer */}
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs sm:text-sm font-semibold text-slate-700">
-              {isBn
-                ? `${toBanglaDigits(Math.max(1, seenDriverCount || seenDrivers.length || visibleBids.length))} জন চালক আপনার অনুরোধ দেখেছেন`
-                : `${Math.max(1, seenDriverCount || seenDrivers.length || visibleBids.length)} driver${(seenDriverCount || seenDrivers.length || visibleBids.length) === 1 ? '' : 's'} viewed your request`}
-            </span>
+            {(() => {
+              const count = Math.max(
+                typeof seenDriverCount === 'number' ? seenDriverCount : 0,
+                seenDrivers?.length || 0,
+                visibleBids.length
+              );
+              return (
+                <span className="text-xs sm:text-sm font-semibold text-slate-700">
+                  {isBn
+                    ? `${toBanglaDigits(count)} জন চালক আপনার অনুরোধ দেখেছেন`
+                    : `${count} driver${count === 1 ? '' : 's'} viewed your request`}
+                </span>
+              );
+            })()}
             {/* Driver Avatar Thumbnails */}
             {seenDrivers && seenDrivers.length > 0 ? (
               <div className="flex -space-x-1.5 overflow-hidden">
@@ -864,6 +1117,18 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
           <div className="border-t border-slate-100" />
 
+          {/* Success Banner when Offer is Raised / Updated */}
+          {offerUpdatedNotice && (
+            <div className="flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold animate-fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>
+                {isBn
+                  ? `আপনার নতুন প্রস্তাবিত ভাড়া ${formatFare(proposedFare)} সফলভাবে আপডেট হয়েছে`
+                  : `Your proposed fare of ${formatFare(proposedFare)} has been updated`}
+              </span>
+            </div>
+          )}
+
           {/* Stepper: [ -10 ]   BDT 15409   [ +10 ] */}
           <div className="grid grid-cols-12 gap-3 items-center">
             <button
@@ -919,6 +1184,26 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
             {isDrawerExpanded && (
               <div className="pt-3 pb-1 space-y-3 text-xs border-t border-slate-100 animate-fade-in">
+                {/* Service Type & Hours Summary */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-slate-600 font-medium">
+                    {isBn ? 'সার্ভিস ধরন:' : 'Service Type:'}
+                  </span>
+                  <span className="font-bold text-slate-900 font-heading text-xs">
+                    {getFormattedServiceName()}
+                  </span>
+                </div>
+
+                {/* Proposed Fare Summary */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-slate-600 font-medium">
+                    {isBn ? 'আপনার প্রস্তাবিত ভাড়া:' : 'Your Proposed Fare:'}
+                  </span>
+                  <span className="font-bold text-slate-900 font-heading text-sm">
+                    {formatFare(proposedFare)}
+                  </span>
+                </div>
+
                 {/* Route Stops */}
                 <div className="space-y-2">
                   <div className="flex items-start gap-2">
@@ -981,30 +1266,103 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         isOpen={isRaiseOfferOpen}
         onClose={() => setIsRaiseOfferOpen(false)}
         currentOffer={proposedFare}
-        tripUuid={
-          tripUuid ||
-          activeTrip?.uuid ||
-          (bids[0] as any)?.trip_uuid ||
-          (bids[0] as any)?.rental_trip_uuid ||
-          ''
-        }
+        tripUuid={currentTripUuidRef.current || currentTripUuid || tripUuid}
         customerUuid={
           customerUuid ||
           activeTrip?.customer_uuid ||
           (activeTrip as any)?.customerUuid ||
           user?.uuid ||
-          ''
+          getActiveCustomerUuid()
         }
-        onOfferUpdated={(newFare) => {
+        onOfferUpdated={async (newFare, newTripUuid) => {
+          const effectiveNewUuid = newTripUuid || currentTripUuidRef.current || tripUuid;
+          setCurrentTripUuid(effectiveNewUuid);
+          currentTripUuidRef.current = effectiveNewUuid;
+          if (onTripUuidUpdated && newTripUuid) {
+            onTripUuidUpdated(effectiveNewUuid);
+          }
+
+          // Clean old trip data
+          clearTripDataFromLocalStorage();
+          setBids([]);
+          setSeenDrivers([]);
+          setHiddenBidUuids(new Set());
+
           setProposedFare(newFare);
           setBottomOfferPrice(newFare);
           setIsTimerExpired(false);
           setHasPromptedExpired(false);
           setCycleStartTs(Date.now());
+          setOfferUpdatedNotice(true);
+          setTimeout(() => setOfferUpdatedNotice(false), 4000);
+
+          const effCust =
+            customerUuid ||
+            activeTrip?.customer_uuid ||
+            (activeTrip as any)?.customerUuid ||
+            user?.uuid ||
+            getActiveCustomerUuid();
+
+          if (effectiveNewUuid) {
+            try {
+              const singleRes = await customerTripService.fetchSingleTripBids(
+                effCust,
+                effectiveNewUuid,
+                language,
+                'ALL',
+                token || undefined
+              );
+              if (singleRes.status && singleRes.data) {
+                const trip = singleRes.data;
+                const freshFare = Number(
+                  trip.offer_amount || (trip as any).offer_ammount || newFare
+                );
+                setProposedFare(freshFare);
+                setBottomOfferPrice(freshFare);
+                if (trip.created_at) {
+                  setTripCreatedAt(trip.created_at);
+                }
+                if (trip.drivers && Array.isArray(trip.drivers)) {
+                  setBids(trip.drivers);
+                }
+                if (trip.seen_drivers && Array.isArray(trip.seen_drivers)) {
+                  setSeenDrivers(trip.seen_drivers);
+                }
+                const modalSeenCount =
+                  typeof trip.seen_driver_count === 'number'
+                    ? trip.seen_driver_count
+                    : (trip.seen_drivers?.length ?? 0);
+                setSeenDriverCount(modalSeenCount);
+                setActiveTripManually(trip);
+              } else {
+                setActiveTripManually({
+                  uuid: effectiveNewUuid,
+                  customer_uuid: effCust,
+                  service_name: serviceName,
+                  offer_amount: newFare,
+                  trip_status: 'REQUESTED',
+                  pickup_locations: [{ address: pickupAddress }],
+                  dropoff_locations: [{ address: dropoffAddress }],
+                  drivers: [],
+                  created_at: new Date().toISOString(),
+                } as any);
+              }
+            } catch (err) {
+              console.warn('Failed to fetch updated trip data in onOfferUpdated:', err);
+            }
+          }
         }}
-        onKeepTrying={() => {
+        onKeepTrying={(newTripUuid) => {
+          if (newTripUuid && newTripUuid !== currentTripUuidRef.current) {
+            setCurrentTripUuid(newTripUuid);
+            currentTripUuidRef.current = newTripUuid;
+            if (onTripUuidUpdated) {
+              onTripUuidUpdated(newTripUuid);
+            }
+          }
           setIsTimerExpired(false);
           setHasPromptedExpired(false);
+          setTripCreatedAt(new Date().toISOString());
           setCycleStartTs(Date.now());
         }}
       />
@@ -1371,21 +1729,20 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
     serviceName?.toLowerCase().includes('ride_share') ||
     serviceName?.toLowerCase() === 'rideshare';
 
-  // 40 seconds duration for bid acceptance progress bar
-  const totalDurationSeconds = 40;
+  // Bid acceptance progress bar: 40 seconds for RIDE_SHARE, 40 minutes for other services
+  const totalDurationSeconds = isRideShare ? 40 : 40 * 60;
   const hasExpiredRef = useRef(false);
 
-  // Stable persistent start timestamp for this bid card
-  const startTsRef = useRef<number>(Date.now());
+  // Stable persistent start timestamp for this bid card based on Asia/Dhaka created_at
+  const initialBidTs = parseAsiaBangladeshTimestamp(bid.created_at || (bid as any).createdAt);
+  const startTsRef = useRef<number>(initialBidTs);
 
-  // Calculate start timestamp if bid has a fresh createdAt within the last 40 seconds
+  // Calculate start timestamp if bid has a fresh createdAt within the allowed duration
   useEffect(() => {
     const raw = bid.created_at || (bid as any).createdAt;
     if (raw) {
       try {
-        const formatted =
-          typeof raw === 'string' && !raw.includes('T') ? raw.replace(' ', 'T') : raw;
-        const ts = new Date(formatted).getTime();
+        const ts = parseAsiaBangladeshTimestamp(raw);
         const diff = Date.now() - ts;
         if (!isNaN(ts) && diff >= 0 && diff < totalDurationSeconds * 1000) {
           startTsRef.current = ts;
@@ -1394,29 +1751,42 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
         // preserve current mount time
       }
     }
-  }, [bid.created_at]);
+  }, [bid.created_at, totalDurationSeconds]);
 
-  const [progressFraction, setProgressFraction] = useState<number>(0);
+  const [progressFraction, setProgressFraction] = useState<number>(() => {
+    const elapsedMs = Math.max(0, Date.now() - initialBidTs);
+    const totalMs = totalDurationSeconds * 1000;
+    return Math.min(1, Math.max(0, elapsedMs / totalMs));
+  });
+  const [remainingBidSecs, setRemainingBidSecs] = useState<number>(() => {
+    const elapsedMs = Math.max(0, Date.now() - initialBidTs);
+    const totalMs = totalDurationSeconds * 1000;
+    return Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
+  });
 
-  // Smooth progress bar update every 100ms; visual indicator only, NEVER auto-cancels!
+  // Smooth progress bar update every 100ms; when progress bar ends, cancel bid via API and remove card
   useEffect(() => {
+    hasExpiredRef.current = false;
     const interval = setInterval(() => {
       const now = Date.now();
       const elapsedMs = Math.max(0, now - startTsRef.current);
       const totalMs = totalDurationSeconds * 1000;
       const frac = Math.min(1, Math.max(0, elapsedMs / totalMs));
+      const remSecs = Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
 
       setProgressFraction(frac);
+      setRemainingBidSecs(remSecs);
 
       if (elapsedMs >= totalMs && !hasExpiredRef.current) {
         hasExpiredRef.current = true;
         clearInterval(interval);
-        // Do NOT auto decline! Driver offer remains visible and actionable.
+        // After end of progress bar in accepted button, cancel bid and remove from UI
+        onDecline(bid, 'cancel_rent_bid_driver_or_customer_admin');
       }
     }, 100);
 
     return () => clearInterval(interval);
-  }, [totalDurationSeconds]);
+  }, [totalDurationSeconds, bid, onDecline]);
 
   const rawAmount =
     bid.total_amount ??
@@ -1429,10 +1799,6 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
   const formattedBidPrice = isBn
     ? `৳ ${toBanglaDigits(Math.round(numAmount).toLocaleString('en-IN'))}`
     : `BDT ${Math.round(numAmount).toLocaleString('en-IN')}`;
-
-  const baseBidAmount = bid.bid_amount ?? (bid as any).bidAmount ?? numAmount;
-  const insuranceAmount = bid.insurance_charge_amount ?? 0;
-  const discountAmount = bid.customer_discount_amount ?? 0;
 
   const driverName =
     bid.name || bid.driver_name || (bid as any).driverName || (isBn ? 'চালক' : 'Driver');
@@ -1453,7 +1819,7 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
 
   return (
     <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-md hover:shadow-lg transition-all space-y-4">
-      {/* 1. Fare Display with Detailed Breakdown */}
+      {/* 1. Fare Display */}
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-baseline gap-2">
@@ -1463,42 +1829,6 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
             <span className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-md">
               {isBn ? 'মোট প্রদেয়' : 'Total Payable'}
             </span>
-          </div>
-
-          {/* Breakdown: Base + Insurance + Discount */}
-          <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1 flex-wrap">
-            <span>
-              {isBn ? 'মূল অফার:' : 'Base Bid:'}{' '}
-              <strong className="text-slate-700">
-                {isBn
-                  ? `৳ ${toBanglaDigits(Math.round(baseBidAmount))}`
-                  : `BDT ${Math.round(baseBidAmount)}`}
-              </strong>
-            </span>
-            {insuranceAmount > 0 && (
-              <>
-                <span>•</span>
-                <span>
-                  {isBn ? 'বীমা:' : 'Insurance:'}{' '}
-                  <strong className="text-slate-700">
-                    {isBn
-                      ? `৳ ${toBanglaDigits(Math.round(insuranceAmount))}`
-                      : `BDT ${Math.round(insuranceAmount)}`}
-                  </strong>
-                </span>
-              </>
-            )}
-            {discountAmount > 0 && (
-              <>
-                <span>•</span>
-                <span className="text-emerald-600 font-semibold">
-                  {isBn ? 'ছাড়:' : 'Discount:'}{' '}
-                  -{isBn
-                    ? `৳ ${toBanglaDigits(Math.round(discountAmount))}`
-                    : `BDT ${Math.round(discountAmount)}`}
-                </span>
-              </>
-            )}
           </div>
         </div>
 
@@ -1601,7 +1931,7 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
           {isBn ? 'বাতিল' : 'Decline'}
         </button>
 
-        {/* Accept Button with Charcoal Progress Fill */}
+        {/* Accept Button with Charcoal Progress Fill Running in Background */}
         <button
           type="button"
           disabled={isCurrentAccepting}
@@ -1610,13 +1940,13 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
             isCurrentAccepting ? 'opacity-80 pointer-events-none' : 'hover:bg-slate-950'
           }`}
         >
-          {/* Charcoal Dark Gray Progress Fill (#505562) filling from right as 40s elapses */}
+          {/* Charcoal Dark Gray Progress Fill (#374151) filling in the background as 40s/40m elapses */}
           <div
-            className="absolute inset-y-0 right-0 bg-[#505562] transition-all duration-100 ease-linear pointer-events-none rounded-r-2xl"
+            className="absolute inset-y-0 left-0 bg-[#374151] transition-all duration-100 ease-linear pointer-events-none rounded-2xl"
             style={{ width: `${progressFraction * 100}%` }}
           />
 
-          {/* Text Overlay in Crisp White */}
+          {/* Text Overlay in Crisp White without countdown numbers (clean background progress process) */}
           <div className="relative z-10 flex items-center justify-center gap-1.5 font-bold text-white text-sm">
             {isCurrentAccepting ? (
               <>

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useActiveTrip } from '@/context/ActiveTripContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { LiveBiddingRadarModal } from './LiveBiddingRadarModal';
+import { formatTripServiceType } from '@/utils/serviceFormat';
 import {
   Radio,
   ChevronRight,
@@ -55,25 +56,8 @@ export const ActiveTripGlobalOverlay: React.FC = () => {
     ? `৳ ${fare.toLocaleString('en-IN')}`
     : `BDT ${fare.toLocaleString('en-IN')}`;
 
-  const formatServiceName = (name?: string) => {
-    switch (name) {
-      case 'RIDE_SHARE':
-        return isBn ? 'রাইড শেয়ার' : 'Ride Share';
-      case 'INTER_CITY_RENTER':
-        return isBn ? 'ইন্টারসিটি' : 'Intercity';
-      case 'RETURN':
-        return isBn ? 'রিটার্ন ট্রিপ' : 'Return Trip';
-      case 'HOURLY':
-        return isBn ? 'ঘণ্টাভিত্তিক রেন্টাল' : 'Hourly Rental';
-      case 'AIRPORT_RENTER':
-        return isBn ? 'এয়ারপোর্ট' : 'Airport';
-      case 'WEDDING_RENTER':
-        return isBn ? 'ওয়েডিং' : 'Wedding';
-      case 'DELIVERY':
-        return isBn ? 'ডেলিভারি' : 'Delivery';
-      default:
-        return name?.replace(/_/g, ' ') || (isBn ? 'রাইড অনুরোধ' : 'Ride Request');
-    }
+  const formatServiceName = (name?: string, hours?: string | number | null) => {
+    return formatTripServiceType(name, hours, language).name;
   };
 
   // ── Minimized Floating Pill View (Black & White Theme) ─────────────────────
@@ -93,7 +77,17 @@ export const ActiveTripGlobalOverlay: React.FC = () => {
 
             <div className="text-left">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                <span>{formatServiceName(activeTrip.service_name)}</span>
+                <span>
+                  {formatServiceName(
+                    activeTrip.service_name ||
+                      (activeTrip as any).service_type ||
+                      (activeTrip as any).servive_type ||
+                      activeTrip.car_service?.service_name,
+                    activeTrip.hours_booked ||
+                      (activeTrip as any).hours ||
+                      (activeTrip as any).rental_duration
+                  )}
+                </span>
                 <span className="text-black font-extrabold">{formattedFare}</span>
               </div>
               <div className="text-[10px] text-emerald-600 font-semibold">
@@ -135,7 +129,15 @@ export const ActiveTripGlobalOverlay: React.FC = () => {
                   {isBn ? 'চলমান রাইড অনুরোধ' : 'LIVE RIDE REQUEST'}
                 </span>
                 <span className="block text-[11px] text-slate-500 font-medium">
-                  {formatServiceName(activeTrip.service_name)}
+                  {formatServiceName(
+                    activeTrip.service_name ||
+                      (activeTrip as any).service_type ||
+                      (activeTrip as any).servive_type ||
+                      activeTrip.car_service?.service_name,
+                    activeTrip.hours_booked ||
+                      (activeTrip as any).hours ||
+                      (activeTrip as any).rental_duration
+                  )}
                   {activeTrip.car_category?.car_type ? ` • ${activeTrip.car_category.car_type}` : ''}
                 </span>
               </div>

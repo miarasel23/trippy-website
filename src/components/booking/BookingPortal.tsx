@@ -9,6 +9,7 @@ import {
 import {
   customerTripService,
   getActiveCustomerUuid,
+  clearTripDataFromLocalStorage,
 } from '@/services/customerTripService';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { openLoginModal } from '@/redux/features/authSlice';
@@ -63,11 +64,13 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
   } | null>({ type: 'pickup', index: 0 });
 
   // 3. Date and Time schedule state (Bangladesh Time format)
-  const [startDatetime, setStartDatetime] = useState<string>(() =>
-    formatDateTimeToApi(new Date())
-  );
+  const [startDatetime, setStartDatetime] = useState<string>(() => {
+    const isRide = selectedService === 'RIDE_SHARE';
+    const initDate = isRide ? new Date() : new Date(Date.now() + 2 * 3600 * 1000);
+    return formatDateTimeToApi(initDate);
+  });
   const [endDatetime, setEndDatetime] = useState<string>(() => {
-    const later = new Date(Date.now() + 8 * 3600 * 1000);
+    const later = new Date(Date.now() + 10 * 3600 * 1000);
     return formatDateTimeToApi(later);
   });
   const [hoursBooked, setHoursBooked] = useState<string>('4');
@@ -122,12 +125,21 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
           user?.uuid ||
           localStorage.getItem('trippy_customer_uuid') ||
           getActiveCustomerUuid(),
-        serviceName: globalActiveTrip.service_name || 'RIDE_SHARE',
+        serviceName:
+          globalActiveTrip.service_name ||
+          (globalActiveTrip as any).service_type ||
+          (globalActiveTrip as any).servive_type ||
+          globalActiveTrip.car_service?.service_name ||
+          'RIDE_SHARE',
         vehicleName: globalActiveTrip.car_category?.car_type || 'Vehicle',
         proposedFare: globalActiveTrip.offer_amount || 0,
         pickupAddress: pAddress,
         dropoffAddress: dAddress,
-        hoursBooked: globalActiveTrip.hours_booked || undefined,
+        hoursBooked:
+          globalActiveTrip.hours_booked ||
+          (globalActiveTrip as any).hours ||
+          (globalActiveTrip as any).rental_duration ||
+          undefined,
         note: globalActiveTrip.note || undefined,
         createdAt: globalActiveTrip.created_at,
       });
@@ -152,9 +164,30 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     loadServices();
   }, [language]);
 
-  // Reset selected car when service type changes
+  // Reset selected car and update departure datetime when service type changes
   useEffect(() => {
     setSelectedCar(null);
+    const now = Date.now();
+    const currentStartTs = new Date(startDatetime.replace(' ', 'T')).getTime();
+
+    if (selectedService !== 'RIDE_SHARE') {
+      const minRequiredTs = now + 2 * 3600 * 1000;
+      // If start time is less than 2 hours from now or in the past, automatically select 2 hours later
+      if (isNaN(currentStartTs) || currentStartTs < minRequiredTs - 30 * 1000) {
+        const twoHoursLater = new Date(minRequiredTs);
+        setStartDatetime(formatDateTimeToApi(twoHoursLater));
+
+        if (selectedService === 'RETURN') {
+          const later = new Date(twoHoursLater.getTime() + 8 * 3600 * 1000);
+          setEndDatetime(formatDateTimeToApi(later));
+        }
+      }
+    } else {
+      // If switching to RIDE_SHARE and start time was in the past, reset to now
+      if (isNaN(currentStartTs) || currentStartTs < now - 60 * 1000) {
+        setStartDatetime(formatDateTimeToApi(new Date()));
+      }
+    }
   }, [selectedService]);
 
   // When activeTrip becomes active, automatically scroll to driver finding radar so user never has to scroll up
@@ -220,11 +253,23 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       return;
     }
 
+    const nowTs = Date.now();
+    const startTs = new Date(startDatetime.replace(' ', 'T')).getTime();
+
+    // Disallow past date and time for all trips
+    if (isNaN(startTs) || startTs < nowTs - 60 * 1000) {
+      alert(
+        isBn
+          ? 'অতীতের তারিখ বা সময় নির্বাচন করা যাবে না। অনুগ্রহ করে বর্তমান বা ভবিষ্যতের সময় নির্ধারণ করুন।'
+          : 'Cannot select past date or time. Please select current or future time.'
+      );
+      return;
+    }
+
     // Lead time validation for non-RIDE_SHARE services (at least 2 hours in advance)
     if (selectedService !== 'RIDE_SHARE') {
-      const minLeadTime = Date.now() + 105 * 60 * 1000; // ~1h 45m min
-      const startTs = new Date(startDatetime.replace(' ', 'T')).getTime();
-      if (!isNaN(startTs) && startTs < minLeadTime) {
+      const minLeadTime = nowTs + 2 * 3600 * 1000 - 60 * 1000; // 2 hours minimum
+      if (startTs < minLeadTime) {
         alert(
           isBn
             ? 'ইন্টারসিটি বা শিডিউল করা ট্রিপের জন্য শুরু করার সময় বর্তমান সময় থেকে কমপক্ষে ২ ঘন্টা পরের হতে হবে।'
@@ -298,10 +343,25 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     const formattedDropoff =
       dropoffLocations[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
 
-    const createdTripUuid =
-      res.status && (res.data?.uuid || res.data?.trip_uuid || res.data?.rental_trip_uuid || res.data?.trip?.uuid)
-        ? res.data.uuid || res.data.trip_uuid || res.data.rental_trip_uuid || res.data?.trip?.uuid
-        : `trip-${Date.now()}`;
+    let createdTripUuid = '';
+    if (res && res.status !== false) {
+      if (res.data && typeof res.data === 'object') {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          createdTripUuid = res.data[0]?.uuid || res.data[0]?.trip_uuid || '';
+        } else {
+          createdTripUuid = res.data.uuid || res.data.trip_uuid || res.data.rental_trip_uuid || '';
+        }
+      }
+      if (!createdTripUuid) {
+        createdTripUuid = (res as any).uuid || (res as any).trip_uuid || '';
+      }
+    }
+    if (!createdTripUuid) {
+      createdTripUuid = `trip-${Date.now()}`;
+    }
+
+    // Clean old trip and date data from localStorage upon new trip creation
+    clearTripDataFromLocalStorage();
 
     const tripData = {
       uuid: createdTripUuid,
@@ -451,6 +511,9 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
               note={activeTrip.note}
               createdAt={activeTrip.createdAt}
               initialBids={globalActiveTrip?.drivers || []}
+              onTripUuidUpdated={(newUuid) => {
+                setActiveTrip((prev) => (prev ? { ...prev, uuid: newUuid } : null));
+              }}
               onCancelTrip={() => {
                 setActiveTrip(null);
                 clearGlobalActiveTrip();

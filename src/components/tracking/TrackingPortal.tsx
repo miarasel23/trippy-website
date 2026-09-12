@@ -29,6 +29,7 @@ import {
   ZoomIn,
   Eye,
   CameraOff,
+  User,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useActiveTrip } from '@/context/ActiveTripContext';
@@ -46,6 +47,7 @@ import {
 import { TripReviewModal } from '@/components/booking/TripReviewModal';
 import { CarPhotoGalleryModal } from '@/components/booking/CarPhotoGalleryModal';
 import { TrackingGoogleMap } from '@/components/tracking/TrackingGoogleMap';
+import { formatTripServiceType } from '@/utils/serviceFormat';
 
 // Sample default trip structure matching the live backend API response provided by the user
 const DEFAULT_API_TRIP: RentalTrip = {
@@ -330,39 +332,80 @@ export const TrackingPortal: React.FC = () => {
 
   // ── 3. Step-by-Step Lifecycle Status Logic (Website Way) ───────────────────
   const statusParam = searchParams.get('status')?.toUpperCase();
-  const rawStatus = (statusParam || trip?.trip_status || 'COMPLETED').toUpperCase();
+  const tripStatusFromApi = (trip?.trip_status || '').toUpperCase();
+  // Default to IN_PROGRESS when we have an active trip uuid being tracked, unless explicitly COMPLETED
+  const rawStatus = (statusParam || tripStatusFromApi || (effectiveTripUuid ? 'IN_PROGRESS' : 'COMPLETED')).toUpperCase();
 
-  // Active trip statuses explicitly identified by the user:
-  // accepted, in_progress, ride_started (or on_the_way), first_completed
-  const isActiveTrip =
-    rawStatus === 'ACCEPTED' ||
-    rawStatus === 'ACCEPT' ||
-    rawStatus === 'IN_PROGRESS' ||
-    rawStatus === 'INPROGRESS' ||
-    rawStatus === 'ON_THE_WAY' ||
-    rawStatus === 'ONTHEWAY' ||
-    rawStatus === 'RIDE_STARTED' ||
-    rawStatus === 'RIDESTARTED' ||
-    rawStatus === 'STARTED' ||
-    rawStatus === 'FIRST_COMPLETED' ||
-    rawStatus === 'FIRSTCOMPLETED' ||
-    rawStatus === 'PICKUP_ARRIVED';
+  // Completed or cancelled trip statuses
+  const isCompleted =
+    rawStatus === 'COMPLETED' ||
+    rawStatus === 'FINISHED' ||
+    rawStatus === 'TRIP_COMPLETED' ||
+    rawStatus === 'CANCELLED' ||
+    rawStatus === 'CANCELED' ||
+    rawStatus === 'TRIP_CANCELLED';
 
-  const isCompleted = !isActiveTrip;
   const isFirstCompleted =
     rawStatus === 'FIRST_COMPLETED' || rawStatus === 'FIRSTCOMPLETED';
+
   const isRideStarted =
     rawStatus === 'RIDE_STARTED' ||
     rawStatus === 'RIDESTARTED' ||
     rawStatus === 'STARTED' ||
     isFirstCompleted;
+
   const isInProgress =
     rawStatus === 'IN_PROGRESS' ||
     rawStatus === 'INPROGRESS' ||
     rawStatus === 'ACCEPTED' ||
     rawStatus === 'ACCEPT' ||
     rawStatus === 'ON_THE_WAY' ||
-    rawStatus === 'ONTHEWAY';
+    rawStatus === 'ONTHEWAY' ||
+    rawStatus === 'PICKUP_ARRIVED' ||
+    isRideStarted;
+
+  // Active trip remains visible and tracked until explicitly completed or cancelled
+  const isActiveTrip = !isCompleted && (isInProgress || Boolean(effectiveTripUuid));
+
+  // ── Live Rider Geolocation Tracking (Keeps rider location visible until completed) ──
+  const [liveRiderGps, setLiveRiderGps] = useState<{
+    latitude: number;
+    longitude: number;
+    address?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+    if (isCompleted) return;
+
+    let watchId: number | null = null;
+    try {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setLiveRiderGps({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        },
+        (err) => {
+          console.debug('Rider live GPS error/fallback to pickup:', err.message);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 10000,
+          timeout: 10000,
+        }
+      );
+    } catch (e) {
+      console.debug('Geolocation watch exception:', e);
+    }
+
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, [isCompleted]);
 
   // ── 2.b Live Driver Location Polling (/v1/customer-driver-track/get) ──────────
   useEffect(() => {
@@ -427,22 +470,33 @@ export const TrackingPortal: React.FC = () => {
     ? rawCarPhotos.filter((p) => Boolean(p && typeof p === 'string' && p.trim().length > 0))
     : [];
 
-  // Return trip logic: If service is return & first_completed, flip locations
-  const serviceTypeParam = searchParams.get('service_type')?.toUpperCase();
-  const serviceNameParam = searchParams.get('service_name')?.toUpperCase();
-  const rawService = (
-    serviceTypeParam ||
+  // Return trip and service type logic
+  const serviceTypeParam = searchParams.get('service_type');
+  const serviceNameParam = searchParams.get('service_name');
+  const hoursParam = searchParams.get('hours_booked') || searchParams.get('hours');
+
+  const rawServiceName =
     serviceNameParam ||
+    serviceTypeParam ||
     trip?.service_name ||
     (trip as any)?.service_type ||
     (trip as any)?.servive_type ||
-    ''
-  ).toUpperCase();
+    trip?.car_service?.service_name ||
+    '';
+
+  const hoursBooked =
+    hoursParam ||
+    trip?.hours_booked ||
+    (trip as any)?.hours ||
+    (trip as any)?.rental_duration ||
+    null;
+
+  const serviceInfo = formatTripServiceType(rawServiceName, hoursBooked, language);
 
   const isReturnService =
-    rawService.includes('RETURN') ||
-    rawService.includes('ROUND') ||
-    rawService.includes('TWO_WAY');
+    rawServiceName.toUpperCase().includes('RETURN') ||
+    rawServiceName.toUpperCase().includes('ROUND') ||
+    rawServiceName.toUpperCase().includes('TWO_WAY');
 
   const basePickupLocation = trip?.pickup_locations?.[0] || {
     uuid: 'pickup',
@@ -470,6 +524,14 @@ export const TrackingPortal: React.FC = () => {
     activePickupLocation.address || 'Senpara Porbota, Mirpur 10., Dhaka, Bangladesh';
   const dropoffAddress =
     activeDropoffLocation.address || 'Gulshan 2, Dhaka, Bangladesh';
+
+  // Effective rider location (uses live GPS if permitted, otherwise designated pickup point)
+  const effectiveRiderLocation = {
+    latitude: liveRiderGps?.latitude || Number(activePickupLocation.latitude) || 23.8045,
+    longitude: liveRiderGps?.longitude || Number(activePickupLocation.longitude) || 90.3701,
+    address: liveRiderGps?.address || pickupAddress,
+    isLiveGps: Boolean(liveRiderGps),
+  };
 
   // Calculate active step number for stepper
   const getStepIndex = () => {
@@ -505,15 +567,15 @@ export const TrackingPortal: React.FC = () => {
           : 'Vehicle is ready for the return route to origin.',
       };
     }
-    if (isRideStarted) {
+    if (isRideStarted || rawStatus === 'IN_PROGRESS' || rawStatus === 'INPROGRESS') {
       return {
-        badge: isBn ? 'যাত্রা চলমান' : 'Ride Ongoing',
+        badge: isBn ? 'যাত্রা চলমান' : 'Ride In Progress',
         title: isBn
           ? 'গন্তব্যের উদ্দেশ্যে গাড়ি এগিয়ে চলেছে'
           : 'Heading towards your destination',
         desc: isBn
-          ? 'লাইভ জিপিএস রুট ট্র্যাকিং ও নিরাপত্তা নজরদারি সক্রিয় রয়েছে।'
-          : 'Live highway tracking and passenger safety protocols are currently active.',
+          ? 'রাইডার ও চালকের অবস্থান দৃশ্যমান রয়েছে এবং লাইভ জিপিএস সক্রিয়।'
+          : 'Rider and driver locations are visible with live GPS tracking active.',
       };
     }
     if (isInProgress) {
@@ -613,11 +675,14 @@ export const TrackingPortal: React.FC = () => {
         {/* ── 1. Top Header Bar (Website Way) ──────────────────────────────── */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <Badge variant="primary">
                 {isBn ? 'লাইভ রাইড ট্র্যাকিং' : 'Live Ride Tracking'}
               </Badge>
+              <span className={`text-xs font-extrabold px-3 py-0.5 rounded-full border shadow-2xs ${serviceInfo.badgeColor}`}>
+                {serviceInfo.name}
+              </span>
               <span className="text-xs font-mono font-bold text-slate-500">
                 {displayTripId}
               </span>
@@ -929,15 +994,43 @@ export const TrackingPortal: React.FC = () => {
                   {isBn ? 'রুট ও বুকিং বিবরণ' : 'Route & Booking Details'}
                 </span>
 
-                {/* Pickup */}
+                {/* Service Type & Hours Booked Row */}
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-xl bg-white border border-slate-200 flex items-center justify-center flex-shrink-0">
+                      <Car className="w-3.5 h-3.5 text-slate-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        {isBn ? 'সার্ভিস ধরন' : 'SERVICE TYPE'}
+                      </span>
+                      <span className="text-xs font-black text-slate-900 truncate block">
+                        {serviceInfo.name}
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${serviceInfo.badgeColor}`}>
+                    {serviceInfo.isHourly ? (serviceInfo.hoursText || 'Hourly') : serviceInfo.name}
+                  </span>
+                </div>
+
+                {/* Rider Location (Pickup) */}
                 <div className="flex items-start gap-2.5">
-                  <div className="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
-                    A
+                  <div className="w-6 h-6 rounded-full bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
+                    <User className="w-3.5 h-3.5 text-blue-600" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                      {isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-bold text-blue-700 block">
+                        {isBn ? 'রাইডার লোকেশন (পিকআপ)' : 'Rider Location (Pickup)'}
+                      </span>
+                      {isInProgress && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                          {isBn ? 'দৃশ্যমান' : 'Live on Map'}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs font-semibold text-slate-800 line-clamp-2">
                       {pickupAddress}
                     </p>
@@ -1091,10 +1184,11 @@ export const TrackingPortal: React.FC = () => {
                 pickupLocation={activePickupLocation}
                 dropoffLocation={activeDropoffLocation}
                 driverLocation={latestDriverLocation}
+                riderLocation={effectiveRiderLocation}
                 driverName={driverName}
                 carType={carType}
                 carPlate={carPlate}
-                serviceName={trip?.service_name || 'RIDE_SHARE'}
+                serviceName={serviceInfo.rawKey || rawServiceName || 'RIDE_SHARE'}
                 tripStatus={rawStatus}
                 speed={speed}
                 etaMinutes={etaMinutes}

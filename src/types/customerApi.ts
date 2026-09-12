@@ -118,6 +118,7 @@ export interface CreateRentalTripPayload {
 
 export interface RentalDriverBid {
   uuid?: string;
+  bid_uuid?: string;
   rent_bid_uuid?: string;
   rentBidUuid?: string;
   driver_uuid?: string;

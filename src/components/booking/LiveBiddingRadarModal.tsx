@@ -14,6 +14,7 @@ export const LiveBiddingRadarModal: React.FC = () => {
     closeRadarModal,
     customerUuid,
     clearActiveTrip,
+    setActiveTripManually,
   } = useActiveTrip();
   const { language } = useLanguage();
   const isBn = language === 'bn';
@@ -73,16 +74,29 @@ export const LiveBiddingRadarModal: React.FC = () => {
           <LiveBiddingRadarView
             tripUuid={activeTrip.uuid || ''}
             customerUuid={customerUuid}
-            serviceName={activeTrip.service_name}
+            serviceName={
+              activeTrip.service_name ||
+              (activeTrip as any).service_type ||
+              (activeTrip as any).servive_type ||
+              activeTrip.car_service?.service_name
+            }
             proposedFare={activeTrip.offer_amount || 0}
             pickupAddress={pickupAddress}
             dropoffAddress={dropoffAddress}
             vehicleName={vehicleName}
-            hoursBooked={activeTrip.hours_booked || undefined}
+            hoursBooked={
+              activeTrip.hours_booked ||
+              (activeTrip as any).hours ||
+              (activeTrip as any).rental_duration ||
+              undefined
+            }
             note={activeTrip.note || undefined}
             createdAt={activeTrip.created_at}
             initialBids={activeTrip.drivers || []}
             isModal={true}
+            onTripUuidUpdated={(newUuid) => {
+              setActiveTripManually({ ...activeTrip, uuid: newUuid });
+            }}
             onCancelTrip={() => {
               clearActiveTrip();
               closeRadarModal();

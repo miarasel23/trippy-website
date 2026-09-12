@@ -73,9 +73,29 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
   const isHourly = serviceType === 'HOURLY';
   const isRideShare = serviceType === 'RIDE_SHARE';
 
-  // Minimum allowed start time: now for RIDE_SHARE, or now + 2 hours for all scheduled services
+  // Minimum allowed start time: now for RIDE_SHARE, or now + 2 hours for all scheduled/non-rideshare services
   const minLeadMs = isRideShare ? 0 : 2 * 3600 * 1000;
   const minAllowedDate = new Date(Date.now() + minLeadMs);
+
+  // Automatically select current time + 2 hours for non-rideshare trips, or now for rideshare if past
+  React.useEffect(() => {
+    const now = Date.now();
+    const minRequiredTs = now + minLeadMs;
+    const currentStartTs = startDatetime ? new Date(startDatetime.replace(' ', 'T')).getTime() : 0;
+
+    // If startDatetime is missing, invalid, or earlier than the required lead time:
+    if (!startDatetime || isNaN(currentStartTs) || currentStartTs < minRequiredTs - 30 * 1000) {
+      const autoDate = new Date(minRequiredTs);
+      onChangeStartDatetime(formatDateTimeToApi(autoDate));
+      if (isReturn) {
+        const currentEndTs = endDatetime ? new Date(endDatetime.replace(' ', 'T')).getTime() : 0;
+        if (!endDatetime || isNaN(currentEndTs) || currentEndTs <= minRequiredTs) {
+          const laterEnd = new Date(autoDate.getTime() + 8 * 3600 * 1000);
+          onChangeEndDatetime(formatDateTimeToApi(laterEnd));
+        }
+      }
+    }
+  }, [serviceType, isRideShare, minLeadMs]);
 
   const [activePreset, setActivePreset] = React.useState<'earliest' | 'today_evening' | 'tomorrow_morning' | null>(null);
 
@@ -106,6 +126,10 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(9, 0, 0, 0);
+      const minDate = new Date(now.getTime() + minLeadMs);
+      if (tomorrow < minDate) {
+        tomorrow.setDate(tomorrow.getDate() + 1);
+      }
       onChangeStartDatetime(formatDateTimeToApi(tomorrow));
       if (isReturn) {
         const later = new Date(tomorrow.getTime() + 12 * 3600 * 1000);
@@ -124,12 +148,19 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
     { key: 'tomorrow_morning', label: '🌅 Tomorrow Morning (9:00 AM)', labelBn: '🌅 কাল সকালে (৯:০০ AM)' },
   ];
 
-  // Helper check if selected start time is less than 2 hours for scheduled rides
-  const isStartTimeTooEarly = !isRideShare && startDatetime && new Date(startDatetime.replace(' ', 'T')).getTime() < (Date.now() + 110 * 60 * 1000);
-
+  // Helper check if selected start time is in the past or less than 2 hours for scheduled rides
+  const nowTs = Date.now();
+  const startTs = startDatetime ? new Date(startDatetime.replace(' ', 'T')).getTime() : 0;
+  const isPastTime = startTs > 0 && startTs < (nowTs - 60 * 1000);
+  const isStartTimeTooEarly = !isRideShare && startTs > 0 && startTs < (nowTs + 2 * 3600 * 1000 - 60 * 1000);
 
   const startDisplay = formatDisplayLabel(startDatetime);
   const endDisplay   = formatDisplayLabel(endDatetime);
+
+  // Minimum return datetime should be at least 30 mins after startDatetime
+  const minEndDate = startTs > 0
+    ? new Date(startTs + 30 * 60 * 1000)
+    : minAllowedDate;
 
   return (
     <div className="space-y-3 bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm">
@@ -143,9 +174,16 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
             {isBn ? 'যাত্রার তারিখ ও সময় নির্ধারণ' : 'Select Travel Date & Time'}
           </h3>
         </div>
-        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-          BD Time (UTC+6)
-        </span>
+        <div className="flex items-center gap-1.5">
+          {!isRideShare && (
+            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+              {isBn ? 'কমপক্ষে ২ ঘন্টা আগে' : 'Min 2h Advance'}
+            </span>
+          )}
+          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+            BD Time (UTC+6)
+          </span>
+        </div>
       </div>
 
       {/* Quick Schedule Presets — with active/selected highlight */}
@@ -170,18 +208,50 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-        {/* Start Datetime — native picker, AM/PM display label below */}
+        {/* Start Datetime — native picker with min attribute (disallowing past and < 2h for non-rideshare) */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 focus-within:border-black transition-all">
-          <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1 flex items-center gap-1">
-            <Calendar className="w-3 h-3 text-emerald-600" />
-            {isBn ? 'যাত্রার তারিখ ও সময়' : 'Departure Date & Time'}
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-emerald-600" />
+              {isBn ? 'যাত্রার তারিখ ও সময়' : 'Departure Date & Time'}
+            </label>
+            <span className="text-[10px] font-bold text-slate-500">
+              {isRideShare
+                ? (isBn ? 'ন্যূনতম: এখন' : 'Min: Now')
+                : (isBn ? 'ন্যূনতম: ২ ঘন্টা পর' : 'Min: 2h later')}
+            </span>
+          </div>
           <input
             type="datetime-local"
+            min={apiToInputValue(formatDateTimeToApi(minAllowedDate))}
             value={apiToInputValue(startDatetime)}
             onChange={(e) => {
               setActivePreset(null);
-              onChangeStartDatetime(inputToApiValue(e.target.value));
+              const val = e.target.value;
+              if (!val) return;
+              const chosenTs = new Date(val).getTime();
+              const currentNow = Date.now();
+              const requiredMin = currentNow + (isRideShare ? 0 : 2 * 3600 * 1000);
+
+              // Disallow selecting past time or < 2h for non-rideshare
+              if (chosenTs < requiredMin - 30 * 1000) {
+                const clamped = new Date(requiredMin);
+                onChangeStartDatetime(formatDateTimeToApi(clamped));
+                if (isReturn) {
+                  const endTs = new Date(endDatetime.replace(' ', 'T')).getTime();
+                  if (isNaN(endTs) || endTs <= clamped.getTime()) {
+                    onChangeEndDatetime(formatDateTimeToApi(new Date(clamped.getTime() + 8 * 3600 * 1000)));
+                  }
+                }
+              } else {
+                onChangeStartDatetime(inputToApiValue(val));
+                if (isReturn) {
+                  const endTs = new Date(endDatetime.replace(' ', 'T')).getTime();
+                  if (isNaN(endTs) || endTs <= chosenTs) {
+                    onChangeEndDatetime(formatDateTimeToApi(new Date(chosenTs + 8 * 3600 * 1000)));
+                  }
+                }
+              }
             }}
             className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none cursor-pointer"
           />
@@ -207,10 +277,24 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
             </div>
             <input
               type="datetime-local"
+              min={apiToInputValue(formatDateTimeToApi(minEndDate))}
               value={apiToInputValue(endDatetime)}
               onChange={(e) => {
                 setActivePreset(null);
-                onChangeEndDatetime(inputToApiValue(e.target.value));
+                const val = e.target.value;
+                if (!val) return;
+                const chosenTs = new Date(val).getTime();
+                const currentStartTs = new Date(startDatetime.replace(' ', 'T')).getTime();
+                const minReturnTs = !isNaN(currentStartTs) && currentStartTs > 0
+                  ? currentStartTs + 30 * 60 * 1000
+                  : Date.now() + 2 * 3600 * 1000;
+
+                if (chosenTs < minReturnTs) {
+                  const clamped = new Date(minReturnTs);
+                  onChangeEndDatetime(formatDateTimeToApi(clamped));
+                } else {
+                  onChangeEndDatetime(inputToApiValue(val));
+                }
               }}
               className="w-full bg-transparent text-xs sm:text-sm font-bold text-amber-950 focus:outline-none cursor-pointer"
             />
@@ -249,6 +333,17 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
           </div>
         )}
       </div>
+
+      {isPastTime && (
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-red-800 bg-red-50 border border-red-300 rounded-xl px-3 py-2">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-red-600" />
+          <span>
+            {isBn
+              ? 'অতীতের তারিখ বা সময় নির্বাচন করা যাবে না। অনুগ্রহ করে বর্তমান বা ভবিষ্যতের সময় নির্ধারণ করুন।'
+              : 'Past date or time cannot be selected. Please select a current or future departure time.'}
+          </span>
+        </div>
+      )}
 
       {isStartTimeTooEarly && (
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-xl px-3 py-2">

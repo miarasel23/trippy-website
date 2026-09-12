@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { customerTripService } from '@/services/customerTripService';
+import {
+  customerTripService,
+  clearTripDataFromLocalStorage,
+} from '@/services/customerTripService';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface RaiseOfferModalProps {
@@ -11,8 +14,8 @@ interface RaiseOfferModalProps {
   currentOffer: number;
   tripUuid: string;
   customerUuid: string;
-  onOfferUpdated: (newAmount: number) => void;
-  onKeepTrying?: () => void;
+  onOfferUpdated: (newAmount: number, newTripUuid?: string) => void;
+  onKeepTrying?: (newTripUuid?: string) => void;
 }
 
 function toBanglaDigits(str: string | number): string {
@@ -69,6 +72,9 @@ export const RaiseOfferModal: React.FC<RaiseOfferModalProps> = ({
 
   const handleRaiseOffer = async () => {
     setIsUpdating(true);
+    // Remove all trip and date data from local storage before calling API
+    clearTripDataFromLocalStorage();
+
     const res = await customerTripService.updateOfferAmount(
       customerUuid,
       tripUuid,
@@ -77,19 +83,28 @@ export const RaiseOfferModal: React.FC<RaiseOfferModalProps> = ({
     );
     setIsUpdating(false);
 
+    let newTripUuid = '';
     if (res && res.status !== false) {
-      onOfferUpdated(tempOfferPrice);
-      onClose();
-    } else {
-      // Even if backend mock has warning, update locally and restart cycle
-      onOfferUpdated(tempOfferPrice);
-      onClose();
+      if (res.data && typeof res.data === 'object') {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          newTripUuid = res.data[0]?.uuid || res.data[0]?.trip_uuid || '';
+        } else {
+          newTripUuid = res.data.uuid || res.data.trip_uuid || res.data.rental_trip_uuid || '';
+        }
+      }
+      if (!newTripUuid) {
+        newTripUuid = (res as any).uuid || (res as any).trip_uuid || '';
+      }
     }
+
+    onOfferUpdated(tempOfferPrice, newTripUuid || tripUuid);
+    onClose();
   };
 
   const handleKeepTrying = async () => {
     setIsKeepTryingLoading(true);
-    await customerTripService.updateOfferAmount(
+    clearTripDataFromLocalStorage();
+    const res = await customerTripService.updateOfferAmount(
       customerUuid,
       tripUuid,
       currentOffer,
@@ -97,10 +112,24 @@ export const RaiseOfferModal: React.FC<RaiseOfferModalProps> = ({
     );
     setIsKeepTryingLoading(false);
 
+    let newTripUuid = '';
+    if (res && res.status !== false) {
+      if (res.data && typeof res.data === 'object') {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          newTripUuid = res.data[0]?.uuid || res.data[0]?.trip_uuid || '';
+        } else {
+          newTripUuid = res.data.uuid || res.data.trip_uuid || res.data.rental_trip_uuid || '';
+        }
+      }
+      if (!newTripUuid) {
+        newTripUuid = (res as any).uuid || (res as any).trip_uuid || '';
+      }
+    }
+
     if (onKeepTrying) {
-      onKeepTrying();
+      onKeepTrying(newTripUuid || tripUuid);
     } else {
-      onOfferUpdated(currentOffer);
+      onOfferUpdated(currentOffer, newTripUuid || tripUuid);
     }
     onClose();
   };
