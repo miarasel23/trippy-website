@@ -128,18 +128,27 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   const { language } = useLanguage();
   const { user, token } = useAppSelector((state) => state.auth);
 
-  const [activeTrip, setActiveTrip] = useState<RentalTrip | null>(() => {
-    if (typeof window === 'undefined') return null;
+  const [activeTrip, setActiveTrip] = useState<RentalTrip | null>(null);
+  const [bidsCount, setBidsCount] = useState<number>(0);
+  const hasLoadedInitialCacheRef = React.useRef(false);
+
+  // Restore cached active trip on mount on client side without SSR mismatch
+  useEffect(() => {
     try {
       const cached =
         sessionStorage.getItem('trippy_active_trip_cache') ||
         localStorage.getItem('trippy_active_trip_cache');
-      if (cached) return JSON.parse(cached);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setActiveTrip(parsed);
+        setBidsCount(parsed?.drivers?.length ?? parsed?.total_bids ?? 0);
+      }
     } catch {}
-    return null;
-  });
+    hasLoadedInitialCacheRef.current = true;
+  }, []);
 
   useEffect(() => {
+    if (!hasLoadedInitialCacheRef.current && !activeTrip) return;
     if (activeTrip) {
       try {
         const json = JSON.stringify(activeTrip);
@@ -155,27 +164,13 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
           sessionStorage.setItem(`trippy_trip_created_${activeTrip.uuid}`, cTime);
         }
       } catch {}
-    } else {
+    } else if (hasLoadedInitialCacheRef.current) {
       try {
         sessionStorage.removeItem('trippy_active_trip_cache');
         localStorage.removeItem('trippy_active_trip_cache');
       } catch {}
     }
   }, [activeTrip]);
-
-  const [bidsCount, setBidsCount] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0;
-    try {
-      const cached =
-        sessionStorage.getItem('trippy_active_trip_cache') ||
-        localStorage.getItem('trippy_active_trip_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return parsed?.drivers?.length ?? parsed?.total_bids ?? 0;
-      }
-    } catch {}
-    return 0;
-  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isOverlayVisible, setIsOverlayVisible] = useState<boolean>(true);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
