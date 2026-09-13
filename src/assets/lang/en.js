@@ -10,7 +10,7 @@ export const en = {
     verified: "Verified",
     verifiedDriver: "100% Verified Drivers",
     gpsProtected: "GPS Protected",
-    hotline: "Hotline: 16223",
+    hotline: "Hotline: 01997709990",
     emergencySos: "Emergency SOS (999)",
     allRightsReserved: "All rights reserved.",
     onlineBooking: "Online Booking",
@@ -256,7 +256,7 @@ export const en = {
     battery: "BATTERY",
     safetyTitle: "Passenger Safety & Assistance",
     emergencySosBtn: "Emergency SOS (Police 999)",
-    hotlineBtn: "24/7 Safety Hotline (16223)",
+    hotlineBtn: "24/7 Safety Hotline (01997709990)",
     sosAlert:
       "Triggering National Emergency SOS (Bangladesh Police 999). Live GPS coordinates broadcasted to control room.",
   },
@@ -370,7 +370,7 @@ export const en = {
     safety: {
       sos: "🚨 Emergency SOS (999)",
       screening: "Driver Screening",
-      hotline: "Hotline: 16223",
+      hotline: "Hotline: 01997709990",
       faq: "Help Center & FAQ",
       privacy: "Privacy & Terms",
     },

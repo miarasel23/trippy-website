@@ -74,18 +74,18 @@ export const Footer: React.FC = () => {
             </h4>
             <ul className="space-y-2.5 text-sm text-slate-600">
               <li>
-                <Link href="/tracking" className="text-red-600 hover:text-red-700 transition-colors font-semibold flex items-center gap-1.5">
+                <a href="tel:999" className="text-red-600 hover:text-red-700 transition-colors font-semibold flex items-center gap-1.5">
                   {t.footer.safety.sos}
-                </Link>
+                </a>
               </li>
               <li><Link href="/tracking" className="hover:text-black transition-colors">{t.footer.safety.screening}</Link></li>
               <li>
-                <a href="tel:16223" className="hover:text-black transition-colors flex items-center gap-1.5">
+                <a href="tel:01997709990" className="hover:text-black transition-colors flex items-center gap-1.5">
                   <Phone className="w-3.5 h-3.5 text-brand-primary" /> {t.footer.safety.hotline}
                 </a>
               </li>
               <li><Link href="/#faq" className="hover:text-black transition-colors">{t.footer.safety.faq}</Link></li>
-              <li><Link href="/app" className="hover:text-black transition-colors">{t.footer.safety.privacy}</Link></li>
+              <li><Link href="/privacy" className="hover:text-black transition-colors">{t.footer.safety.privacy}</Link></li>
             </ul>
           </div>
 

@@ -90,6 +90,9 @@ function getDefaultActionWhen(pathStr: string): string {
   if (pathStr.includes('give-review') || pathStr.includes('customer/review')) {
     return 'give_review';
   }
+  if (pathStr.includes('privacy-policy') || pathStr.includes('terms-condition')) {
+    return 'privacy_policy_terms_condition';
+  }
   return 'admin_login';
 }
 
@@ -112,6 +115,10 @@ export async function GET(
 
     if (!targetUrl.searchParams.has('language_code')) {
       targetUrl.searchParams.set('language_code', 'bn');
+    }
+    if (!targetUrl.searchParams.has('country_code')) {
+      const activeLang = targetUrl.searchParams.get('language_code');
+      targetUrl.searchParams.set('country_code', activeLang === 'en' ? 'GB' : 'BD');
     }
     if (!targetUrl.searchParams.has('action_when')) {
       targetUrl.searchParams.set('action_when', getDefaultActionWhen(fullPathStr));

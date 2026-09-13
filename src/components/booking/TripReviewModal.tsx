@@ -192,7 +192,7 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
 
               <button
                 type="button"
-                onClick={() => alert(isBn ? 'সহায়তার জন্য কল করুন: ১৬২২৩' : 'Help & Support: 16223')}
+                onClick={() => alert(isBn ? 'সহায়তার জন্য কল করুন: ০১৯৯৭৭০৯৯৯০' : 'Help & Support: 01997709990')}
                 className="w-8 h-8 rounded-full border border-slate-300 text-slate-600 flex items-center justify-center text-xs font-bold hover:bg-slate-100 transition-colors"
                 title="Help"
               >

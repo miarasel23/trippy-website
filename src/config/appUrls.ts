@@ -41,6 +41,7 @@ export const AppUrls = {
     customerProfile: '/api/customer/profile',
     customerLocations: '/api/customer/locations',
     giveReview: '/api/customer/review',
+    privacyPolicyTermsCondition: '/api/v1/global-api/privacy-policy-terms-condition/list',
   },
 
   // Direct Backend API Endpoints (used by Next.js server route handlers / reverse proxies)
@@ -66,6 +67,7 @@ export const AppUrls = {
     rentalTripGiveReview: `${API_BASE_URL}/v1/rental-trip/give-review`,
     customerDriverTrackGet: `${API_BASE_URL}/v1/customer-driver-track/get`,
     saveCustomerDriverTrack: `${API_BASE_URL}/v1/customer-driver-track/create`,
+    privacyPolicyTermsCondition: `${API_BASE_URL}/v1/global-api/privacy-policy-terms-condition/list`,
   },
 };
 

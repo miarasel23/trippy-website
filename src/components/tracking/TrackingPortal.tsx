@@ -32,6 +32,7 @@ import {
   User,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { usePolicySupport } from '@/hooks/usePolicySupport';
 import { useActiveTrip } from '@/context/ActiveTripContext';
 import { useAppSelector } from '@/redux/hooks';
 import {
@@ -140,6 +141,7 @@ const DEFAULT_API_TRIP: RentalTrip = {
 export const TrackingPortal: React.FC = () => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
+  const { hotlinePhone, hotlineDisplay, emergencyNumber, emergencyDisplay } = usePolicySupport();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { token, user } = useAppSelector((state) => state.auth);
@@ -305,6 +307,11 @@ export const TrackingPortal: React.FC = () => {
     'Dhaka-Metro-cha-54-1400';
   const carType =
     trip?.car_category?.car_type || activeDriver?.car_model || 'HIACE';
+  const carAvatar =
+    trip?.car_category?.car_avatar ||
+    (activeDriver as any)?.car_avatar ||
+    (trip as any)?.car_service?.avatar ||
+    null;
 
   // Driver Phone: Check accepted_driver.phone, drivers[0].phone, fallback to 01997709990
   const driverPhone =
@@ -915,12 +922,23 @@ export const TrackingPortal: React.FC = () => {
 
                 {/* Vehicle Model & Registration Plate */}
                 <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 px-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                      {isBn ? 'গাড়ির বিবরণ' : 'Vehicle & Model'}
-                    </span>
-                    <div className="text-xs font-bold text-slate-800 capitalize">
-                      {carType}
+                  <div className="flex items-center gap-2.5">
+                    {carAvatar && (
+                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                        <img
+                          src={getImageUrl(carAvatar)}
+                          alt={carType}
+                          className="w-full h-full object-contain p-0.5"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        {isBn ? 'গাড়ির বিবরণ' : 'Vehicle & Model'}
+                      </span>
+                      <div className="text-xs font-bold text-slate-800 capitalize">
+                        {carType}
+                      </div>
                     </div>
                   </div>
                   <span className="text-xs font-mono font-bold bg-white text-slate-900 border border-slate-300 px-2.5 py-1 rounded-lg shadow-2xs">
@@ -997,8 +1015,24 @@ export const TrackingPortal: React.FC = () => {
                 {/* Service Type & Hours Booked Row */}
                 <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-xl bg-white border border-slate-200 flex items-center justify-center flex-shrink-0">
-                      <Car className="w-3.5 h-3.5 text-slate-700" />
+                    <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-2xs">
+                      {carAvatar ? (
+                        <img
+                          src={getImageUrl(carAvatar)}
+                          alt={carType}
+                          className="w-full h-full object-contain p-0.5"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            const fallback = e.currentTarget.parentElement?.querySelector('.car-fallback-icon');
+                            if (fallback) (fallback as HTMLElement).classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <Car
+                        className={`w-4 h-4 text-slate-700 car-fallback-icon ${
+                          carAvatar ? 'hidden' : 'block'
+                        }`}
+                      />
                     </div>
                     <div className="min-w-0">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">
@@ -1119,15 +1153,7 @@ export const TrackingPortal: React.FC = () => {
               </div>
 
               {/* Telemetry Stats */}
-              <div className="grid grid-cols-3 gap-2.5">
-                <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center shadow-2xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    {isBn ? 'গতি' : 'Speed'}
-                  </span>
-                  <strong className="text-sm sm:text-base font-extrabold text-slate-900 font-mono">
-                    {speed} km/h
-                  </strong>
-                </div>
+              <div className="grid grid-cols-2 gap-2.5">
                 <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">
                     {isBn ? 'দূরত্ব' : 'Remaining'}
@@ -1153,27 +1179,20 @@ export const TrackingPortal: React.FC = () => {
                 </span>
 
                 <a
-                  href="tel:16223"
+                  href={`tel:${hotlinePhone}`}
                   className="w-full py-3 px-4 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white transition-colors"
                 >
                   <Phone className="w-4 h-4 text-emerald-400" />
-                  <span>{isBn ? 'জরুরি হটলাইন: ১৬২২৩' : '24/7 Hotline: 16223'}</span>
+                  <span>{isBn ? `জরুরি হটলাইন: ${hotlineDisplay}` : `24/7 Hotline: ${hotlineDisplay}`}</span>
                 </a>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    alert(
-                      isBn
-                        ? 'জরুরি এসওএস সিগন্যাল পাঠানো হয়েছে।'
-                        : 'Emergency SOS alert sent.'
-                    )
-                  }
+                <a
+                  href={`tel:${emergencyNumber}`}
                   className="w-full py-2.5 px-4 text-xs font-bold rounded-2xl flex items-center justify-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors cursor-pointer"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>{isBn ? 'জরুরি এসওএস (SOS)' : 'Emergency SOS'}</span>
-                </button>
+                  <span>{isBn ? `জরুরি এসওএস (${emergencyDisplay})` : `Emergency SOS (${emergencyDisplay})`}</span>
+                </a>
               </div>
 
             </div>

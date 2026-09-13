@@ -126,6 +126,14 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
   const riderMarkerRef = useRef<any>(null);
   const pickupMarkerRef = useRef<any>(null);
   const dropoffMarkerRef = useRef<any>(null);
+  // Track the last known driver position to avoid redundant setPosition calls
+  // that cause the marker to visually flicker/jump on every API poll.
+  const lastDriverPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastRiderPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastIsBikeRef = useRef<boolean | null>(null);
+  // Track route key and bounds fitting to prevent map shivering on polling
+  const hasFittedBoundsRef = useRef(false);
+  const lastRouteKeyRef = useRef('');
 
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(false);
@@ -341,38 +349,43 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
       anchor: new window.google.maps.Point(22, 50),
     });
 
-    // A. Pickup Marker
+    // Route key based on pickup and dropoff coordinates
     const pLat = Number(pickupLocation?.latitude) || 23.8045;
     const pLng = Number(pickupLocation?.longitude) || 90.3701;
-    const pPos = new window.google.maps.LatLng(pLat, pLng);
+    const dLat = Number(dropoffLocation?.latitude) || 23.7947;
+    const dLng = Number(dropoffLocation?.longitude) || 90.4143;
+    const currentRouteKey = `${pLat.toFixed(5)},${pLng.toFixed(5)}->${dLat.toFixed(5)},${dLng.toFixed(5)}`;
+    const routeChanged = lastRouteKeyRef.current !== currentRouteKey;
 
-    if (pickupMarkerRef.current) {
-      pickupMarkerRef.current.setPosition(pPos);
-    } else {
+    const pPos = new window.google.maps.LatLng(pLat, pLng);
+    const dPos = new window.google.maps.LatLng(dLat, dLng);
+
+    // A. Pickup Marker
+    if (!pickupMarkerRef.current) {
       pickupMarkerRef.current = new window.google.maps.Marker({
         position: pPos,
         map,
         title: pickupLocation?.address || 'Pickup Point',
         icon: createPinIcon('#059669', 'A'),
       });
+    } else if (routeChanged) {
+      pickupMarkerRef.current.setPosition(pPos);
+      pickupMarkerRef.current.setTitle(pickupLocation?.address || 'Pickup Point');
     }
     bounds.extend(pPos);
     hasPoints = true;
 
     // B. Dropoff Marker
-    const dLat = Number(dropoffLocation?.latitude) || 23.7947;
-    const dLng = Number(dropoffLocation?.longitude) || 90.4143;
-    const dPos = new window.google.maps.LatLng(dLat, dLng);
-
-    if (dropoffMarkerRef.current) {
-      dropoffMarkerRef.current.setPosition(dPos);
-    } else {
+    if (!dropoffMarkerRef.current) {
       dropoffMarkerRef.current = new window.google.maps.Marker({
         position: dPos,
         map,
         title: dropoffLocation?.address || 'Dropoff Point',
         icon: createPinIcon('#dc2626', 'B'),
       });
+    } else if (routeChanged) {
+      dropoffMarkerRef.current.setPosition(dPos);
+      dropoffMarkerRef.current.setTitle(dropoffLocation?.address || 'Dropoff Point');
     }
     bounds.extend(dPos);
     hasPoints = true;
@@ -383,16 +396,21 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
     const rPos = new window.google.maps.LatLng(rLat, rLng);
 
     if (!isCompleted) {
-      const riderIcon = createRiderIcon();
-      const riderTitle = isBn
-        ? `রাইডারের অবস্থান: ${riderLocation?.address || pickupLocation?.address || 'পিকআপ স্থান'}`
-        : `Rider Location: ${riderLocation?.address || pickupLocation?.address || 'Pickup Point'}`;
+      const riderPosChanged =
+        !lastRiderPosRef.current ||
+        Math.abs(lastRiderPosRef.current.lat - rLat) > 0.00005 ||
+        Math.abs(lastRiderPosRef.current.lng - rLng) > 0.00005;
 
       if (riderMarkerRef.current) {
-        riderMarkerRef.current.setPosition(rPos);
-        riderMarkerRef.current.setIcon(riderIcon);
-        riderMarkerRef.current.setTitle(riderTitle);
+        if (riderPosChanged) {
+          riderMarkerRef.current.setPosition(rPos);
+          lastRiderPosRef.current = { lat: rLat, lng: rLng };
+        }
       } else {
+        const riderIcon = createRiderIcon();
+        const riderTitle = isBn
+          ? `রাইডারের অবস্থান: ${riderLocation?.address || pickupLocation?.address || 'পিকআপ স্থান'}`
+          : `Rider Location: ${riderLocation?.address || pickupLocation?.address || 'Pickup Point'}`;
         riderMarkerRef.current = new window.google.maps.Marker({
           position: rPos,
           map,
@@ -400,39 +418,59 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
           icon: riderIcon,
           zIndex: 950,
         });
+        lastRiderPosRef.current = { lat: rLat, lng: rLng };
       }
       bounds.extend(rPos);
     } else if (riderMarkerRef.current) {
       riderMarkerRef.current.setMap(null);
       riderMarkerRef.current = null;
+      lastRiderPosRef.current = null;
     }
 
     // D. Driver Marker (Car or Motorcycle)
     if (driverLocation && driverLocation.latitude && driverLocation.longitude) {
-      const drvPos = new window.google.maps.LatLng(
-        driverLocation.latitude,
-        driverLocation.longitude
-      );
+      const newLat = driverLocation.latitude;
+      const newLng = driverLocation.longitude;
 
-      const vehicleIcon = createVehicleIcon(isMotorcycle);
+      const posChanged =
+        !lastDriverPosRef.current ||
+        Math.abs(lastDriverPosRef.current.lat - newLat) > 0.00005 ||
+        Math.abs(lastDriverPosRef.current.lng - newLng) > 0.00005;
+
+      const bikeChanged = lastIsBikeRef.current !== isMotorcycle;
+      const drvPos = new window.google.maps.LatLng(newLat, newLng);
 
       if (driverMarkerRef.current) {
-        driverMarkerRef.current.setPosition(drvPos);
-        driverMarkerRef.current.setIcon(vehicleIcon);
+        if (posChanged) {
+          driverMarkerRef.current.setPosition(drvPos);
+          lastDriverPosRef.current = { lat: newLat, lng: newLng };
+        }
+        if (bikeChanged) {
+          driverMarkerRef.current.setIcon(createVehicleIcon(isMotorcycle));
+          lastIsBikeRef.current = isMotorcycle;
+        }
       } else {
         driverMarkerRef.current = new window.google.maps.Marker({
           position: drvPos,
           map,
           title: `${driverName} (${carPlate})`,
-          icon: vehicleIcon,
+          icon: createVehicleIcon(isMotorcycle),
           zIndex: 999,
         });
+        lastDriverPosRef.current = { lat: newLat, lng: newLng };
+        lastIsBikeRef.current = isMotorcycle;
       }
       bounds.extend(drvPos);
     }
 
-    // E. Directions Route from Pickup to Dropoff
-    if (pickupLocation?.address && dropoffLocation?.address && directionsRendererRef.current) {
+    // E. Directions Route from Pickup to Dropoff - ONLY recalculate when route actually changes
+    if (
+      pickupLocation?.address &&
+      dropoffLocation?.address &&
+      directionsRendererRef.current &&
+      routeChanged
+    ) {
+      lastRouteKeyRef.current = currentRouteKey;
       const directionsService = new window.google.maps.DirectionsService();
       directionsService.route(
         {
@@ -448,8 +486,11 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
       );
     }
 
-    if (hasPoints) {
+    // ONLY fit bounds on initial load or if route points actually changed.
+    // NEVER fit bounds on routine polling updates to completely prevent map shivering/jumping.
+    if (hasPoints && (!hasFittedBoundsRef.current || routeChanged)) {
       map.fitBounds(bounds, { top: 70, bottom: 100, left: 60, right: 60 });
+      hasFittedBoundsRef.current = true;
     }
   }, [mapLoaded, pickupLocation, dropoffLocation, driverLocation, riderLocation, tripStatus, driverName, carPlate]);
 
@@ -629,13 +670,7 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
                 )}
               </g>
 
-              {/* Speed & Live Status Badge */}
-              <g transform="translate(30, -14)">
-                <rect x="0" y="0" width="136" height="28" rx="6" fill="#000000" stroke="#1e293b" strokeWidth="1" />
-                <text x="10" y="18" fill="#ffffff" fontSize="11" fontWeight="bold" fontFamily="monospace">
-                  {isCompleted ? 'Arrived ✓' : `${speed} km/h • Live`}
-                </text>
-              </g>
+              {/* Speed badge removed — speed data is not reliably available from the GPS API */}
             </g>
           </svg>
 
@@ -716,8 +751,8 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
             {isCompleted
               ? isBn ? 'গন্তব্যে পৌঁছেছেন' : 'Arrived at Destination'
               : isBn
-              ? `লাইভ ট্র্যাকিং • ${speed} কিমি/ঘণ্টা`
-              : `Live GPS • ${speed} km/h`}
+              ? 'লাইভ ট্র্যাকিং'
+              : 'Live GPS'}
           </span>
         </div>
       </div>
