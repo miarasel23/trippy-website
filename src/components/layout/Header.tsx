@@ -8,6 +8,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { openLoginModal, logout } from '@/redux/features/authSlice';
 import { useActiveTrip } from '@/context/ActiveTripContext';
+import { isTripReviewed } from '@/utils/tripStorage';
 
 export const Header: React.FC = () => {
   const pathname = usePathname();
@@ -19,6 +20,18 @@ export const Header: React.FC = () => {
   const dispatch = useAppDispatch();
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const { activeTrip, bidsCount } = useActiveTrip();
+
+  const showActiveTripPill = Boolean(
+    activeTrip &&
+    activeTrip.trip_status !== 'CANCELLED' &&
+    activeTrip.trip_status !== 'CANCELED' &&
+    !(
+      (activeTrip.trip_status === 'COMPLETED' ||
+        activeTrip.trip_status === 'FINISHED' ||
+        activeTrip.trip_status === 'TRIP_COMPLETED') &&
+      isTripReviewed(activeTrip, activeTrip.uuid)
+    )
+  );
 
   // Close user dropdown on outside click
   useEffect(() => {
@@ -113,7 +126,7 @@ export const Header: React.FC = () => {
             </div>
 
             {/* Active Trip Pill in Header for all trip lifecycle states */}
-            {activeTrip && (
+            {showActiveTripPill && activeTrip && (
               <Link
                 href={
                   activeTrip.trip_status === 'REQUESTED'
@@ -305,7 +318,7 @@ export const Header: React.FC = () => {
               )}
 
               {/* Active Trip Banner for Mobile */}
-              {activeTrip && (
+              {showActiveTripPill && activeTrip && (
                 <Link
                   href={
                     activeTrip.trip_status === 'REQUESTED'

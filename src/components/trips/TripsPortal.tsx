@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/common/Badge';
 import { formatTripServiceType } from '@/utils/serviceFormat';
+import { clearAllTripRelatedStorage, markTripReviewed, isTripReviewed } from '@/utils/tripStorage';
 
 const TripsContent: React.FC = () => {
   const searchParams = useSearchParams();
@@ -129,7 +130,7 @@ const TripsContent: React.FC = () => {
 
   // If completed and not yet reviewed, auto-open review modal
   useEffect(() => {
-    if (isTripCompleted && currentTrip && !currentTrip.given_review && !hasReviewed) {
+    if (isTripCompleted && currentTrip && !isTripReviewed(currentTrip, currentTrip.uuid) && !hasReviewed) {
       setIsReviewModalOpen(true);
     }
   }, [isTripCompleted, currentTrip, hasReviewed]);
@@ -386,6 +387,10 @@ const TripsContent: React.FC = () => {
               onReviewSubmitted={() => {
                 setHasReviewed(true);
                 setIsReviewModalOpen(false);
+                if (currentTrip.uuid) {
+                  markTripReviewed(currentTrip.uuid);
+                  clearAllTripRelatedStorage(currentTrip.uuid);
+                }
                 refreshActiveTrip();
               }}
             />
@@ -488,13 +493,9 @@ const TripsContent: React.FC = () => {
               const dropoff =
                 tripItem.dropoff_locations?.[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
 
-              // Review check: review_status value is false should show option for review
+              // Review check: review_status or given_review check
               const needsReview =
-                isItemCompleted &&
-                (tripItem.review_status === false ||
-                  tripItem.review_status === 'false' ||
-                  tripItem.review_status === 0 ||
-                  !tripItem.given_review);
+                isItemCompleted && !isTripReviewed(tripItem, tripItem.uuid);
 
               return (
                 <div
@@ -691,6 +692,10 @@ const TripsContent: React.FC = () => {
                 selectedReviewTrip.dropoff_locations?.[0]?.address || 'Dropoff'
               }
               onReviewSubmitted={() => {
+                if (selectedReviewTrip.uuid) {
+                  markTripReviewed(selectedReviewTrip.uuid);
+                  clearAllTripRelatedStorage(selectedReviewTrip.uuid);
+                }
                 setSelectedReviewTrip(null);
                 // Refresh trips
                 customerTripService

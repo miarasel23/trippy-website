@@ -151,7 +151,7 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
   // Helper check if selected start time is in the past or less than 2 hours for scheduled rides
   const nowTs = Date.now();
   const startTs = startDatetime ? new Date(startDatetime.replace(' ', 'T')).getTime() : 0;
-  const isPastTime = startTs > 0 && startTs < (nowTs - 60 * 1000);
+  const isPastTime = !isRideShare && startTs > 0 && startTs < (nowTs - 60 * 1000);
   const isStartTimeTooEarly = !isRideShare && startTs > 0 && startTs < (nowTs + 2 * 3600 * 1000 - 60 * 1000);
 
   const startDisplay = formatDisplayLabel(startDatetime);

@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { Star, CheckCircle2, Loader2, X, Sparkles, ThumbsUp, ShieldCheck } from 'lucide-react';
-import { customerTripService, getImageUrl } from '@/services/customerTripService';
+import { getImageUrl, customerTripService } from '@/services/customerTripService';
+import { clearAllTripRelatedStorage, markTripReviewed } from '@/utils/tripStorage';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAppSelector } from '@/redux/hooks';
 
@@ -144,11 +145,22 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
     setIsSubmitting(false);
 
     if (res && res.status) {
+      markTripReviewed(tripUuid);
+      clearAllTripRelatedStorage(tripUuid);
       setIsSuccess(true);
       setTimeout(() => {
         if (onReviewSubmitted) onReviewSubmitted();
         onClose();
       }, 1600);
+    } else if (res && !res.status && /already/i.test(res.message || '')) {
+      // Backend already accepted review for this trip
+      markTripReviewed(tripUuid);
+      clearAllTripRelatedStorage(tripUuid);
+      setIsSuccess(true);
+      setTimeout(() => {
+        if (onReviewSubmitted) onReviewSubmitted();
+        onClose();
+      }, 1000);
     } else {
       setErrorMessage(res?.message || (isBn ? 'রিভিউ জমা দিতে ব্যর্থ হয়েছে।' : 'Failed to submit review.'));
     }

@@ -13,6 +13,7 @@ import {
 import { CarPhotoGalleryModal } from './CarPhotoGalleryModal';
 import { RaiseOfferModal } from './RaiseOfferModal';
 import { TripReviewModal } from './TripReviewModal';
+import { clearAllTripRelatedStorage, markTripReviewed, isTripReviewed } from '@/utils/tripStorage';
 import { useLanguage } from '@/context/LanguageContext';
 import { useActiveTrip, hasTripDataChanged } from '@/context/ActiveTripContext';
 import { useAppSelector, useAppDispatch } from '@/redux/hooks';
@@ -132,7 +133,13 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   const { language } = useLanguage();
   const isBn = language === 'bn';
   const { user, token } = useAppSelector((state) => state.auth);
-  const { setIsRadarOnPage, activeTrip, setActiveTripManually, dismissOverlay } = useActiveTrip();
+  const {
+    setIsRadarOnPage,
+    activeTrip,
+    setActiveTripManually,
+    dismissOverlay,
+    clearActiveTrip,
+  } = useActiveTrip();
 
   // Dynamic active trip UUID state: when offer amount is updated, backend creates a new trip
   const [currentTripUuid, setCurrentTripUuid] = useState<string>(tripUuid);
@@ -840,11 +847,10 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
             setSeenDriverCount(polledSeenCount);
           }
 
-          // Sync with active trip global context (only if trip data changed)
-          setActiveTripManually(trip);
-
           // Handle trip completion or cancellation (until completed and cancelled)
           const status = (trip.trip_status || '').toUpperCase();
+          const isReviewDone = isTripReviewed(trip, effectiveTrip);
+
           if (
             status === 'COMPLETED' ||
             status === 'TRIP_COMPLETED' ||
@@ -852,6 +858,18 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           ) {
             isTerminal = true;
             clearInterval(interval);
+
+            // Clean all trip-related storage immediately
+            clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
+
+            // If already reviewed, do NOT open review modal! Terminate and exit radar cleanly.
+            if (isReviewDone) {
+              clearActiveTrip();
+              onCancelTrip();
+              return;
+            }
+
+            // Otherwise, open review modal for unreviewed completed trip
             setCompletedTripForReview(trip);
             setIsTripCompletedReviewOpen(true);
             return;
@@ -864,6 +882,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           ) {
             isTerminal = true;
             clearInterval(interval);
+            clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
             alert(isBn ? 'ট্রিপটি বাতিল করা হয়েছে।' : 'Trip has been cancelled.');
             onCancelTrip();
             return;
@@ -872,6 +891,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           if (status === 'ACCEPTED' || status === 'ON_THE_WAY' || status === 'STARTED') {
             isTerminal = true;
             clearInterval(interval);
+            clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
+            onCancelTrip();
             const driverId =
               trip.accepted_driver?.driver_uuid ||
               (trip as any).driver_uuid ||
@@ -880,6 +901,9 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
             router.push(`/tracking?trip_uuid=${effectiveTrip}&driver_uuid=${driverId}`);
             return;
           }
+
+          // Sync with active trip global context only for active requested trips
+          setActiveTripManually(trip);
 
           return;
         }
@@ -1083,6 +1107,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     );
 
     if (res.status) {
+      clearAllTripRelatedStorage(activeCurrentUuid);
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('trippy_has_active_ride', 'true');
@@ -1955,6 +1980,9 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         <TripReviewModal
           isOpen={isTripCompletedReviewOpen}
           onClose={() => {
+            const u = completedTripForReview.uuid || tripUuid;
+            if (u) markTripReviewed(u);
+            clearAllTripRelatedStorage(u);
             setIsTripCompletedReviewOpen(false);
             onCancelTrip();
           }}
@@ -1984,6 +2012,9 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
             completedTripForReview.offer_amount
           }
           onReviewSubmitted={() => {
+            const u = completedTripForReview.uuid || tripUuid;
+            if (u) markTripReviewed(u);
+            clearAllTripRelatedStorage(u);
             setIsTripCompletedReviewOpen(false);
             onCancelTrip();
           }}

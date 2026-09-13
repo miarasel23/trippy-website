@@ -14,6 +14,7 @@ import {
 } from '@/services/customerTripService';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAppSelector } from '@/redux/hooks';
+import { clearAllTripRelatedStorage, isTripReviewed } from '@/utils/tripStorage';
 
 interface ActiveTripContextType {
   activeTrip: RentalTrip | null;
@@ -223,7 +224,8 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
             status === 'TRIP_CANCELLED' ||
             status === 'COMPLETED' ||
             status === 'TRIP_COMPLETED' ||
-            status === 'FINISHED'
+            status === 'FINISHED' ||
+            isTripReviewed(nextTrip, nextTrip.uuid)
           ) {
             nextTrip = null;
           }
@@ -248,7 +250,8 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
             status !== 'TRIP_CANCELLED' &&
             status !== 'COMPLETED' &&
             status !== 'TRIP_COMPLETED' &&
-            status !== 'FINISHED'
+            status !== 'FINISHED' &&
+            !isTripReviewed(sTrip, sTrip.uuid)
           ) {
             nextTrip = sTrip;
           }
@@ -335,12 +338,21 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const clearActiveTrip = () => {
+    clearAllTripRelatedStorage();
     setActiveTrip(null);
     setBidsCount(0);
     setIsRadarModalOpen(false);
   };
 
   const setActiveTripManually = (trip: RentalTrip | null) => {
+    if (trip && isTripReviewed(trip, trip.uuid)) {
+      clearAllTripRelatedStorage(trip.uuid);
+      setActiveTrip(null);
+      setBidsCount(0);
+      setIsRadarModalOpen(false);
+      return;
+    }
+
     if (trip?.uuid) {
       const cTime =
         trip.created_at ||

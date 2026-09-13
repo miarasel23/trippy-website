@@ -370,7 +370,7 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
       lastRiderPosRef.current = null;
     }
 
-    // D. Driver Marker (Car or Motorcycle)
+    // D. Driver Marker (Car or Motorcycle) - only placed if driverLocation is provided (i.e. status is IN_PROGRESS)
     if (driverLocation && driverLocation.latitude && driverLocation.longitude) {
       const newLat = driverLocation.latitude;
       const newLng = driverLocation.longitude;
@@ -404,6 +404,13 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
         lastIsBikeRef.current = isMotorcycle;
       }
       bounds.extend(drvPos);
+    } else {
+      // Remove driver marker when status is ACCEPTED (driver location not shown yet)
+      if (driverMarkerRef.current) {
+        driverMarkerRef.current.setMap(null);
+        driverMarkerRef.current = null;
+        lastDriverPosRef.current = null;
+      }
     }
 
     // E. Directions Route from Pickup to Dropoff - ONLY recalculate when route actually changes
@@ -679,22 +686,29 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
       <div className="absolute bottom-4 left-4 right-4 z-20 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-              <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
-              {isBn ? 'চালকের অবস্থান' : 'Driver Location'}
-            </span>
-            <span className="text-[11px] font-mono text-slate-400">
-              {driverLocation?.latitude && driverLocation?.longitude
-                ? `${Number(driverLocation.latitude).toFixed(4)}, ${Number(driverLocation.longitude).toFixed(4)}`
-                : 'Live GPS'}
-            </span>
+            {driverLocation?.latitude && driverLocation?.longitude ? (
+              <>
+                <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
+                  {isBn ? 'চালকের অবস্থান' : 'Driver Location'}
+                </span>
+                <span className="text-[11px] font-mono text-slate-400">
+                  {`${Number(driverLocation.latitude).toFixed(4)}, ${Number(driverLocation.longitude).toFixed(4)}`}
+                </span>
+              </>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+                {isBn ? 'চালক নিশ্চিত • রাইড শুরুর অপেক্ষায়' : 'Driver Confirmed • Waiting for ride to start'}
+              </span>
+            )}
           </div>
 
           <p
             className="text-xs font-bold text-slate-900 truncate"
-            title={displayAddress}
+            title={driverLocation ? displayAddress : (pickupLocation?.address || '')}
           >
-            {displayAddress}
+            {driverLocation ? displayAddress : (pickupLocation?.address || (isBn ? 'পিকআপ পয়েন্টে চালকের অপেক্ষায়' : 'Waiting for driver at pickup point'))}
           </p>
 
           <p className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5">

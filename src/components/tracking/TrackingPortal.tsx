@@ -48,6 +48,7 @@ import { TripReviewModal } from '@/components/booking/TripReviewModal';
 import { CarPhotoGalleryModal } from '@/components/booking/CarPhotoGalleryModal';
 import { TrackingGoogleMap } from '@/components/tracking/TrackingGoogleMap';
 import { formatTripServiceType } from '@/utils/serviceFormat';
+import { clearAllTripRelatedStorage, markTripReviewed, isTripReviewed } from '@/utils/tripStorage';
 
 // Sample default trip structure matching the live backend API response provided by the user
 const DEFAULT_API_TRIP: RentalTrip = {
@@ -158,10 +159,10 @@ export const TrackingPortal: React.FC = () => {
   const effectiveCustomerUuid =
     customerUuidParam || user?.uuid || getActiveCustomerUuid();
   const effectiveTripUuid =
-    tripUuidParam || contextActiveTrip?.uuid || '6cc58e5d-c79f-4fc8-9229-25c73453cdab';
+    tripUuidParam || contextActiveTrip?.uuid || '';
 
   const [trip, setTrip] = useState<RentalTrip | null>(
-    contextActiveTrip || DEFAULT_API_TRIP
+    contextActiveTrip || null
   );
   const [speed, setSpeed] = useState<number>(45);
   const [etaMinutes, setEtaMinutes] = useState<number>(12);
@@ -254,6 +255,13 @@ export const TrackingPortal: React.FC = () => {
         setTrip(currentTrip);
 
         const status = (currentTrip.trip_status || '').toUpperCase();
+
+        // If trip is strictly in REQUESTED bidding state, redirect back to trips/bidding radar
+        if (status === 'REQUESTED') {
+          router.push(`/trips?trip_uuid=${effectiveTripUuid}`);
+          return;
+        }
+
         const isDone =
           status === 'COMPLETED' ||
           status === 'FINISHED' ||
@@ -262,23 +270,18 @@ export const TrackingPortal: React.FC = () => {
           status === 'CANCELED' ||
           status === 'TRIP_CANCELLED';
 
-        if (typeof window !== 'undefined') {
-          try {
-            if (isDone) {
-              localStorage.removeItem('trippy_has_active_ride');
-            } else {
+        if (isDone) {
+          clearAllTripRelatedStorage(effectiveTripUuid);
+        } else {
+          if (typeof window !== 'undefined') {
+            try {
               localStorage.setItem('trippy_has_active_ride', 'true');
-            }
-          } catch {}
+            } catch {}
+          }
         }
 
         // Check if review has been given
-        const isReviewed =
-          Boolean(currentTrip.given_review) ||
-          currentTrip.review_status === true ||
-          currentTrip.review_status === 'true' ||
-          currentTrip.review_status === 1 ||
-          currentTrip.accepted_driver?.review_status === true;
+        const isReviewed = isTripReviewed(currentTrip, effectiveTripUuid);
 
         if (isDone && !isReviewed && !hasReviewed) {
           setIsReviewModalOpen(true);
@@ -400,18 +403,24 @@ export const TrackingPortal: React.FC = () => {
     rawStatus === 'STARTED' ||
     isFirstCompleted;
 
+  // Strict status division as requested:
+  // 1. ACCEPTED: Driver accepted, tracking is shown but driver location in map is NOT shown
+  const isAccepted =
+    rawStatus === 'ACCEPTED' || rawStatus === 'ACCEPT' || rawStatus === 'CONFIRMED';
+
+  // 2. IN_PROGRESS: Driver is moving/on the way/ride started - driver location in map IS shown!
   const isInProgress =
     rawStatus === 'IN_PROGRESS' ||
     rawStatus === 'INPROGRESS' ||
-    rawStatus === 'ACCEPTED' ||
-    rawStatus === 'ACCEPT' ||
+    rawStatus === 'STARTED' ||
+    rawStatus === 'RIDE_STARTED' ||
     rawStatus === 'ON_THE_WAY' ||
     rawStatus === 'ONTHEWAY' ||
     rawStatus === 'PICKUP_ARRIVED' ||
     isRideStarted;
 
   // Active trip remains visible and tracked until explicitly completed or cancelled
-  const isActiveTrip = !isCompleted && (isInProgress || Boolean(effectiveTripUuid));
+  const isActiveTrip = !isCompleted && (isAccepted || isInProgress || Boolean(effectiveTripUuid));
 
   // ── Live Rider Geolocation Tracking (Keeps rider location visible until completed) ──
   const [liveRiderGps, setLiveRiderGps] = useState<{
@@ -1218,7 +1227,7 @@ export const TrackingPortal: React.FC = () => {
               <TrackingGoogleMap
                 pickupLocation={activePickupLocation}
                 dropoffLocation={activeDropoffLocation}
-                driverLocation={latestDriverLocation}
+                driverLocation={isInProgress ? latestDriverLocation : null}
                 riderLocation={effectiveRiderLocation}
                 driverName={driverName}
                 carType={carType}
@@ -1885,6 +1894,10 @@ export const TrackingPortal: React.FC = () => {
           onReviewSubmitted={() => {
             setHasReviewed(true);
             setIsReviewModalOpen(false);
+            if (effectiveTripUuid) {
+              markTripReviewed(effectiveTripUuid);
+            }
+            clearAllTripRelatedStorage(effectiveTripUuid);
             clearActiveTrip();
             // Redirect to home page for new trip booking as requested
             router.push('/');

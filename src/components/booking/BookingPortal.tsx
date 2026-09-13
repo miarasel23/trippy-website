@@ -21,6 +21,7 @@ import { LiveBiddingRadarView } from './LiveBiddingRadarView';
 import { GoogleRouteMap } from './GoogleRouteMap';
 import { useLanguage } from '@/context/LanguageContext';
 import { useActiveTrip } from '@/context/ActiveTripContext';
+import { clearAllTripRelatedStorage, isTripReviewed } from '@/utils/tripStorage';
 import { Badge } from '../common/Badge';
 import { Sparkles, MapPin, Zap, RefreshCw, PlusCircle } from 'lucide-react';
 
@@ -108,6 +109,20 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
         localStorage.getItem('trippy_booking_active_trip');
       if (cached) {
         const parsed = JSON.parse(cached);
+        // If trip is already completed, finished, cancelled, or reviewed, purge and do not restore
+        const st = (parsed?.trip_status || '').toUpperCase();
+        if (
+          !parsed?.uuid ||
+          st === 'COMPLETED' ||
+          st === 'FINISHED' ||
+          st === 'TRIP_COMPLETED' ||
+          st === 'CANCELLED' ||
+          st === 'CANCELED' ||
+          isTripReviewed(parsed, parsed?.uuid)
+        ) {
+          clearAllTripRelatedStorage(parsed?.uuid);
+          return null;
+        }
         if (parsed?.uuid && !parsed.createdAt) {
           parsed.createdAt =
             localStorage.getItem(`trippy_trip_created_${parsed.uuid}`) ||
@@ -132,15 +147,27 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
         }
       } catch {}
     } else {
-      try {
-        sessionStorage.removeItem('trippy_booking_active_trip');
-        localStorage.removeItem('trippy_booking_active_trip');
-      } catch {}
+      clearAllTripRelatedStorage();
     }
   }, [activeTrip]);
 
   // Auto-resume live bidding radar if an active REQUESTED trip exists on server
   useEffect(() => {
+    // If no active REQUESTED trip exists globally, dismiss radar and clear booking active trip
+    if (
+      !globalActiveTrip ||
+      globalActiveTrip.trip_status !== 'REQUESTED' ||
+      globalActiveTrip.accepted_bid_uuid ||
+      globalActiveTrip.accepted_driver ||
+      isTripReviewed(globalActiveTrip, globalActiveTrip?.uuid)
+    ) {
+      if (activeTrip) {
+        clearAllTripRelatedStorage(activeTrip?.uuid);
+        setActiveTrip(null);
+      }
+      return;
+    }
+
     if (
       globalActiveTrip &&
       globalActiveTrip.trip_status === 'REQUESTED' &&
@@ -304,20 +331,30 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     }
 
     const nowTs = Date.now();
-    const startTs = new Date(startDatetime.replace(' ', 'T')).getTime();
+    let startTs = new Date(startDatetime.replace(' ', 'T')).getTime();
+    let effectiveStartDatetime = startDatetime;
 
-    // Disallow past date and time for all trips
-    if (isNaN(startTs) || startTs < nowTs - 60 * 1000) {
-      alert(
-        isBn
-          ? 'অতীতের তারিখ বা সময় নির্বাচন করা যাবে না। অনুগ্রহ করে বর্তমান বা ভবিষ্যতের সময় নির্ধারণ করুন।'
-          : 'Cannot select past date or time. Please select current or future time.'
-      );
-      return;
-    }
+    if (selectedService === 'RIDE_SHARE') {
+      // RIDE_SHARE allows current date and time (Ride Now / On-demand).
+      // If start time was set earlier or elapsed while user was choosing options, auto-refresh to current time now.
+      if (isNaN(startTs) || startTs < nowTs) {
+        const freshNow = formatDateTimeToApi(new Date());
+        effectiveStartDatetime = freshNow;
+        setStartDatetime(freshNow);
+        startTs = new Date(freshNow.replace(' ', 'T')).getTime();
+      }
+    } else {
+      // Scheduled services (Intercity, Return, Hourly) must not be in the past
+      if (isNaN(startTs) || startTs < nowTs - 60 * 1000) {
+        alert(
+          isBn
+            ? 'অতীতের তারিখ বা সময় নির্বাচন করা যাবে না। অনুগ্রহ করে বর্তমান বা ভবিষ্যতের সময় নির্ধারণ করুন।'
+            : 'Cannot select past date or time. Please select current or future time.'
+        );
+        return;
+      }
 
-    // Lead time validation for non-RIDE_SHARE services (at least 2 hours in advance)
-    if (selectedService !== 'RIDE_SHARE') {
+      // Lead time validation for non-RIDE_SHARE services (at least 2 hours in advance)
       const minLeadTime = nowTs + 2 * 3600 * 1000 - 60 * 1000; // 2 hours minimum
       if (startTs < minLeadTime) {
         alert(
@@ -338,7 +375,6 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
         );
         return;
       }
-      const startTs = new Date(startDatetime.replace(' ', 'T')).getTime();
       const endTs = new Date(endDatetime.replace(' ', 'T')).getTime();
       if (endTs <= startTs) {
         alert(
@@ -367,7 +403,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
 
     const payload = {
       service_name: selectedService,
-      start_datetime: startDatetime,
+      start_datetime: effectiveStartDatetime,
       ...(selectedService === 'RETURN' ? { end_datetime: endDatetime } : {}),
       ...(selectedService === 'HOURLY' ? { hours_booked: hoursBooked || '4' } : {}),
       payment_method: 'CASH',
@@ -570,6 +606,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
                 setActiveTrip((prev) => (prev ? { ...prev, uuid: newUuid } : null));
               }}
               onCancelTrip={() => {
+                clearAllTripRelatedStorage(activeTrip?.uuid);
                 setActiveTrip(null);
                 clearGlobalActiveTrip();
               }}
