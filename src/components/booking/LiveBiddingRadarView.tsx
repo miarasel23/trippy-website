@@ -1099,28 +1099,37 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
     const activeCurrentUuid = currentTripUuidRef.current || currentTripUuid || tripUuid;
 
-    const res = await customerTripService.acceptBid(
-      customerUuid,
-      bidUuid,
-      activeCurrentUuid,
-      language
-    );
+    try {
+      const res = await customerTripService.acceptBid(
+        customerUuid,
+        bidUuid,
+        activeCurrentUuid,
+        language
+      );
 
-    if (res.status) {
-      clearAllTripRelatedStorage(activeCurrentUuid);
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem('trippy_has_active_ride', 'true');
-        } catch {}
+      if (res.status) {
+        clearAllTripRelatedStorage(activeCurrentUuid);
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('trippy_has_active_ride', 'true');
+          } catch {}
+        }
+        dismissOverlay();
+        const driverId = bidToAccept.driver_uuid || bidToAccept.driverUuid || '';
+        router.push(`/tracking?trip_uuid=${activeCurrentUuid}&driver_uuid=${driverId}`);
+      } else {
+        setIsAccepting(null);
+        setBidToAccept(null);
+        alert(
+          res.message ||
+          (isBn ? 'ড্রাইভারের বিড গ্রহণে সমস্যা হয়েছে।' : 'Failed to accept driver bid.')
+        );
       }
-      dismissOverlay();
-      const driverId = bidToAccept.driver_uuid || bidToAccept.driverUuid || '';
-      router.push(`/tracking?trip_uuid=${activeCurrentUuid}&driver_uuid=${driverId}`);
-    } else {
+    } catch (err: any) {
       setIsAccepting(null);
       setBidToAccept(null);
       alert(
-        res.message ||
+        err?.message ||
         (isBn ? 'ড্রাইভারের বিড গ্রহণে সমস্যা হয়েছে।' : 'Failed to accept driver bid.')
       );
     }
@@ -1699,7 +1708,14 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
       {/* ── Accept Bid Confirmation Dialog ────────────────────────────── */}
       {bidToAccept && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+          onClick={(e) => {
+            if (!isAccepting && e.target === e.currentTarget) {
+              setBidToAccept(null);
+            }
+          }}
+        >
           <div className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600">
               <Car className="w-6 h-6" />
@@ -1749,18 +1765,49 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 type="button"
+                disabled={Boolean(isAccepting)}
                 onClick={() => setBidToAccept(null)}
-                className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 transition-colors"
+                className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
                 {isBn ? 'না, ভাবছি' : 'No'}
               </button>
 
               <button
                 type="button"
+                disabled={Boolean(isAccepting)}
                 onClick={handleConfirmAcceptBid}
-                className="py-2.5 px-4 rounded-xl bg-black hover:bg-slate-900 text-white font-bold text-xs border border-black shadow-sm transition-colors"
+                className={`relative overflow-hidden py-2.5 px-4 rounded-xl font-bold text-xs border shadow-sm transition-all select-none ${
+                  isAccepting
+                    ? 'bg-slate-900 border-slate-800 text-white cursor-wait opacity-95'
+                    : 'bg-black hover:bg-slate-900 border-black text-white active:scale-98 cursor-pointer'
+                }`}
               >
-                {isBn ? 'হ্যাঁ, গ্রহণ করুন' : 'Yes, Accept'}
+                {/* Background Progress Fill (expands while accepting) */}
+                {isAccepting && (
+                  <div
+                    className="absolute inset-0 bg-emerald-950/70 pointer-events-none animate-btn-fill"
+                    style={{ willChange: 'width' }}
+                  />
+                )}
+
+                {/* Content Overlay */}
+                <div className="relative z-10 flex items-center justify-center gap-2">
+                  {isAccepting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400 shrink-0" />
+                      <span>{isBn ? 'গ্রহণ করা হচ্ছে...' : 'Accepting...'}</span>
+                    </>
+                  ) : (
+                    <span>{isBn ? 'হ্যাঁ, গ্রহণ করুন' : 'Yes, Accept'}</span>
+                  )}
+                </div>
+
+                {/* Bottom Loader Progress Bar */}
+                {isAccepting && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-800 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 via-teal-300 to-emerald-400 w-full animate-btn-progress" />
+                  </div>
+                )}
               </button>
             </div>
           </div>

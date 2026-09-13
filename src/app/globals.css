@@ -1475,3 +1475,45 @@ body {
   clip-path: polygon(0 40%, 100% 0%, 100% 100%, 0 60%);
   pointer-events: none;
 }
+
+/* Button Indeterminate Bottom Progress Bar & Fill */
+@keyframes buttonProgressSlide {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(30%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-btn-progress {
+  animation: buttonProgressSlide 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
+
+@keyframes buttonProgressFill {
+  0% {
+    width: 0%;
+  }
+  25% {
+    width: 35%;
+  }
+  60% {
+    width: 70%;
+  }
+  90% {
+    width: 90%;
+  }
+  100% {
+    width: 96%;
+  }
+}
+
+.animate-btn-fill {
+  animation: buttonProgressFill 2.5s ease-out forwards;
+  will-change: width;
+}
+
