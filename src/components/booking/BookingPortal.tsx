@@ -459,9 +459,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
           setActiveTripManually(singleRes.data);
         }
       })
-      .catch((err) => {
-        console.warn('Initial single trip polling call:', err);
-      });
+      .catch(() => {});
 
     // Automatically scroll to driver finding radar view so user immediately sees next step without scrolling up
     window.scrollTo({ top: 0, behavior: 'instant' });

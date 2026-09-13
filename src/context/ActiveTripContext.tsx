@@ -284,8 +284,7 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       return nextTrip;
-    } catch (err) {
-      console.error('Error refreshing active trip:', err);
+    } catch {
       return activeTripRef.current;
     }
   }, [customerUuid, language, token]);

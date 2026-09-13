@@ -8,16 +8,14 @@ import {
   Navigation,
   MapPin,
   Car,
-  Compass,
   ZoomIn,
   ZoomOut,
   Route,
+  Clock,
+  Radio,
+  Share2,
   Phone,
   MessageCircle,
-  Sparkles,
-  Radio,
-  RotateCcw,
-  User,
 } from 'lucide-react';
 
 declare global {
@@ -324,31 +322,6 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
       };
     };
 
-    // Helper: Create Distinctive Rider Marker SVG with pulsing halo and person silhouette
-    const createRiderIcon = () => ({
-      url: `data:image/svg+xml;utf-8,${encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="44" height="52" viewBox="0 0 44 52">
-          <defs>
-            <filter id="riderShadow" x="-30%" y="-30%" width="160%" height="160%">
-              <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.38"/>
-            </filter>
-          </defs>
-          <g filter="url(#riderShadow)">
-            <!-- Outer Pin Body (Royal Blue #2563eb) -->
-            <path d="M22 2 C12 2 4 10 4 20 C4 31 22 50 22 50 S40 31 40 20 C40 10 32 2 22 2 Z" fill="#2563eb" stroke="#ffffff" stroke-width="2.5"/>
-            <!-- Inner White Badge -->
-            <circle cx="22" cy="19" r="10.5" fill="#ffffff"/>
-            <!-- Person Head -->
-            <circle cx="22" cy="15.5" r="3.5" fill="#2563eb"/>
-            <!-- Person Shoulders -->
-            <path d="M15 25 C15 21.5 18 20.5 22 20.5 C26 20.5 29 21.5 29 25 Z" fill="#2563eb"/>
-          </g>
-        </svg>
-      `)}`,
-      scaledSize: new window.google.maps.Size(44, 52),
-      anchor: new window.google.maps.Point(22, 50),
-    });
-
     // Route key based on pickup and dropoff coordinates
     const pLat = Number(pickupLocation?.latitude) || 23.8045;
     const pLng = Number(pickupLocation?.longitude) || 90.3701;
@@ -390,38 +363,8 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
     bounds.extend(dPos);
     hasPoints = true;
 
-    // C. Rider Location Marker (Always visible when in_progress until completed)
-    const rLat = Number(riderLocation?.latitude) || pLat;
-    const rLng = Number(riderLocation?.longitude) || pLng;
-    const rPos = new window.google.maps.LatLng(rLat, rLng);
-
-    if (!isCompleted) {
-      const riderPosChanged =
-        !lastRiderPosRef.current ||
-        Math.abs(lastRiderPosRef.current.lat - rLat) > 0.00005 ||
-        Math.abs(lastRiderPosRef.current.lng - rLng) > 0.00005;
-
-      if (riderMarkerRef.current) {
-        if (riderPosChanged) {
-          riderMarkerRef.current.setPosition(rPos);
-          lastRiderPosRef.current = { lat: rLat, lng: rLng };
-        }
-      } else {
-        const riderIcon = createRiderIcon();
-        const riderTitle = isBn
-          ? `রাইডারের অবস্থান: ${riderLocation?.address || pickupLocation?.address || 'পিকআপ স্থান'}`
-          : `Rider Location: ${riderLocation?.address || pickupLocation?.address || 'Pickup Point'}`;
-        riderMarkerRef.current = new window.google.maps.Marker({
-          position: rPos,
-          map,
-          title: riderTitle,
-          icon: riderIcon,
-          zIndex: 950,
-        });
-        lastRiderPosRef.current = { lat: rLat, lng: rLng };
-      }
-      bounds.extend(rPos);
-    } else if (riderMarkerRef.current) {
+    // C. Person / Rider Location Marker - Removed from Google Map as requested
+    if (riderMarkerRef.current) {
       riderMarkerRef.current.setMap(null);
       riderMarkerRef.current = null;
       lastRiderPosRef.current = null;
@@ -504,14 +447,6 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
     mapInstanceRef.current.setZoom(16);
   }, [driverLocation]);
 
-  const handleRecenterRider = useCallback(() => {
-    if (!mapInstanceRef.current || !window.google) return;
-    const rLat = Number(riderLocation?.latitude) || Number(pickupLocation?.latitude) || 23.8045;
-    const rLng = Number(riderLocation?.longitude) || Number(pickupLocation?.longitude) || 90.3701;
-    mapInstanceRef.current.panTo({ lat: rLat, lng: rLng });
-    mapInstanceRef.current.setZoom(16);
-  }, [riderLocation, pickupLocation]);
-
   const handleFitFullRoute = useCallback(() => {
     if (!mapInstanceRef.current || !window.google) return;
     const bounds = new window.google.maps.LatLngBounds();
@@ -591,17 +526,11 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
               strokeLinecap="round"
             />
 
-            {/* Rider & Pickup Point A (Visible Until Completed) */}
+            {/* Pickup Point A */}
             <g transform="translate(280, 580)">
-              <circle r="22" fill="rgba(37, 99, 235, 0.2)">
-                <animate attributeName="r" values="16;28;16" dur="2s" repeatCount="indefinite" />
-              </circle>
-              <circle r="12" fill="#2563eb" />
+              <circle r="12" fill="#059669" />
               <circle r="4" fill="#ffffff" />
-              <text x="24" y="-4" fill="#1d4ed8" fontSize="11" fontWeight="bold">
-                {isBn ? 'রাইডার অবস্থান' : 'Rider Location (You)'}
-              </text>
-              <text x="24" y="10" fill="#0f172a" fontSize="12" fontWeight="bold">
+              <text x="24" y="5" fill="#0f172a" fontSize="12" fontWeight="bold">
                 {pickupLocation?.address ? pickupLocation.address.slice(0, 26) : 'Pickup Point (A)'}
               </text>
             </g>
@@ -684,17 +613,6 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
 
       {/* Floating Map Controls (Top Right) */}
       <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
-        {/* Focus on Rider Location */}
-        <button
-          type="button"
-          onClick={handleRecenterRider}
-          className="w-10 h-10 rounded-2xl bg-white/95 hover:bg-white text-slate-800 hover:text-blue-600 shadow-md border border-slate-200/90 flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
-          title={isBn ? 'রাইডারের অবস্থানে যান' : 'Focus on Rider Location'}
-          aria-label="Focus on rider"
-        >
-          <User className="w-4 h-4 text-blue-600" />
-        </button>
-
         {driverLocation && (
           <button
             type="button"
@@ -765,10 +683,6 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
               <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
               {isBn ? 'চালকের অবস্থান' : 'Driver Location'}
             </span>
-            <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
-              <User className="w-3 h-3 text-blue-600" />
-              {isBn ? 'রাইডারের অবস্থান দৃশ্যমান' : 'Rider Location Visible'}
-            </span>
             <span className="text-[11px] font-mono text-slate-400">
               {driverLocation?.latitude && driverLocation?.longitude
                 ? `${Number(driverLocation.latitude).toFixed(4)}, ${Number(driverLocation.longitude).toFixed(4)}`
@@ -790,8 +704,8 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
             <span>•</span>
             <span>{driverName}</span>
             <span className="hidden sm:inline">•</span>
-            <span className="text-blue-600 font-semibold truncate max-w-[220px]" title={riderLocation?.address || pickupLocation?.address || ''}>
-              {isBn ? 'রাইডার:' : 'Rider:'} {riderLocation?.address || pickupLocation?.address || (isBn ? 'পিকআপ স্থান' : 'Pickup')}
+            <span className="text-emerald-700 font-semibold truncate max-w-[220px]" title={pickupLocation?.address || ''}>
+              {isBn ? 'পিকআপ:' : 'Pickup:'} {pickupLocation?.address || (isBn ? 'পিকআপ স্থান' : 'Pickup Point')}
             </span>
           </p>
         </div>

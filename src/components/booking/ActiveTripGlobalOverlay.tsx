@@ -33,14 +33,44 @@ export const ActiveTripGlobalOverlay: React.FC = () => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
-  // Do not show floating popup card when already actively on this page (/booking, /trips, or radar is active on screen)
+  // Check if activeTrip status is strictly a pending REQUESTED bidding trip
+  const rawStatus = (activeTrip?.trip_status || '').toUpperCase();
+  const isRequestedBiddingTrip = rawStatus === 'REQUESTED';
+  const hasAcceptedDriver =
+    Boolean(activeTrip?.accepted_bid_uuid) ||
+    Boolean(activeTrip?.accepted_driver) ||
+    Boolean((activeTrip as any)?.driver_uuid) ||
+    Boolean((activeTrip as any)?.driver) ||
+    Boolean((activeTrip as any)?.assigned_driver);
+
+  // If trip is not strictly in REQUESTED bidding state or has an assigned driver, it is an accepted / active ride
+  const isAcceptedOrActiveTrip = !isRequestedBiddingTrip || hasAcceptedDriver;
+
+  // Check if an active ride is marked in browser storage
+  const hasActiveRideInStorage =
+    typeof window !== 'undefined' &&
+    localStorage.getItem('trippy_has_active_ride') === 'true';
+
+  // Do not show floating popup card when:
+  // 1. User is on /tracking, /booking, /trips
+  // 2. An active ride or accepted trip is ongoing (bidding phase is finished)
+  // 3. Current activeTrip is not in pending REQUESTED status
+  // 4. Radar modal is open or radar view is already active on current page
   const isRadarActiveOnCurrentPage =
     isRadarOnPage ||
     pathname.startsWith('/booking') ||
     pathname.startsWith('/trips') ||
+    pathname.startsWith('/tracking') ||
     isRadarModalOpen;
 
-  if (!activeTrip || !isOverlayVisible || isRadarActiveOnCurrentPage) {
+  if (
+    !activeTrip ||
+    !isOverlayVisible ||
+    !isRequestedBiddingTrip ||
+    isAcceptedOrActiveTrip ||
+    hasActiveRideInStorage ||
+    isRadarActiveOnCurrentPage
+  ) {
     return <LiveBiddingRadarModal />;
   }
 

@@ -114,9 +114,7 @@ export function clearTripDataFromLocalStorage(): void {
         localStorage.removeItem(key);
       } catch {}
     }
-  } catch (err) {
-    console.warn('Failed to clear trip data from localStorage:', err);
-  }
+  } catch {}
 }
 
 export const customerTripService = {
@@ -146,8 +144,7 @@ export const customerTripService = {
       if (!res.ok) return [];
       const json: SearchLocationResponse = await res.json();
       return json.status && Array.isArray(json.data) ? json.data : [];
-    } catch (err) {
-      console.error('searchLocations error:', err);
+    } catch {
       return [];
     }
   },
@@ -165,8 +162,7 @@ export const customerTripService = {
       if (!res.ok) return null;
       const json: RentalInfoResponse = await res.json();
       return json.status && json.data ? json.data : null;
-    } catch (err) {
-      console.error('fetchRentalInfo error:', err);
+    } catch {
       return null;
     }
   },
@@ -204,9 +200,8 @@ export const customerTripService = {
       });
 
       return await res.json();
-    } catch (err: any) {
-      console.error('calculateTripPrice error:', err);
-      return { status: false, message: err?.message || 'Price calculation failed' };
+    } catch {
+      return { status: false, message: 'Price calculation failed' };
     }
   },
 
@@ -254,16 +249,19 @@ export const customerTripService = {
     }
 
     try {
-      const url = `${AppUrls.proxy.rentalBids}?platform=web&language_code=${languageCode}&customer_uuid=${customerUuid}&trip_status=${tripStatus}&action_when=rental_bid_trip_list_for_customer`;
-      const res = await fetch(url, { headers });
-      if (!res.ok) return [];
-      const json = await res.json();
-      if (json.status && Array.isArray(json.data)) {
+      const query = `platform=web&language_code=${languageCode}&customer_uuid=${customerUuid}&trip_status=${tripStatus}&action_when=rental_bid_trip_list_for_customer`;
+      const directUrl = `${AppUrls.backend.rentalBidTripListForCustomer}?${query}`;
+      let res = await fetch(directUrl, { headers }).catch(() => null);
+      if (!res || !res.ok) {
+        res = await fetch(`${AppUrls.proxy.rentalBids}?${query}`, { headers }).catch(() => null);
+      }
+      if (!res || !res.ok) return [];
+      const json = await res.json().catch(() => null);
+      if (json && json.status && Array.isArray(json.data)) {
         return json.data;
       }
       return [];
-    } catch (err) {
-      console.error('fetchBids error:', err);
+    } catch {
       return [];
     }
   },
@@ -318,12 +316,19 @@ export const customerTripService = {
         trip_status: tripStatus,
       });
 
-      const url = `${AppUrls.proxy.rentalBidTripSingle}?${query.toString()}`;
-      const res = await fetch(url, { headers });
-      if (!res.ok) {
-        return { status: false, data: null, message: `HTTP ${res.status}` };
+      // Use direct backend URL so Next.js dev server proxy does not log repeated polling in terminal/console
+      const directUrl = `${AppUrls.backend.rentalBidTripSingleForCustomer}?${query.toString()}`;
+      let res = await fetch(directUrl, { headers }).catch(() => null);
+      if (!res || !res.ok) {
+        res = await fetch(`${AppUrls.proxy.rentalBidTripSingle}?${query.toString()}`, { headers }).catch(() => null);
       }
-      const json = await res.json();
+      if (!res || !res.ok) {
+        return { status: false, data: null, message: res ? `HTTP ${res.status}` : 'Request failed' };
+      }
+      const json = await res.json().catch(() => null);
+      if (!json) {
+        return { status: false, data: null, message: 'Invalid response' };
+      }
 
       let trip: RentalTrip | null = null;
       if (json.status && json.data) {
@@ -355,9 +360,8 @@ export const customerTripService = {
       }
 
       return { status: Boolean(json.status), data: trip, message: json.message };
-    } catch (err: any) {
-      console.error('fetchSingleTripBids error:', err);
-      return { status: false, data: null, message: err?.message };
+    } catch {
+      return { status: false, data: null, message: 'Request failed' };
     }
   },
 
@@ -564,7 +568,6 @@ export const customerTripService = {
 
       return await res.json();
     } catch (err: any) {
-      console.error('giveReview error:', err);
       return { status: false, message: err?.message || 'Failed to submit review' };
     }
   },
@@ -582,7 +585,8 @@ export const customerTripService = {
     if (!driverUuid) return [];
     const authToken = token || getStoredAuthToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
     };
     if (authToken) {
       headers.Authorization = authToken.startsWith('Bearer ')
@@ -591,22 +595,40 @@ export const customerTripService = {
     }
 
     try {
-      const res = await fetch(AppUrls.proxy.driverLocation, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          platform: 'web',
-          language_code: languageCode,
-          action_when: 'track_location_get',
-          driver_uuid: driverUuid,
-        }),
+      const body = new URLSearchParams({
+        platform: 'web',
+        language_code: languageCode,
+        action_when: 'track_location_get',
+        driver_uuid: driverUuid,
       });
 
-      if (!res.ok) return [];
-      const json: DriverTrackingResponse = await res.json();
-      return json.status && Array.isArray(json.data) ? json.data : [];
-    } catch (err) {
-      console.error('fetchDriverLocation error:', err);
+      // Try direct backend endpoint first to avoid Next.js dev server terminal proxy logging
+      let res = await fetch(AppUrls.backend.customerDriverTrackGet, {
+        method: 'POST',
+        headers,
+        body: body.toString(),
+      }).catch(() => null);
+
+      if (!res || !res.ok) {
+        res = await fetch(AppUrls.proxy.driverLocation, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authToken ? { Authorization: headers.Authorization } : {}),
+          },
+          body: JSON.stringify({
+            platform: 'web',
+            language_code: languageCode,
+            action_when: 'track_location_get',
+            driver_uuid: driverUuid,
+          }),
+        }).catch(() => null);
+      }
+
+      if (!res || !res.ok) return [];
+      const json: DriverTrackingResponse = await res.json().catch(() => null);
+      return json && json.status && Array.isArray(json.data) ? json.data : [];
+    } catch {
       return [];
     }
   },

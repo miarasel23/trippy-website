@@ -261,9 +261,7 @@ export function parseAsiaBangladeshTimestamp(raw?: string | number | null): numb
     if (best !== null) {
       return best;
     }
-  } catch (e) {
-    console.warn('Error parsing Asia/Dhaka timestamp:', e);
-  }
+  } catch {}
 
   return now;
 }

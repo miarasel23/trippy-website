@@ -19,7 +19,13 @@ export const LiveBiddingRadarModal: React.FC = () => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
-  if (!isRadarModalOpen || !activeTrip) return null;
+  const rawStatus = (activeTrip?.trip_status || '').toUpperCase();
+  const isAcceptedOrActive =
+    rawStatus !== 'REQUESTED' ||
+    Boolean(activeTrip?.accepted_bid_uuid) ||
+    Boolean(activeTrip?.accepted_driver);
+
+  if (!isRadarModalOpen || !activeTrip || isAcceptedOrActive) return null;
 
   const pickupAddress =
     activeTrip.pickup_locations?.map((l) => l.address).filter(Boolean).join(' → ') ||

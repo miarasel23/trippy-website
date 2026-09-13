@@ -132,7 +132,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   const { language } = useLanguage();
   const isBn = language === 'bn';
   const { user, token } = useAppSelector((state) => state.auth);
-  const { setIsRadarOnPage, activeTrip, setActiveTripManually } = useActiveTrip();
+  const { setIsRadarOnPage, activeTrip, setActiveTripManually, dismissOverlay } = useActiveTrip();
 
   // Dynamic active trip UUID state: when offer amount is updated, backend creates a new trip
   const [currentTripUuid, setCurrentTripUuid] = useState<string>(tripUuid);
@@ -728,9 +728,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           // Fallback: no created_at available, reset timer from now
           restartCountdown();
         }
-      } catch (err) {
-        console.warn('Failed to fetch updated trip data after raise fare:', err);
-      }
+      } catch {}
     }
 
     setIsUpdatingBottomOffer(false);
@@ -953,8 +951,9 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     };
 
     pollBids();
-    // Poll every 10 seconds
-    const interval = setInterval(pollBids, 10000);
+    // Dynamic polling interval: 5s for RIDE_SHARE, 30s for other services
+    const pollIntervalMs = isRideShare ? 5000 : 30000;
+    const interval = setInterval(pollBids, pollIntervalMs);
 
     return () => {
       isMounted = false;
@@ -972,6 +971,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     isBn,
     onCancelTrip,
     setActiveTripManually,
+    isRideShare,
   ]);
 
   // ── 3. Action Handlers ───────────────────────────────────────────────────
@@ -1083,6 +1083,12 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     );
 
     if (res.status) {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('trippy_has_active_ride', 'true');
+        } catch {}
+      }
+      dismissOverlay();
       const driverId = bidToAccept.driver_uuid || bidToAccept.driverUuid || '';
       router.push(`/tracking?trip_uuid=${activeCurrentUuid}&driver_uuid=${driverId}`);
     } else {
@@ -1646,9 +1652,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                   created_at: new Date().toISOString(),
                 } as any);
               }
-            } catch (err) {
-              console.warn('Failed to fetch updated trip data in onOfferUpdated:', err);
-            }
+            } catch {}
           }
         }}
         onKeepTrying={(newTripUuid) => {

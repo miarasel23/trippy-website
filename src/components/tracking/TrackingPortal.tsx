@@ -29,7 +29,6 @@ import {
   ZoomIn,
   Eye,
   CameraOff,
-  User,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { usePolicySupport } from '@/hooks/usePolicySupport';
@@ -145,7 +144,12 @@ export const TrackingPortal: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { token, user } = useAppSelector((state) => state.auth);
-  const { activeTrip: contextActiveTrip, clearActiveTrip } = useActiveTrip();
+  const { activeTrip: contextActiveTrip, clearActiveTrip, dismissOverlay } = useActiveTrip();
+
+  // Ensure right-side bidding overlay is always dismissed when on live tracking
+  useEffect(() => {
+    dismissOverlay();
+  }, [dismissOverlay]);
 
   const tripUuidParam = searchParams.get('trip_uuid');
   const driverUuidParam = searchParams.get('driver_uuid');
@@ -206,7 +210,29 @@ export const TrackingPortal: React.FC = () => {
     updated_at: '2026-09-12T13:10:27',
   });
 
-  // ── 1. Real-time Trip Polling from Backend API (Every 10 seconds) ──────────
+  // Return trip and service type logic
+  const serviceTypeParam = searchParams.get('service_type');
+  const serviceNameParam = searchParams.get('service_name');
+  const hoursParam = searchParams.get('hours_booked') || searchParams.get('hours');
+
+  const rawServiceName =
+    serviceNameParam ||
+    serviceTypeParam ||
+    trip?.service_name ||
+    (trip as any)?.service_type ||
+    (trip as any)?.servive_type ||
+    trip?.car_service?.service_name ||
+    '';
+
+  const isRideShare =
+    rawServiceName.toUpperCase() === 'RIDE_SHARE' ||
+    rawServiceName.toLowerCase().includes('ride_share') ||
+    rawServiceName.toLowerCase() === 'rideshare';
+
+  // Dynamic polling interval: 5s for Ride Share, 30s for other services
+  const pollIntervalMs = isRideShare ? 5000 : 30000;
+
+  // ── 1. Real-time Trip Polling from Backend API (5s for Ride Share, 30s for Others) ──
   useEffect(() => {
     let isMounted = true;
 
@@ -231,7 +257,20 @@ export const TrackingPortal: React.FC = () => {
         const isDone =
           status === 'COMPLETED' ||
           status === 'FINISHED' ||
-          status === 'TRIP_COMPLETED';
+          status === 'TRIP_COMPLETED' ||
+          status === 'CANCELLED' ||
+          status === 'CANCELED' ||
+          status === 'TRIP_CANCELLED';
+
+        if (typeof window !== 'undefined') {
+          try {
+            if (isDone) {
+              localStorage.removeItem('trippy_has_active_ride');
+            } else {
+              localStorage.setItem('trippy_has_active_ride', 'true');
+            }
+          } catch {}
+        }
 
         // Check if review has been given
         const isReviewed =
@@ -248,13 +287,13 @@ export const TrackingPortal: React.FC = () => {
     };
 
     pollTripStatus();
-    const interval = setInterval(pollTripStatus, 10000);
+    const interval = setInterval(pollTripStatus, pollIntervalMs);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [effectiveTripUuid, effectiveCustomerUuid, language, token, hasReviewed]);
+  }, [effectiveTripUuid, effectiveCustomerUuid, language, token, hasReviewed, pollIntervalMs]);
 
   // Telemetry fluctuation simulator
   useEffect(() => {
@@ -394,18 +433,14 @@ export const TrackingPortal: React.FC = () => {
             longitude: pos.coords.longitude,
           });
         },
-        (err) => {
-          console.debug('Rider live GPS error/fallback to pickup:', err.message);
-        },
+        () => {},
         {
           enableHighAccuracy: true,
           maximumAge: 10000,
           timeout: 10000,
         }
       );
-    } catch (e) {
-      console.debug('Geolocation watch exception:', e);
-    }
+    } catch {}
 
     return () => {
       if (watchId !== null) {
@@ -454,9 +489,7 @@ export const TrackingPortal: React.FC = () => {
             }
           }
         }
-      } catch (err) {
-        console.error('Error polling driver GPS location:', err);
-      }
+      } catch {}
     };
 
     pollDriverLocation();
@@ -476,20 +509,6 @@ export const TrackingPortal: React.FC = () => {
     : Array.isArray(rawCarPhotos)
     ? rawCarPhotos.filter((p) => Boolean(p && typeof p === 'string' && p.trim().length > 0))
     : [];
-
-  // Return trip and service type logic
-  const serviceTypeParam = searchParams.get('service_type');
-  const serviceNameParam = searchParams.get('service_name');
-  const hoursParam = searchParams.get('hours_booked') || searchParams.get('hours');
-
-  const rawServiceName =
-    serviceNameParam ||
-    serviceTypeParam ||
-    trip?.service_name ||
-    (trip as any)?.service_type ||
-    (trip as any)?.servive_type ||
-    trip?.car_service?.service_name ||
-    '';
 
   const hoursBooked =
     hoursParam ||
@@ -671,6 +690,11 @@ export const TrackingPortal: React.FC = () => {
     await customerTripService.cancelTrip(effectiveTripUuid, cancelReason, language);
     setIsCancelling(false);
     setIsCancelModalOpen(false);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('trippy_has_active_ride');
+      } catch {}
+    }
     clearActiveTrip();
     router.push('/');
   };
@@ -1048,23 +1072,15 @@ export const TrackingPortal: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Rider Location (Pickup) */}
+                {/* Pickup Point A */}
                 <div className="flex items-start gap-2.5">
-                  <div className="w-6 h-6 rounded-full bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
-                    <User className="w-3.5 h-3.5 text-blue-600" />
+                  <div className="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5">
+                    A
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] uppercase font-bold text-blue-700 block">
-                        {isBn ? 'রাইডার লোকেশন (পিকআপ)' : 'Rider Location (Pickup)'}
-                      </span>
-                      {isInProgress && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-                          {isBn ? 'দৃশ্যমান' : 'Live on Map'}
-                        </span>
-                      )}
-                    </div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      {isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point'}
+                    </span>
                     <p className="text-xs font-semibold text-slate-800 line-clamp-2">
                       {pickupAddress}
                     </p>
