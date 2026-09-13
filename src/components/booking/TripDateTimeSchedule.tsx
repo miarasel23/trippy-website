@@ -339,8 +339,12 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-red-600" />
           <span>
             {isBn
-              ? 'অতীতের তারিখ বা সময় নির্বাচন করা যাবে না। অনুগ্রহ করে বর্তমান বা ভবিষ্যতের সময় নির্ধারণ করুন।'
-              : 'Past date or time cannot be selected. Please select a current or future departure time.'}
+              ? isRideShare
+                ? 'অতীতের সময় নির্বাচন করা যাবে না। রাইড শেয়ারের জন্য বর্তমান সময় বা ভবিষ্যতের সময় নির্বাচন করুন।'
+                : 'অতীতের তারিখ বা সময় নির্বাচন করা যাবে না। অনুগ্রহ করে বর্তমান বা ভবিষ্যতের সময় নির্ধারণ করুন।'
+              : isRideShare
+                ? 'Cannot select a past time. For Ride Share, please select the current time or later.'
+                : 'Cannot select a past date or time. Please select a current or future departure time.'}
           </span>
         </div>
       )}

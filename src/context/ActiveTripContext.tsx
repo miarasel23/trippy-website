@@ -59,6 +59,9 @@ export function hasTripDataChanged(
   if ((p.trip_status || '').toUpperCase() !== (n.trip_status || '').toUpperCase()) return true;
   if (Number(p.offer_amount || 0) !== Number(n.offer_amount || 0)) return true;
   if (p.accepted_bid_uuid !== n.accepted_bid_uuid) return true;
+  if (n.created_at && p.created_at !== n.created_at) return true;
+  if ((n as any).createdAt && (p as any).createdAt !== (n as any).createdAt) return true;
+  if ((n as any).creation_date && (p as any).creation_date !== (n as any).creation_date) return true;
 
   const pTotalBids = p.total_bids ?? p.bid_summary?.total_bids ?? p.drivers?.length ?? 0;
   const nTotalBids = n.total_bids ?? n.bid_summary?.total_bids ?? n.drivers?.length ?? 0;
@@ -124,8 +127,54 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   const { language } = useLanguage();
   const { user, token } = useAppSelector((state) => state.auth);
 
-  const [activeTrip, setActiveTrip] = useState<RentalTrip | null>(null);
-  const [bidsCount, setBidsCount] = useState<number>(0);
+  const [activeTrip, setActiveTrip] = useState<RentalTrip | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached =
+        sessionStorage.getItem('trippy_active_trip_cache') ||
+        localStorage.getItem('trippy_active_trip_cache');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    if (activeTrip) {
+      try {
+        const json = JSON.stringify(activeTrip);
+        sessionStorage.setItem('trippy_active_trip_cache', json);
+        localStorage.setItem('trippy_active_trip_cache', json);
+        const cTime =
+          activeTrip.created_at ||
+          (activeTrip as any).createdAt ||
+          (activeTrip as any).creation_date ||
+          (activeTrip as any).created_date;
+        if (activeTrip.uuid && cTime) {
+          localStorage.setItem(`trippy_trip_created_${activeTrip.uuid}`, cTime);
+          sessionStorage.setItem(`trippy_trip_created_${activeTrip.uuid}`, cTime);
+        }
+      } catch {}
+    } else {
+      try {
+        sessionStorage.removeItem('trippy_active_trip_cache');
+        localStorage.removeItem('trippy_active_trip_cache');
+      } catch {}
+    }
+  }, [activeTrip]);
+
+  const [bidsCount, setBidsCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const cached =
+        sessionStorage.getItem('trippy_active_trip_cache') ||
+        localStorage.getItem('trippy_active_trip_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed?.drivers?.length ?? parsed?.total_bids ?? 0;
+      }
+    } catch {}
+    return 0;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isOverlayVisible, setIsOverlayVisible] = useState<boolean>(true);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
@@ -207,6 +256,19 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // 2. ONLY re-render if new data is found OR data was lost
+      if (nextTrip?.uuid) {
+        const cTime =
+          nextTrip.created_at ||
+          (nextTrip as any).createdAt ||
+          (nextTrip as any).creation_date ||
+          (nextTrip as any).created_date;
+        if (cTime && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`trippy_trip_created_${nextTrip.uuid}`, cTime);
+            sessionStorage.setItem(`trippy_trip_created_${nextTrip.uuid}`, cTime);
+          } catch {}
+        }
+      }
       if (hasTripDataChanged(activeTripRef.current, nextTrip)) {
         setActiveTrip(nextTrip);
         if (nextTrip) {
@@ -280,6 +342,29 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const setActiveTripManually = (trip: RentalTrip | null) => {
+    if (trip?.uuid) {
+      const cTime =
+        trip.created_at ||
+        (trip as any).createdAt ||
+        (trip as any).creation_date ||
+        (trip as any).created_date ||
+        activeTripRef.current?.created_at ||
+        (activeTripRef.current as any)?.createdAt ||
+        (typeof window !== 'undefined'
+          ? localStorage.getItem(`trippy_trip_created_${trip.uuid}`) ||
+            sessionStorage.getItem(`trippy_trip_created_${trip.uuid}`)
+          : undefined);
+
+      if (cTime) {
+        trip.created_at = cTime;
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`trippy_trip_created_${trip.uuid}`, cTime);
+            sessionStorage.setItem(`trippy_trip_created_${trip.uuid}`, cTime);
+          } catch {}
+        }
+      }
+    }
     if (hasTripDataChanged(activeTripRef.current, trip)) {
       setActiveTrip(trip);
       if (trip) {

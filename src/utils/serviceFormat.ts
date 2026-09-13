@@ -187,38 +187,83 @@ export function extractTripServiceInfo(trip?: any): {
 
 /**
  * Parses a date string or timestamp in Asia/Dhaka (Bangladesh Standard Time, UTC+6).
- * Handles:
- * - '2026-09-12 21:40:00' (no timezone -> treated as Asia/Dhaka +06:00)
- * - '2026-09-12T21:40:00+06:00'
- * - '2026-09-12T15:40:00Z'
- * - numeric timestamps or ISO formats
+ * Handles all backend serialization formats:
+ * - UTC strings without Z: '2026-09-12 16:06:00'
+ * - Asia/Dhaka local strings without Z: '2026-09-12 22:06:00'
+ * - ISO with Z: '2026-09-12T16:06:00.000000Z'
+ * - Asia/Dhaka ISO saved with Z: '2026-09-12T22:06:00.000000Z'
+ * - Explicit offset: '2026-09-12T22:06:00+06:00'
+ * - Numeric timestamps
+ * Resolves the true elapsed time between created_at and now in Bangladesh time.
  */
 export function parseAsiaBangladeshTimestamp(raw?: string | number | null): number {
   if (!raw) return Date.now();
-  if (typeof raw === 'number') return raw;
+  const now = Date.now();
+
+  if (typeof raw === 'number') {
+    let ts = raw;
+    if (ts - now > 5 * 3600 * 1000) {
+      ts -= 6 * 3600 * 1000;
+    }
+    return Math.min(now, ts);
+  }
 
   try {
     const str = String(raw).trim();
-    if (!str) return Date.now();
+    if (!str) return now;
 
-    // If it already has an explicit timezone offset (+06:00, -05:00, Z)
-    if (str.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(str)) {
-      const ts = new Date(str).getTime();
-      if (!isNaN(ts)) return ts;
+    const formatted = str.includes('T') ? str : str.replace(' ', 'T');
+    const cleanIso = formatted.replace(/\.\d+/, ''); // strip sub-second microseconds
+
+    const candidates: number[] = [];
+
+    // 1. Direct standard parse
+    const d1 = new Date(str).getTime();
+    if (!isNaN(d1)) {
+      candidates.push(d1);
+      // If parsed as UTC but was actually local BD time saved with Z
+      candidates.push(d1 - 6 * 3600 * 1000);
     }
 
-    // String without timezone, e.g. '2026-09-12 21:40:00' or '2026-09-12T21:40:00'
-    const formatted = str.includes('T') ? str : str.replace(' ', 'T');
-    // Parse explicitly as Asia/Dhaka (+06:00)
-    const bdIso = `${formatted}+06:00`;
-    const ts = new Date(bdIso).getTime();
-    if (!isNaN(ts)) return ts;
+    // 2. Treat as UTC ('...Z')
+    const utcStr = cleanIso.endsWith('Z') ? cleanIso : `${cleanIso}Z`;
+    const dUtc = new Date(utcStr).getTime();
+    if (!isNaN(dUtc)) {
+      candidates.push(dUtc);
+      candidates.push(dUtc - 6 * 3600 * 1000);
+    }
 
-    const fallbackTs = new Date(formatted).getTime();
-    if (!isNaN(fallbackTs)) return fallbackTs;
+    // 3. Treat as Asia/Dhaka ('...+06:00')
+    const dhakaBase = cleanIso.replace(/[+-]\d{2}:?\d{2}$|Z$/, '');
+    const dDhaka = new Date(`${dhakaBase}+06:00`).getTime();
+    if (!isNaN(dDhaka)) {
+      candidates.push(dDhaka);
+      candidates.push(dDhaka + 6 * 3600 * 1000);
+      candidates.push(dDhaka + 12 * 3600 * 1000);
+    }
+
+    // Find candidate that is in the past (allowing 5s clock skew)
+    // Priority: smallest valid positive elapsed time (i.e. created recently)
+    const unique = Array.from(new Set(candidates));
+    let best: number | null = null;
+    let minValidElapsed = Infinity;
+
+    for (const c of unique) {
+      const elapsed = now - c;
+      // Allow up to 60s server clock skew (if slightly in the future, treat as 0s elapsed for comparison)
+      const effectiveElapsed = elapsed >= -60000 && elapsed < 0 ? 0 : elapsed;
+      if (effectiveElapsed >= 0 && effectiveElapsed < minValidElapsed) {
+        minValidElapsed = effectiveElapsed;
+        best = c; // Always return the stable candidate timestamp c, NEVER Date.now()!
+      }
+    }
+
+    if (best !== null) {
+      return best;
+    }
   } catch (e) {
     console.warn('Error parsing Asia/Dhaka timestamp:', e);
   }
 
-  return Date.now();
+  return now;
 }

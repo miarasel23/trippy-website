@@ -1,9 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './features/authSlice';
+import tripTimerReducer from './features/tripTimerSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    tripTimer: tripTimerReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
 });

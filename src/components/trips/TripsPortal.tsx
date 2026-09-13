@@ -188,9 +188,17 @@ const TripsContent: React.FC = () => {
               (currentTrip as any).rental_duration ||
               undefined
             }
-            note={currentTrip.note || undefined}
-            createdAt={currentTrip.created_at}
-            initialBids={currentTrip.drivers || []}
+            createdAt={
+              currentTrip.created_at ||
+              (currentTrip as any).createdAt ||
+              (currentTrip as any).creation_date ||
+              (currentTrip as any).created_date ||
+              (typeof window !== 'undefined' && currentTrip.uuid
+                ? localStorage.getItem(`trippy_trip_created_${currentTrip.uuid}`) ||
+                  sessionStorage.getItem(`trippy_trip_created_${currentTrip.uuid}`) ||
+                  undefined
+                : undefined)
+            }
             onTripUuidUpdated={(newUuid) => {
               if (specificTrip) {
                 setSpecificTrip((prev) => (prev ? { ...prev, uuid: newUuid } : null));

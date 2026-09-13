@@ -90,9 +90,17 @@ export const LiveBiddingRadarModal: React.FC = () => {
               (activeTrip as any).rental_duration ||
               undefined
             }
-            note={activeTrip.note || undefined}
-            createdAt={activeTrip.created_at}
-            initialBids={activeTrip.drivers || []}
+            createdAt={
+              activeTrip.created_at ||
+              (activeTrip as any).createdAt ||
+              (activeTrip as any).creation_date ||
+              (activeTrip as any).created_date ||
+              (typeof window !== 'undefined' && activeTrip.uuid
+                ? localStorage.getItem(`trippy_trip_created_${activeTrip.uuid}`) ||
+                  sessionStorage.getItem(`trippy_trip_created_${activeTrip.uuid}`) ||
+                  undefined
+                : undefined)
+            }
             isModal={true}
             onTripUuidUpdated={(newUuid) => {
               setActiveTripManually({ ...activeTrip, uuid: newUuid });

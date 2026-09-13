@@ -100,14 +100,50 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     hoursBooked?: string;
     note?: string;
     createdAt?: string;
-  } | null>(null);
+  } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached =
+        sessionStorage.getItem('trippy_booking_active_trip') ||
+        localStorage.getItem('trippy_booking_active_trip');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.uuid && !parsed.createdAt) {
+          parsed.createdAt =
+            localStorage.getItem(`trippy_trip_created_${parsed.uuid}`) ||
+            sessionStorage.getItem(`trippy_trip_created_${parsed.uuid}`) ||
+            undefined;
+        }
+        return parsed;
+      }
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    if (activeTrip) {
+      try {
+        const json = JSON.stringify(activeTrip);
+        sessionStorage.setItem('trippy_booking_active_trip', json);
+        localStorage.setItem('trippy_booking_active_trip', json);
+        if (activeTrip.uuid && activeTrip.createdAt) {
+          localStorage.setItem(`trippy_trip_created_${activeTrip.uuid}`, activeTrip.createdAt);
+          sessionStorage.setItem(`trippy_trip_created_${activeTrip.uuid}`, activeTrip.createdAt);
+        }
+      } catch {}
+    } else {
+      try {
+        sessionStorage.removeItem('trippy_booking_active_trip');
+        localStorage.removeItem('trippy_booking_active_trip');
+      } catch {}
+    }
+  }, [activeTrip]);
 
   // Auto-resume live bidding radar if an active REQUESTED trip exists on server
   useEffect(() => {
     if (
       globalActiveTrip &&
       globalActiveTrip.trip_status === 'REQUESTED' &&
-      !activeTrip &&
       !hasDismissedRadar
     ) {
       const pAddress =
@@ -119,30 +155,44 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
         globalActiveTrip.dropoff_locations?.[0]?.address ||
         (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
 
-      setActiveTrip({
-        uuid: globalActiveTrip.uuid || '',
-        customerUuid:
-          user?.uuid ||
-          localStorage.getItem('trippy_customer_uuid') ||
-          getActiveCustomerUuid(),
-        serviceName:
-          globalActiveTrip.service_name ||
-          (globalActiveTrip as any).service_type ||
-          (globalActiveTrip as any).servive_type ||
-          globalActiveTrip.car_service?.service_name ||
-          'RIDE_SHARE',
-        vehicleName: globalActiveTrip.car_category?.car_type || 'Vehicle',
-        proposedFare: globalActiveTrip.offer_amount || 0,
-        pickupAddress: pAddress,
-        dropoffAddress: dAddress,
-        hoursBooked:
-          globalActiveTrip.hours_booked ||
-          (globalActiveTrip as any).hours ||
-          (globalActiveTrip as any).rental_duration ||
-          undefined,
-        note: globalActiveTrip.note || undefined,
-        createdAt: globalActiveTrip.created_at,
-      });
+      const resolvedCreatedAt =
+        globalActiveTrip.created_at ||
+        (globalActiveTrip as any).createdAt ||
+        (globalActiveTrip as any).creation_date ||
+        (globalActiveTrip as any).created_date ||
+        (typeof window !== 'undefined' && globalActiveTrip.uuid
+          ? localStorage.getItem(`trippy_trip_created_${globalActiveTrip.uuid}`) ||
+            sessionStorage.getItem(`trippy_trip_created_${globalActiveTrip.uuid}`)
+          : undefined);
+
+      if (!activeTrip) {
+        setActiveTrip({
+          uuid: globalActiveTrip.uuid || '',
+          customerUuid:
+            user?.uuid ||
+            localStorage.getItem('trippy_customer_uuid') ||
+            getActiveCustomerUuid(),
+          serviceName:
+            globalActiveTrip.service_name ||
+            (globalActiveTrip as any).service_type ||
+            (globalActiveTrip as any).servive_type ||
+            globalActiveTrip.car_service?.service_name ||
+            'RIDE_SHARE',
+          vehicleName: globalActiveTrip.car_category?.car_type || 'Vehicle',
+          proposedFare: globalActiveTrip.offer_amount || 0,
+          pickupAddress: pAddress,
+          dropoffAddress: dAddress,
+          hoursBooked:
+            globalActiveTrip.hours_booked ||
+            (globalActiveTrip as any).hours ||
+            (globalActiveTrip as any).rental_duration ||
+            undefined,
+          note: globalActiveTrip.note || undefined,
+          createdAt: resolvedCreatedAt,
+        });
+      } else if (resolvedCreatedAt && activeTrip.createdAt !== resolvedCreatedAt) {
+        setActiveTrip((prev) => (prev ? { ...prev, createdAt: resolvedCreatedAt } : null));
+      }
     }
   }, [globalActiveTrip, activeTrip, hasDismissedRadar, user, isBn]);
 
@@ -373,8 +423,15 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       dropoffAddress: formattedDropoff,
       hoursBooked: selectedService === 'HOURLY' ? hoursBooked : undefined,
       note: note.trim() || undefined,
-      createdAt: res.data?.created_at || new Date().toISOString(),
+      createdAt: res.data?.created_at || (res.data as any)?.trip?.created_at || new Date().toISOString(),
     };
+
+    if (typeof window !== 'undefined' && tripData.uuid) {
+      try {
+        localStorage.setItem(`trippy_trip_created_${tripData.uuid}`, tripData.createdAt);
+        sessionStorage.setItem(`trippy_trip_created_${tripData.uuid}`, tripData.createdAt);
+      } catch {}
+    }
 
     setActiveTrip(tripData);
 
@@ -554,20 +611,20 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
                 }
               />
 
-              {/* 3. Conditional Date and Time Schedule (ONLY WHEN service_type !== 'RIDE_SHARE') */}
-              {selectedService !== 'RIDE_SHARE' && (
-                <div className="animate-fade-in">
-                  <TripDateTimeSchedule
-                    serviceType={selectedService}
-                    startDatetime={startDatetime}
-                    endDatetime={endDatetime}
-                    hoursBooked={hoursBooked}
-                    onChangeStartDatetime={(val) => setStartDatetime(val)}
-                    onChangeEndDatetime={(val) => setEndDatetime(val)}
-                    onChangeHoursBooked={(val) => setHoursBooked(val)}
-                  />
-                </div>
-              )}
+              {/* 3. Date and Time Schedule (always shown for all service types) */}
+              {/* RIDE_SHARE: current time accepted (no advance required) */}
+              {/* All other services: minimum 2 hours in advance */}
+              <div className="animate-fade-in">
+                <TripDateTimeSchedule
+                  serviceType={selectedService}
+                  startDatetime={startDatetime}
+                  endDatetime={endDatetime}
+                  hoursBooked={hoursBooked}
+                  onChangeStartDatetime={(val) => setStartDatetime(val)}
+                  onChangeEndDatetime={(val) => setEndDatetime(val)}
+                  onChangeHoursBooked={(val) => setHoursBooked(val)}
+                />
+              </div>
 
 
               {/* 4. Vehicles Horizontal Slider, Note Field & Fare Proposer */}

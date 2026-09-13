@@ -327,12 +327,30 @@ export const customerTripService = {
 
       let trip: RentalTrip | null = null;
       if (json.status && json.data) {
+        let rawItem: any = null;
         if (Array.isArray(json.data)) {
-          trip = json.data[0] || null;
-        } else if (json.data.trip) {
-          trip = json.data.trip;
+          rawItem = json.data[0] || null;
         } else if (typeof json.data === 'object') {
-          trip = json.data;
+          rawItem = json.data;
+        }
+
+        if (rawItem) {
+          const nested = rawItem.rental_trip || rawItem.trip || {};
+          trip = {
+            ...nested,
+            ...rawItem,
+            drivers: rawItem.drivers || nested.drivers || [],
+            seen_drivers: rawItem.seen_drivers || nested.seen_drivers || [],
+            created_at:
+              rawItem.created_at ||
+              nested.created_at ||
+              rawItem.createdAt ||
+              nested.createdAt ||
+              rawItem.creation_date ||
+              nested.creation_date ||
+              rawItem.created_date ||
+              nested.created_date,
+          };
         }
       }
 

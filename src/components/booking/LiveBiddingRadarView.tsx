@@ -15,7 +15,11 @@ import { RaiseOfferModal } from './RaiseOfferModal';
 import { TripReviewModal } from './TripReviewModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { useActiveTrip, hasTripDataChanged } from '@/context/ActiveTripContext';
-import { useAppSelector } from '@/redux/hooks';
+import { useAppSelector, useAppDispatch } from '@/redux/hooks';
+import {
+  setTripCreatedAtOnce,
+  forceTripCreatedAt,
+} from '@/redux/features/tripTimerSlice';
 import {
   formatTripServiceType,
   parseAsiaBangladeshTimestamp,
@@ -275,10 +279,52 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   // Drawer expansion state
   const [isDrawerExpanded, setIsDrawerExpanded] = useState(false);
 
-  // Trip created timestamp
-  const [tripCreatedAt, setTripCreatedAt] = useState<string>(
-    initialCreatedAt || new Date().toISOString()
+  const dispatch = useAppDispatch();
+
+  // Trip created timestamp (tracks server created_at)
+  // Read from Redux first so polling can never overwrite an already-stored value.
+  // Try every possible UUID key so the selector stays populated even when currentTripUuid state lags.
+  const reduxCreatedAt = useAppSelector(
+    (state) => {
+      const map = (state as any).tripTimer?.createdAtByTripUuid ?? {};
+      return (
+        map[currentTripUuidRef.current || ''] ||
+        map[currentTripUuid || ''] ||
+        map[tripUuid || ''] ||
+        map[activeTrip?.uuid || ''] ||
+        undefined
+      ) as string | undefined;
+    }
   );
+
+  const [tripCreatedAt, setTripCreatedAt] = useState<string | undefined>(
+    reduxCreatedAt ||
+    activeTrip?.created_at ||
+    (activeTrip as any)?.createdAt ||
+    (activeTrip as any)?.creation_date ||
+    initialCreatedAt
+  );
+
+  // Sync with activeTrip.created_at when context updates from server
+  // But only update local state if Redux doesn't already have a stable value
+  useEffect(() => {
+    const serverDate =
+      activeTrip?.created_at ||
+      (activeTrip as any)?.createdAt ||
+      (activeTrip as any)?.creation_date;
+    const uuid = currentTripUuid || tripUuid || activeTrip?.uuid;
+    if (serverDate && uuid) {
+      // Dispatch write-once to Redux — won't overwrite if already set
+      dispatch(setTripCreatedAtOnce({ tripUuid: uuid, createdAt: serverDate }));
+      // Update local state only if we don't already have a value
+      if (!tripCreatedAt) {
+        setTripCreatedAt(serverDate);
+      }
+    } else if (!tripCreatedAt && initialCreatedAt) {
+      setTripCreatedAt(initialCreatedAt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTrip?.created_at, (activeTrip as any)?.createdAt, (activeTrip as any)?.creation_date, initialCreatedAt]);
 
   const [bottomOfferPrice, setBottomOfferPrice] = useState<number>(initialProposedFare);
   const [isUpdatingBottomOffer, setIsUpdatingBottomOffer] = useState(false);
@@ -300,47 +346,219 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   );
   const isRideShare = serviceInfo.isRideShare;
 
-  // ── 1. Finding Driver Countdown Timer (2 mins for RIDE_SHARE, 1 hour for other services) ────────────
-  // Counts down strictly from trip created_at timestamp in Asia/Dhaka (Bangladesh) time
-  const maxTimerSeconds = isRideShare ? 2 * 60 : 1 * 3600;
+  // ── 1. Finding Driver Countdown Timer ────────────────────────────────────
+  // RIDE_SHARE = 2 minutes (120s), all other services = 1 hour (3600s)
+  // maxTimerSecondsRaw is derived from service type on each render
+  const maxTimerSecondsRaw = isRideShare ? 2 * 60 : 1 * 3600;
 
-  const initialStartTs = parseAsiaBangladeshTimestamp(tripCreatedAt || initialCreatedAt);
-  const [cycleStartTs, setCycleStartTs] = useState<number>(initialStartTs);
+  // Stable persistent start timestamp for this trip countdown session
+  const tripKeyRef = useRef<string>('');
+
+  const effectiveTripKey =
+    currentTripUuidRef.current ||
+    currentTripUuid ||
+    tripUuid ||
+    activeTrip?.uuid ||
+    '';
+
+  // Helper to retrieve persisted creation timestamp by trip UUID
+  const getPersistedCreatedAt = (uuid?: string): string | undefined => {
+    if (!uuid || typeof window === 'undefined') return undefined;
+    try {
+      return (
+        localStorage.getItem(`trippy_trip_created_${uuid}`) ||
+        sessionStorage.getItem(`trippy_trip_created_${uuid}`) ||
+        undefined
+      );
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Effective creation timestamp: prefer Redux (immutable across polling), then local state, then props, then cache
+  const effectiveCreatedAt =
+    reduxCreatedAt ||
+    tripCreatedAt ||
+    activeTrip?.created_at ||
+    (activeTrip as any)?.createdAt ||
+    (activeTrip as any)?.creation_date ||
+    (activeTrip as any)?.created_date ||
+    initialCreatedAt ||
+    getPersistedCreatedAt(effectiveTripKey);
+
+  // Persist effectiveCreatedAt whenever available
+  useEffect(() => {
+    if (effectiveCreatedAt && effectiveTripKey && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`trippy_trip_created_${effectiveTripKey}`, effectiveCreatedAt);
+        sessionStorage.setItem(`trippy_trip_created_${effectiveTripKey}`, effectiveCreatedAt);
+      } catch { }
+    }
+  }, [effectiveCreatedAt, effectiveTripKey]);
+
+  const startTsRef = useRef<number>(0);
+
+  // ── Timer Lock ──────────────────────────────────────────────────────────
+  // Once the countdown has started (startTsRef is set to a valid past timestamp),
+  // timerLockedRef = true prevents ANY subsequent code from resetting startTsRef.
+  // This is the single source of truth that makes the timer immune to:
+  //   • trip UUID changes (raise-fare creates a new trip)
+  //   • polling responses (each /rental-bid-trip-list returns new created_at)
+  //   • ActiveTripContext updates (setActiveTripManually changes activeTrip)
+  const timerLockedRef = useRef<boolean>(false);
+
+  // Lock maxTimerSeconds in a ref so polling cannot reset the timer:
+  // Once startTsRef is set (countdown running), maxTimerSeconds is frozen.
+  const maxTimerSecondsRef = useRef<number>(maxTimerSecondsRaw);
+  if (maxTimerSecondsRef.current !== maxTimerSecondsRaw && !timerLockedRef.current) {
+    maxTimerSecondsRef.current = maxTimerSecondsRaw;
+  }
+  const maxTimerSeconds = maxTimerSecondsRef.current;
+
+  // Safe start timestamp computation: preserves true elapsed time from created_at in Asia/Dhaka time
+  const computeSafeStartTs = useCallback(
+    (dateStr?: string | null): number => {
+      if (!dateStr) {
+        const persisted = getPersistedCreatedAt(effectiveTripKey);
+        if (persisted) {
+          const rawTs = parseAsiaBangladeshTimestamp(persisted);
+          return Math.min(Date.now(), rawTs);
+        }
+        return startTsRef.current && startTsRef.current < Date.now()
+          ? startTsRef.current
+          : Date.now();
+      }
+      const rawTs = parseAsiaBangladeshTimestamp(dateStr);
+      const now = Date.now();
+      return Math.min(now, rawTs);
+    },
+    [effectiveTripKey]
+  );
+
+  const [cycleStartTs, setCycleStartTs] = useState<number>(() => {
+    const initialTs = computeSafeStartTs(effectiveCreatedAt);
+    startTsRef.current = initialTs;
+    // Lock immediately if we got a real past timestamp from created_at
+    if (initialTs < Date.now()) {
+      timerLockedRef.current = true;
+    }
+    return initialTs;
+  });
+
+  // Initialize start timestamp ONCE — only if timer is not yet locked.
+  // When tripKeyRef changes (new UUID from raise-fare), we do NOT reset the timer.
+  if (!tripKeyRef.current || (effectiveTripKey && tripKeyRef.current !== effectiveTripKey)) {
+    tripKeyRef.current = effectiveTripKey;
+    if (!timerLockedRef.current) {
+      const safeTs = computeSafeStartTs(effectiveCreatedAt);
+      if (safeTs < Date.now() || !startTsRef.current) {
+        startTsRef.current = safeTs;
+        timerLockedRef.current = true;
+      }
+    }
+    // If already locked: UUID changed (raise-fare new trip) but timer keeps running — do nothing.
+  } else if (!timerLockedRef.current && effectiveCreatedAt) {
+    const safeTs = computeSafeStartTs(effectiveCreatedAt);
+    if (safeTs < Date.now() && safeTs !== startTsRef.current) {
+      startTsRef.current = safeTs;
+      timerLockedRef.current = true;
+    }
+  }
+
+  // Sync cycle start ONLY on very first load (when timer is not yet locked).
+  // After lock: effectiveCreatedAt changes from polling/offer-updates are IGNORED.
+  useEffect(() => {
+    if (!effectiveCreatedAt) return;
+    // If already locked, do NOT allow any timestamp updates from polling or API responses
+    if (timerLockedRef.current) return;
+    const parsed = parseAsiaBangladeshTimestamp(effectiveCreatedAt);
+    const currentTs = startTsRef.current;
+    if (!currentTs || Math.abs(parsed - currentTs) > 2000) {
+      startTsRef.current = parsed;
+      timerLockedRef.current = true;
+      setCycleStartTs(parsed);
+      const elapsedMs = Math.max(0, Date.now() - parsed);
+      const elapsedSecs = Math.floor(elapsedMs / 1000);
+      const maxSecs = maxTimerSecondsRef.current;
+      setRemainingSeconds(Math.max(0, maxSecs - elapsedSecs));
+      setTopProgressPct(Math.min(100, Math.max(0, (elapsedMs / (maxSecs * 1000)) * 100)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveCreatedAt]);
 
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() => {
     const now = Date.now();
-    const elapsedSecs = Math.max(0, Math.floor((now - initialStartTs) / 1000));
+    const start = computeSafeStartTs(effectiveCreatedAt);
+    const elapsedSecs = Math.max(0, Math.floor((now - start) / 1000));
     return Math.max(0, maxTimerSeconds - elapsedSecs);
   });
 
   const [topProgressPct, setTopProgressPct] = useState<number>(() => {
     const now = Date.now();
-    const elapsedSecs = Math.max(0, Math.floor((now - initialStartTs) / 1000));
-    return Math.min(100, Math.max(0, (elapsedSecs / maxTimerSeconds) * 100));
+    const start = computeSafeStartTs(effectiveCreatedAt);
+    const elapsedMs = Math.max(0, now - start);
+    return Math.min(100, Math.max(0, (elapsedMs / (maxTimerSeconds * 1000)) * 100));
   });
 
-  // Sync cycle start when tripCreatedAt or initialCreatedAt updates
-  useEffect(() => {
-    const activeDate = tripCreatedAt || initialCreatedAt;
-    if (activeDate) {
-      const ts = parseAsiaBangladeshTimestamp(activeDate);
-      setCycleStartTs(ts);
-    }
-  }, [tripCreatedAt, initialCreatedAt]);
+  const restartCountdown = useCallback(() => {
+    const now = Date.now();
+    startTsRef.current = now;
+    timerLockedRef.current = true; // re-lock at new timestamp (intentional restart only)
+    setCycleStartTs(now);
+    setRemainingSeconds(maxTimerSeconds);
+    setTopProgressPct(0);
+    setIsTimerExpired(false);
+    setHasPromptedExpired(false);
+  }, [maxTimerSeconds]);
 
-  // Smoothly re-calculate remaining seconds and progress every 100ms from Asia/Dhaka created_at time
+  /**
+   * Reset countdown anchored to a specific created_at string from the server.
+   * Used after a successful raise-fare API call: the backend creates a NEW trip
+   * with a new created_at. We compute how many seconds have already elapsed from
+   * that new created_at and show the correct remaining time.
+   *
+   * Example: created_at = 30s ago, maxTimer = 120s → remaining = 90s displayed.
+   *
+   * This is intentional and does NOT conflict with the polling guard (timerLockedRef)
+   * because this function explicitly re-locks after setting the new anchor.
+   */
+  const resetCountdownFromCreatedAt = useCallback((createdAtStr: string) => {
+    const parsed = parseAsiaBangladeshTimestamp(createdAtStr);
+    const now = Date.now();
+    const maxSecs = maxTimerSecondsRef.current;
+    const elapsedMs = Math.max(0, now - parsed);
+    const elapsedSecs = Math.floor(elapsedMs / 1000);
+    const remaining = Math.max(0, maxSecs - elapsedSecs);
+    const pct = Math.min(100, Math.max(0, (elapsedMs / (maxSecs * 1000)) * 100));
+
+    // Temporarily unlock so we can update the anchor, then re-lock immediately
+    timerLockedRef.current = false;
+    startTsRef.current = parsed;
+    timerLockedRef.current = true; // re-lock — polling cannot touch this anymore
+    setCycleStartTs(parsed);
+    setRemainingSeconds(remaining);
+    setTopProgressPct(pct);
+    setIsTimerExpired(remaining <= 0);
+    setHasPromptedExpired(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Decrement second by second smoothly: 01:00:00 -> 00:59:59 -> 00:59:58...
+  // Uses startTsRef (stable ref, never reset by polling) for correct elapsed calculation
   useEffect(() => {
     const check = () => {
       const now = Date.now();
-      const elapsedMs = Math.max(0, now - cycleStartTs);
-      const totalMs = maxTimerSeconds * 1000;
-      const remSecs = Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
+      const maxSecs = maxTimerSecondsRef.current;
+      const elapsedMs = Math.max(0, now - startTsRef.current);
+      const elapsedSecs = Math.floor(elapsedMs / 1000);
+      const remSecs = Math.max(0, maxSecs - elapsedSecs);
+      const totalMs = maxSecs * 1000;
       const pct = Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100));
 
       setRemainingSeconds(remSecs);
       setTopProgressPct(pct);
 
-      if (elapsedMs >= totalMs) {
+      if (remSecs <= 0) {
         setIsTimerExpired(true);
       } else {
         setIsTimerExpired(false);
@@ -350,26 +568,30 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     check();
     const interval = setInterval(check, 100);
     return () => clearInterval(interval);
-  }, [cycleStartTs, maxTimerSeconds]);
+    // Run once on mount — reads from refs, so no dependency needed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Format HH:MM:SS (e.g. 03:59:40) or MM:SS (e.g. 01:40)
+  // Format HH:MM:SS (e.g. 01:00:00 -> 00:59:59) or MM:SS (e.g. 02:00 -> 01:59)
+  // Uses locked maxTimerSeconds ref to ensure format doesn't change during polling
   const formatCountdown = () => {
+    const maxSecs = maxTimerSecondsRef.current;
+    const showHours = maxSecs >= 3600;
     if (remainingSeconds <= 0) {
-      return isBn ? '০০:০০' : '00:00';
+      const zeroStr = showHours ? '00:00:00' : '00:00';
+      return isBn ? toBanglaDigits(zeroStr) : zeroStr;
     }
     const hours = Math.floor(remainingSeconds / 3600);
     const mins = Math.floor((remainingSeconds % 3600) / 60);
     const secs = remainingSeconds % 60;
+    const hStr = String(hours).padStart(2, '0');
     const mStr = String(mins).padStart(2, '0');
     const sStr = String(secs).padStart(2, '0');
 
-    if (hours > 0) {
-      const hStr = String(hours).padStart(2, '0');
-      const timeStr = `${hStr}:${mStr}:${sStr}`;
-      return isBn ? toBanglaDigits(timeStr) : timeStr;
-    }
+    const timeStr = showHours || hours > 0
+      ? `${hStr}:${mStr}:${sStr}`
+      : `${mStr}:${sStr}`;
 
-    const timeStr = `${mStr}:${sStr}`;
     return isBn ? toBanglaDigits(timeStr) : timeStr;
   };
 
@@ -467,7 +689,17 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           setProposedFare(freshFare);
           setBottomOfferPrice(freshFare);
           if (trip.created_at) {
+            // Write-once to Redux (immutable — polling will not overwrite once set)
+            dispatch(setTripCreatedAtOnce({ tripUuid: effectiveNewTripUuid, createdAt: trip.created_at }));
+            // Update local tripCreatedAt so future renders use the new trip's timestamp
             setTripCreatedAt(trip.created_at);
+            // ✓ Reset timer anchored to new trip's created_at:
+            // Calculates elapsed seconds from created_at→now and shows remaining time.
+            // timerLockedRef blocks all polling from touching startTsRef after this.
+            resetCountdownFromCreatedAt(trip.created_at);
+          } else {
+            // No created_at from server — fallback: reset to full duration from now
+            restartCountdown();
           }
           if (trip.drivers && Array.isArray(trip.drivers)) {
             setBids(trip.drivers);
@@ -493,6 +725,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
             drivers: [],
             created_at: new Date().toISOString(),
           } as any);
+          // Fallback: no created_at available, reset timer from now
+          restartCountdown();
         }
       } catch (err) {
         console.warn('Failed to fetch updated trip data after raise fare:', err);
@@ -500,10 +734,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     }
 
     setIsUpdatingBottomOffer(false);
-    // Restart 2-minute cycle
-    setCycleStartTs(Date.now());
-    setIsTimerExpired(false);
-    setHasPromptedExpired(false);
+    // NOTE: Do NOT restart countdown here — the main timer must run continuously
+    // from the original trip creation time, unaffected by offer updates.
   };
 
   // ── 2. Poll Driver Bids via /v1/rental-trip/rental-bid-trip-single_for_customer Every 5s until completed or cancelled ──
@@ -554,8 +786,29 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
             }
           }
 
-          if (trip.created_at && trip.created_at !== tripCreatedAt) {
-            setTripCreatedAt(trip.created_at);
+          const freshCreated =
+            trip.created_at ||
+            (trip as any).createdAt ||
+            (trip as any).creation_date ||
+            (trip as any).created_date ||
+            (trip as any).rental_trip?.created_at ||
+            tripCreatedAt ||
+            getPersistedCreatedAt(trip.uuid) ||
+            getPersistedCreatedAt(effectiveTrip);
+
+          if (freshCreated) {
+            if (!trip.created_at) {
+              trip.created_at = freshCreated;
+            }
+            // Write-once to Redux: polling will not overwrite once set
+            const uuidForTimer = trip.uuid || effectiveTrip;
+            if (uuidForTimer) {
+              dispatch(setTripCreatedAtOnce({ tripUuid: uuidForTimer, createdAt: freshCreated }));
+            }
+            // Only update local React state if not already set (Redux is authoritative)
+            if (!tripCreatedAt) {
+              setTripCreatedAt(freshCreated);
+            }
           }
           const polledService =
             trip.service_name ||
@@ -647,8 +900,21 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       if (trips && trips.length > 0) {
         const currentTrip = trips.find((t) => t.uuid === effectiveTrip) || trips[0];
         if (currentTrip) {
-          if (currentTrip.created_at && currentTrip.created_at !== tripCreatedAt) {
-            setTripCreatedAt(currentTrip.created_at);
+          const fallbackCreated =
+            currentTrip.created_at ||
+            (currentTrip as any).createdAt ||
+            (currentTrip as any).creation_date ||
+            (currentTrip as any).created_date ||
+            (currentTrip as any).rental_trip?.created_at;
+
+          if (fallbackCreated) {
+            const uuid = currentTrip.uuid;
+            if (uuid) {
+              dispatch(setTripCreatedAtOnce({ tripUuid: uuid, createdAt: fallbackCreated }));
+            }
+            if (!tripCreatedAt) {
+              setTripCreatedAt(fallbackCreated);
+            }
           }
           const polledFallbackService =
             currentTrip.service_name ||
@@ -717,8 +983,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       rawPhotos.length > 0
         ? rawPhotos
         : bid.profile_picture || bid.profilePicture || bid.driver_photo
-        ? [bid.profile_picture || bid.profilePicture || bid.driver_photo!]
-        : ['/images/car-placeholder.png'];
+          ? [bid.profile_picture || bid.profilePicture || bid.driver_photo!]
+          : ['/images/car-placeholder.png'];
 
     setGalleryImages(photos);
     setGalleryCarName(bid.car_model || bid.name || bid.driver_name || vehicleName);
@@ -824,7 +1090,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       setBidToAccept(null);
       alert(
         res.message ||
-          (isBn ? 'ড্রাইভারের বিড গ্রহণে সমস্যা হয়েছে।' : 'Failed to accept driver bid.')
+        (isBn ? 'ড্রাইভারের বিড গ্রহণে সমস্যা হয়েছে।' : 'Failed to accept driver bid.')
       );
     }
   };
@@ -852,7 +1118,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
   return (
     <div className="w-full max-w-xl mx-auto min-h-[580px] flex flex-col justify-between relative pb-6">
-      
+
       {/* ── Top Bar (Exact layout as screenshot) ─────────────────────────── */}
       <div className="flex items-center justify-between py-3 mb-4 border-b border-slate-100">
         {/* Back Arrow */}
@@ -896,17 +1162,42 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
       {/* ── Center Section: Radar Animation & Status ───────────────────── */}
       <div className="flex flex-col items-center justify-center my-4 space-y-3">
-        {/* Concentric Animated Radar Icon (Matching screenshot) */}
-        <div className="relative w-20 h-20 flex items-center justify-center">
-          {/* Concentric Pulsing Wave 1 */}
-          <span className="absolute w-20 h-20 rounded-full bg-emerald-500/15 animate-ping opacity-60 pointer-events-none" />
-          {/* Concentric Ring 2 */}
-          <span className="absolute w-16 h-16 rounded-full border border-emerald-400/40 animate-pulse pointer-events-none" />
-          {/* Concentric Ring 3 */}
-          <span className="absolute w-12 h-12 rounded-full border-2 border-emerald-500/50 pointer-events-none" />
-          {/* Center Target Circle */}
-          <div className="w-7 h-7 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+        {/* Continuous Smooth 360° Radar Scanner with Harmonic Ripples (No 1-second popping) */}
+        <div className="relative w-24 h-24 flex items-center justify-center select-none">
+          {/* Outer Boundary Static Ring */}
+          <div className="absolute inset-0 rounded-full border border-emerald-500/25 pointer-events-none" />
+
+          {/* Continuous Smooth 360° Rotating Radar Sweep Scanner Beam */}
+          <div
+            className="absolute inset-0.5 rounded-full overflow-hidden pointer-events-none animate-radar-sweep"
+            style={{
+              background:
+                'conic-gradient(from 0deg, transparent 0deg, transparent 260deg, rgba(16, 185, 129, 0.04) 290deg, rgba(16, 185, 129, 0.32) 360deg)',
+            }}
+          >
+            {/* Leading Sweep Scanner Needle */}
+            <div className="absolute top-0 right-1/2 w-1/2 h-[1.5px] bg-gradient-to-l from-emerald-400 via-emerald-400/80 to-transparent origin-right shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+          </div>
+
+          {/* Smooth Continuous Sonar Wave 1 (3.6s cycle) */}
+          <span className="absolute w-24 h-24 rounded-full border border-emerald-500/40 bg-emerald-500/10 pointer-events-none animate-radar-ripple-1" />
+
+          {/* Smooth Continuous Sonar Wave 2 (3.6s cycle with 1.8s offset) */}
+          <span className="absolute w-24 h-24 rounded-full border border-emerald-500/40 bg-emerald-500/10 pointer-events-none animate-radar-ripple-2" />
+
+          {/* Mid Concentric Guide Ring */}
+          <div className="absolute w-16 h-16 rounded-full border border-emerald-500/30 pointer-events-none" />
+
+          {/* Inner Concentric Guide Ring */}
+          <div className="absolute w-10 h-10 rounded-full border border-emerald-500/40 pointer-events-none" />
+
+          {/* Subtle Radar Coordinate Crosshairs (Horizontal & Vertical) */}
+          <div className="absolute w-full h-[1px] bg-emerald-500/15 pointer-events-none" />
+          <div className="absolute h-full w-[1px] bg-emerald-500/15 pointer-events-none" />
+
+          {/* Center Target Beacon with Smooth Organic Breathing Glow */}
+          <div className="relative z-10 w-7 h-7 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center animate-beacon-pulse shadow-sm">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shadow-[0_0_4px_rgba(5,150,105,0.8)]" />
           </div>
         </div>
 
@@ -945,23 +1236,26 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           )}
         </div>
 
-        {/* Finding Driver 2-minute Smooth Progress Bar */}
+        {/* Finding Driver Smooth GPU-composited Progress Bar */}
         <div className="w-full max-w-[280px] bg-slate-200/80 rounded-full h-1.5 overflow-hidden relative shadow-inner">
           <div
-            className="bg-emerald-500 h-full rounded-full transition-all duration-100 ease-linear"
-            style={{ width: `${topProgressPct}%` }}
+            className="bg-emerald-500 h-full w-full rounded-full pointer-events-none will-change-transform"
+            style={{
+              transform: `scaleX(${Math.min(1, Math.max(0, topProgressPct / 100))})`,
+              transformOrigin: 'left',
+              transition: 'transform 200ms linear',
+            }}
           />
         </div>
 
         {/* Trip Timer Pill & Quick Raise Fare Chip */}
         <div className="flex items-center gap-2 pt-0.5">
-          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-            remainingSeconds <= 10
-              ? 'bg-red-50 text-red-700 border-red-200 animate-pulse'
-              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-          }`}>
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${remainingSeconds <= 10
+            ? 'bg-red-50 text-red-700 border-red-200 animate-pulse'
+            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            }`}>
             <Clock className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="font-mono">{formatCountdown()}</span>
+            <span className="font-mono tabular-nums tracking-wider">{formatCountdown()}</span>
           </div>
 
           {/* Quick Raise Fare Chip */}
@@ -1000,7 +1294,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                 key={bidKey}
                 bid={bid}
                 serviceName={internalServiceName}
-                tripCreatedAt={tripCreatedAt}
+                tripCreatedAt={effectiveCreatedAt || ''}
                 isBn={isBn}
                 isCurrentAccepting={Boolean(isCurrentAccepting)}
                 onDecline={handleDeclineBid}
@@ -1093,7 +1387,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           {/* Green Timer Pill */}
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#E8F5E9] text-[#2E7D32] border border-[#81C784]">
             <Clock className="w-3.5 h-3.5 text-[#2E7D32]" />
-            <span className="font-mono">{formatCountdown()}</span>
+            <span className="font-mono tabular-nums tracking-wider">{formatCountdown()}</span>
           </div>
         </div>
 
@@ -1110,8 +1404,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                   ? 'চালকের অফার প্রস্তুত — নিচের বাটনে ভাড়া পরিবর্তন করতে পারেন'
                   : 'Driver Offer Ready — Or Adjust Your Proposed Fare'
                 : isBn
-                ? 'ড্রাইভারদের অফারের জন্য অপেক্ষা করা হচ্ছে'
-                : 'Waiting for offers from drivers'}
+                  ? 'ড্রাইভারদের অফারের জন্য অপেক্ষা করা হচ্ছে'
+                  : 'Waiting for offers from drivers'}
             </h3>
           </div>
 
@@ -1290,9 +1584,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
           setProposedFare(newFare);
           setBottomOfferPrice(newFare);
-          setIsTimerExpired(false);
-          setHasPromptedExpired(false);
-          setCycleStartTs(Date.now());
+          // NOTE: Do NOT restart countdown — timer runs continuously from trip creation,
+          // unaffected by raise-offer API calls.
           setOfferUpdatedNotice(true);
           setTimeout(() => setOfferUpdatedNotice(false), 4000);
 
@@ -1320,7 +1613,13 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                 setProposedFare(freshFare);
                 setBottomOfferPrice(freshFare);
                 if (trip.created_at) {
+                  // Write-once to Redux (immutable — polling will not overwrite once set)
+                  dispatch(setTripCreatedAtOnce({ tripUuid: effectiveNewUuid, createdAt: trip.created_at }));
                   setTripCreatedAt(trip.created_at);
+                  // ✓ Reset timer anchored to new trip's created_at
+                  resetCountdownFromCreatedAt(trip.created_at);
+                } else {
+                  restartCountdown();
                 }
                 if (trip.drivers && Array.isArray(trip.drivers)) {
                   setBids(trip.drivers);
@@ -1360,10 +1659,12 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
               onTripUuidUpdated(newTripUuid);
             }
           }
-          setIsTimerExpired(false);
-          setHasPromptedExpired(false);
-          setTripCreatedAt(new Date().toISOString());
-          setCycleStartTs(Date.now());
+          const newTs = new Date().toISOString();
+          if (newTripUuid) {
+            dispatch(forceTripCreatedAt({ tripUuid: newTripUuid, createdAt: newTs }));
+          }
+          setTripCreatedAt(newTs);
+          restartCountdown();
         }}
       />
 
@@ -1394,8 +1695,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                   !isNaN(rawTotal) && rawTotal > 0
                     ? rawTotal
                     : rawBid > 0
-                    ? rawBid + insurance - discount
-                    : proposedFare;
+                      ? rawBid + insurance - discount
+                      : proposedFare;
 
                 return (
                   <div className="my-3 py-3 px-5 bg-slate-50 rounded-2xl border border-slate-200/80 inline-flex flex-col items-center">
@@ -1517,8 +1818,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                   <Image
                     src={getImageUrl(
                       reviewsModalBid.profile_picture ||
-                        reviewsModalBid.profilePicture ||
-                        reviewsModalBid.driver_photo
+                      reviewsModalBid.profilePicture ||
+                      reviewsModalBid.driver_photo
                     )}
                     alt={reviewsModalBid.name || 'Driver'}
                     fill
@@ -1704,7 +2005,7 @@ function toBanglaDigits(str: string | number): string {
 interface DriverBidCardItemProps {
   bid: RentalDriverBid;
   serviceName: string;
-  tripCreatedAt: string;
+  tripCreatedAt?: string;
   isBn: boolean;
   isCurrentAccepting: boolean;
   onDecline: (bid: RentalDriverBid, comment?: string) => void;
@@ -1729,64 +2030,68 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
     serviceName?.toLowerCase().includes('ride_share') ||
     serviceName?.toLowerCase() === 'rideshare';
 
-  // Bid acceptance progress bar: 40 seconds for RIDE_SHARE, 40 minutes for other services
-  const totalDurationSeconds = isRideShare ? 40 : 40 * 60;
+  // Accept button progress bar durations:
+  //   RIDE_SHARE  → 40 seconds
+  //   All others  → 40 minutes (2400 seconds)
+  const totalDurationSecondsRaw = isRideShare ? 40 : 40 * 60;
+
+  // Lock duration in a ref so service-type changes from polling don't reset the bar
+  const totalDurRef = useRef<number>(totalDurationSecondsRaw);
   const hasExpiredRef = useRef(false);
 
-  // Stable persistent start timestamp for this bid card based on Asia/Dhaka created_at
-  const initialBidTs = parseAsiaBangladeshTimestamp(bid.created_at || (bid as any).createdAt);
-  const startTsRef = useRef<number>(initialBidTs);
+  // Effective bid date: tripCreatedAt (from Redux, write-once) takes priority
+  const effectiveBidDate =
+    tripCreatedAt ||
+    bid.created_at ||
+    (bid as any).createdAt ||
+    (bid as any).creation_date ||
+    (bid as any).created_date;
 
-  // Calculate start timestamp if bid has a fresh createdAt within the allowed duration
-  useEffect(() => {
-    const raw = bid.created_at || (bid as any).createdAt;
-    if (raw) {
-      try {
-        const ts = parseAsiaBangladeshTimestamp(raw);
-        const diff = Date.now() - ts;
-        if (!isNaN(ts) && diff >= 0 && diff < totalDurationSeconds * 1000) {
-          startTsRef.current = ts;
-        }
-      } catch {
-        // preserve current mount time
-      }
+  const initialBidTs = parseAsiaBangladeshTimestamp(effectiveBidDate);
+
+  // Write-once start timestamp ref — never overwrite after first valid set
+  const startTsRef = useRef<number>(initialBidTs && initialBidTs < Date.now() ? initialBidTs : Date.now());
+  const hasStartBeenSet = useRef<boolean>(Boolean(initialBidTs && initialBidTs < Date.now()));
+
+  // Update startTsRef ONCE when effectiveBidDate first becomes available (e.g. first API response)
+  if (effectiveBidDate && !hasStartBeenSet.current) {
+    const ts = parseAsiaBangladeshTimestamp(effectiveBidDate);
+    if (!isNaN(ts) && ts < Date.now()) {
+      startTsRef.current = ts;
+      hasStartBeenSet.current = true;
     }
-  }, [bid.created_at, totalDurationSeconds]);
+  }
 
   const [progressFraction, setProgressFraction] = useState<number>(() => {
-    const elapsedMs = Math.max(0, Date.now() - initialBidTs);
-    const totalMs = totalDurationSeconds * 1000;
+    const elapsedMs = Math.max(0, Date.now() - startTsRef.current);
+    const totalMs = totalDurRef.current * 1000;
     return Math.min(1, Math.max(0, elapsedMs / totalMs));
   });
-  const [remainingBidSecs, setRemainingBidSecs] = useState<number>(() => {
-    const elapsedMs = Math.max(0, Date.now() - initialBidTs);
-    const totalMs = totalDurationSeconds * 1000;
-    return Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
-  });
 
-  // Smooth progress bar update every 100ms; when progress bar ends, cancel bid via API and remove card
+  // Smooth progress bar update every 100ms — empty deps so it NEVER restarts on polling
   useEffect(() => {
     hasExpiredRef.current = false;
     const interval = setInterval(() => {
       const now = Date.now();
       const elapsedMs = Math.max(0, now - startTsRef.current);
-      const totalMs = totalDurationSeconds * 1000;
+      const totalMs = totalDurRef.current * 1000;
       const frac = Math.min(1, Math.max(0, elapsedMs / totalMs));
-      const remSecs = Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
 
       setProgressFraction(frac);
-      setRemainingBidSecs(remSecs);
 
       if (elapsedMs >= totalMs && !hasExpiredRef.current) {
         hasExpiredRef.current = true;
         clearInterval(interval);
-        // After end of progress bar in accepted button, cancel bid and remove from UI
+        // After progress bar ends, cancel bid and remove from UI
         onDecline(bid, 'cancel_rent_bid_driver_or_customer_admin');
       }
     }, 100);
 
     return () => clearInterval(interval);
-  }, [totalDurationSeconds, bid, onDecline]);
+    // Empty deps: reads from refs, so safe to run once on mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const rawAmount =
     bid.total_amount ??
@@ -1936,14 +2241,18 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
           type="button"
           disabled={isCurrentAccepting}
           onClick={() => onAccept(bid)}
-          className={`relative overflow-hidden rounded-2xl bg-black border border-black text-white h-12 px-5 font-bold text-sm shadow-md transition-all active:scale-98 flex items-center justify-center cursor-pointer select-none ${
-            isCurrentAccepting ? 'opacity-80 pointer-events-none' : 'hover:bg-slate-950'
-          }`}
+          className={`relative overflow-hidden rounded-2xl bg-black border border-black text-white h-12 px-5 font-bold text-sm shadow-md transition-all active:scale-98 flex items-center justify-center cursor-pointer select-none ${isCurrentAccepting ? 'opacity-80 pointer-events-none' : 'hover:bg-slate-950'
+            }`}
         >
-          {/* Charcoal Dark Gray Progress Fill (#374151) filling in the background as 40s/40m elapses */}
+          {/* Charcoal Dark Gray Progress Fill (#374151) — starts fully filled (right side)
+               and drains right-to-left as time elapses. scaleX goes 1→0, origin='right'. */}
           <div
-            className="absolute inset-y-0 left-0 bg-[#374151] transition-all duration-100 ease-linear pointer-events-none rounded-2xl"
-            style={{ width: `${progressFraction * 100}%` }}
+            className="absolute inset-0 bg-[#374151] pointer-events-none rounded-2xl will-change-transform"
+            style={{
+              transform: `scaleX(${Math.min(1, Math.max(0, 1 - progressFraction))})`,
+              transformOrigin: 'right',
+              transition: 'transform 200ms linear',
+            }}
           />
 
           {/* Text Overlay in Crisp White without countdown numbers (clean background progress process) */}
