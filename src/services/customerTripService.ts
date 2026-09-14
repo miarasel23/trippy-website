@@ -640,7 +640,8 @@ export const customerTripService = {
     customerUuid: string,
     driverUuid: string,
     languageCode = 'bn',
-    token?: string
+    token?: string,
+    receiverType = 'DRIVER'
   ): Promise<{ status: boolean; message: string; data?: any }> {
     const authToken = token || getStoredAuthToken();
     try {
@@ -661,7 +662,7 @@ export const customerTripService = {
           sender_type: 'CUSTOMER',
           user1_type: 'CUSTOMER',
           user1_uuid: customerUuid,
-          user2_type: 'DRIVER',
+          user2_type: receiverType,
           user2_uuid: driverUuid,
         }),
       });
@@ -681,31 +682,50 @@ export const customerTripService = {
     driverUuid: string,
     message: string,
     languageCode = 'bn',
-    token?: string
+    token?: string,
+    receiverType = 'DRIVER',
+    file?: File
   ): Promise<{ status: boolean; message: string; data?: any }> {
     const authToken = token || getStoredAuthToken();
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
+      let body: any;
+      const headers: Record<string, string> = {};
       if (authToken) {
         headers.Authorization = `Bearer ${authToken}`;
       }
 
-      const res = await fetch(AppUrls.proxy.liveChatSend, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      if (file) {
+        // Send as FormData for file upload
+        const formData = new FormData();
+        formData.append('platform', 'web');
+        formData.append('language_code', languageCode);
+        formData.append('action_when', 'live_chat_message_send');
+        formData.append('sender_type', 'CUSTOMER');
+        formData.append('sender_uuid', customerUuid);
+        formData.append('receiver_type', receiverType);
+        formData.append('receiver_uuid', driverUuid);
+        formData.append('message', message);
+        formData.append('file', file);
+        body = formData;
+      } else {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify({
           platform: 'web',
           language_code: languageCode,
           action_when: 'live_chat_message_send',
           sender_type: 'CUSTOMER',
           sender_uuid: customerUuid,
-          receiver_type: 'DRIVER',
+          receiver_type: receiverType,
           receiver_uuid: driverUuid,
           message: message,
           file: '',
-        }),
+        });
+      }
+
+      const res = await fetch(AppUrls.proxy.liveChatSend, {
+        method: 'POST',
+        headers,
+        body,
       });
 
       if (!res.ok) return { status: false, message: 'Failed to send message' };

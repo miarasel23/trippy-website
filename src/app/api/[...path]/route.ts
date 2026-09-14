@@ -164,10 +164,11 @@ export async function POST(
     // Parse incoming payload
     let bodyObj: Record<string, any> = {};
     const contentType = req.headers.get('content-type') || '';
+    const isMultipart = contentType.includes('multipart/form-data');
 
     if (contentType.includes('application/json')) {
       bodyObj = await req.json().catch(() => ({}));
-    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+    } else if (contentType.includes('application/x-www-form-urlencoded') || isMultipart) {
       const formData = await req.formData();
       formData.forEach((val, key) => {
         bodyObj[key] = val;
@@ -230,30 +231,43 @@ export async function POST(
       bodyObj.given_by = 'CUSTOMER';
     }
 
-    // Format into URLSearchParams as required by the backend API
-    const formParams = new URLSearchParams();
-    for (const [key, val] of Object.entries(bodyObj)) {
-      if (val === undefined || val === null) continue;
-      if (Array.isArray(val) || (typeof val === 'object' && val !== null)) {
-        formParams.append(key, JSON.stringify(val));
-      } else {
-        formParams.append(key, String(val));
+    let finalBody: any;
+    const requestHeaders: Record<string, string> = {
+      Accept: 'application/json',
+    };
+
+    if (isMultipart) {
+      const form = new FormData();
+      for (const [key, val] of Object.entries(bodyObj)) {
+        if (val === undefined || val === null) continue;
+        form.append(key, val as any);
       }
+      finalBody = form;
+      // Do NOT set Content-Type header for multipart/form-data, fetch sets it with boundary automatically
+    } else {
+      // Format into URLSearchParams as required by the backend API
+      const formParams = new URLSearchParams();
+      for (const [key, val] of Object.entries(bodyObj)) {
+        if (val === undefined || val === null) continue;
+        if (Array.isArray(val) || (typeof val === 'object' && val !== null && !(val instanceof File) && !(val instanceof Blob))) {
+          formParams.append(key, JSON.stringify(val));
+        } else {
+          formParams.append(key, String(val));
+        }
+      }
+      finalBody = formParams.toString();
+      requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
     }
 
     const authHeader = req.headers.get('authorization');
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json',
-    };
     if (authHeader) {
-      headers.Authorization = authHeader;
+      requestHeaders.Authorization = authHeader;
     }
 
     const response = await fetch(targetUrl, {
       method: 'POST',
-      headers,
-      body: formParams.toString(),
+      headers: requestHeaders,
+      body: finalBody,
     });
 
     const data = await response.json();

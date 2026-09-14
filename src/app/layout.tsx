@@ -9,6 +9,7 @@ import { AuthPromptManager } from '@/components/auth/AuthPromptManager';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { ActiveTripProvider } from '@/context/ActiveTripContext';
 import { ActiveTripGlobalOverlay } from '@/components/booking/ActiveTripGlobalOverlay';
+import { AdminSupportChat } from '@/components/chat/AdminSupportChat';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -91,6 +92,7 @@ export default function RootLayout({
               </main>
               <Footer />
               <ActiveTripGlobalOverlay />
+              <AdminSupportChat />
             </ActiveTripProvider>
           </ReduxProvider>
         </LanguageProvider>

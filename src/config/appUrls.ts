@@ -9,6 +9,7 @@ export const API_BASE_URL =
   'http://3.209.161.158/api';
 
 export const IMAGE_BASE_URL = `${API_BASE_URL}/assets/uploads/images`;
+export const CHAT_IMAGE_BASE_URL = `${API_BASE_URL}/`;
 
 export const GOOGLE_MAPS_API_KEY =
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||

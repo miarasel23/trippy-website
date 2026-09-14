@@ -34,6 +34,7 @@ import {
 import { useLanguage } from '@/context/LanguageContext';
 import { usePolicySupport } from '@/hooks/usePolicySupport';
 import { useActiveTrip } from '@/context/ActiveTripContext';
+import { CHAT_IMAGE_BASE_URL } from '@/config/appUrls';
 import { useAppSelector } from '@/redux/hooks';
 import {
   customerTripService,
@@ -180,7 +181,7 @@ export const TrackingPortal: React.FC = () => {
 
   // In-app Driver Chat state
   const [chatMessages, setChatMessages] = useState<
-    Array<{ id: string; sender: 'driver' | 'customer'; text: string; time: string }>
+    Array<{ id: string; sender: 'driver' | 'customer'; text: string; time: string; file?: string }>
   >([]);
   const [chatInput, setChatInput] = useState<string>('');
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -660,6 +661,7 @@ export const TrackingPortal: React.FC = () => {
       id: String(Date.now()),
       sender: 'customer' as const,
       text: msg,
+      file: '',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setChatMessages((prev) => [...prev, newMsg]);
@@ -697,6 +699,7 @@ export const TrackingPortal: React.FC = () => {
           id: m.uuid || String(Math.random()),
           sender: (m.sender_type || '').toUpperCase() === 'CUSTOMER' ? 'customer' : 'driver',
           text: m.message || '',
+          file: m.file_url || m.file || '',
           time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }));
         setChatMessages(fetchedMessages);
@@ -1779,7 +1782,18 @@ export const TrackingPortal: React.FC = () => {
                         : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs shadow-2xs'
                     }`}
                   >
-                    {msg.text}
+                    {msg.file && (
+                      <div className="mb-2">
+                        {msg.file.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                          <img src={`${CHAT_IMAGE_BASE_URL}${msg.file}`} alt="attachment" className="max-w-[200px] rounded-lg object-cover" />
+                        ) : (
+                          <a href={`${CHAT_IMAGE_BASE_URL}${msg.file}`} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                            View Attachment
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {msg.text && <div>{msg.text}</div>}
                   </div>
                   <span className="text-[9px] text-slate-400 mt-1 px-1">{msg.time}</span>
                 </div>
