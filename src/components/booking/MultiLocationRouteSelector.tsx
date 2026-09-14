@@ -213,16 +213,7 @@ const SingleLocationField: React.FC<SingleLocationFieldProps> = ({
             </button>
           )}
 
-          {/* Map Pin / Re-edit Selector Button */}
-          <button
-            type="button"
-            onClick={onOpenMap}
-            title={language === 'bn' ? 'ম্যাপে নির্বাচন বা পরিবর্তন করুন' : 'Select or adjust on map'}
-            className="p-1.5 text-slate-600 hover:text-black hover:bg-slate-200/70 rounded-lg flex items-center gap-1 text-[11px] font-bold border border-slate-200/60 transition-colors"
-          >
-            <Map className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">{language === 'bn' ? 'ম্যাপ' : 'Map'}</span>
-          </button>
+
 
           {/* Remove Stop Button */}
           {canRemove && onRemove && (
