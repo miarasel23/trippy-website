@@ -13,6 +13,16 @@ export const AdminSupportChat: React.FC = () => {
   const { token, user } = useAppSelector((state) => state.auth);
 
   const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const isOpenRef = useRef(isOpen);
+  const lastMessageIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+    if (isOpen) {
+      setUnreadCount(0);
+    }
+  }, [isOpen]);
   const [chatMessages, setChatMessages] = useState<
     Array<{ id: string; sender: 'admin' | 'customer'; text: string; time: string; file?: string }>
   >([]);
@@ -68,6 +78,23 @@ export const AdminSupportChat: React.FC = () => {
           file: m.file_url || m.file || '',
           time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }));
+        
+        if (!isOpenRef.current && fetchedMessages.length > 0) {
+           const lastMsg = fetchedMessages[fetchedMessages.length - 1];
+           if (lastMessageIdRef.current && lastMsg.id !== lastMessageIdRef.current) {
+             const lastIdx = fetchedMessages.findIndex(m => m.id === lastMessageIdRef.current);
+             const newMsgs = lastIdx === -1 ? fetchedMessages : fetchedMessages.slice(lastIdx + 1);
+             const adminNewMsgs = newMsgs.filter(m => m.sender === 'admin');
+             if (adminNewMsgs.length > 0) {
+               setUnreadCount(prev => prev + adminNewMsgs.length);
+             }
+           }
+        }
+        
+        if (fetchedMessages.length > 0) {
+          lastMessageIdRef.current = fetchedMessages[fetchedMessages.length - 1].id;
+        }
+
         setChatMessages(fetchedMessages);
       }
     };
@@ -243,9 +270,14 @@ export const AdminSupportChat: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="w-14 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer group"
+          className="w-14 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-2xl hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer group relative"
         >
           <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+              {unreadCount}
+            </span>
+          )}
         </button>
       )}
     </div>
