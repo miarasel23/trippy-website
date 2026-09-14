@@ -398,7 +398,7 @@ export const en = {
     welcomeBack: "Welcome,",
     customerRole: "Customer",
     secureNote: "Protected by Trippy Security & 2FA SMS Verification.",
-    invalidPhone: "Please enter a valid 11-digit mobile number (e.g. 01997709990)",
+    invalidPhone: "Please enter a valid 11-digit mobile number (e.g. 01XXXXXXXXX)",
     invalidOtp: "Please enter the 6-digit OTP code",
   },
   notFound: {
