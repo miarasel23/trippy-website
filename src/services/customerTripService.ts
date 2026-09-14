@@ -632,5 +632,87 @@ export const customerTripService = {
       return [];
     }
   },
+
+  /**
+   * Fetches the live chat conversation between a customer and a driver.
+   */
+  async fetchLiveChatConversation(
+    customerUuid: string,
+    driverUuid: string,
+    languageCode = 'bn',
+    token?: string
+  ): Promise<{ status: boolean; message: string; data?: any }> {
+    const authToken = token || getStoredAuthToken();
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
+
+      const res = await fetch(AppUrls.proxy.liveChatConversation, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          platform: 'web',
+          language_code: languageCode,
+          action_when: 'live_chat_message_list',
+          sender_type: 'CUSTOMER',
+          user1_type: 'CUSTOMER',
+          user1_uuid: customerUuid,
+          user2_type: 'DRIVER',
+          user2_uuid: driverUuid,
+        }),
+      });
+
+      if (!res.ok) return { status: false, message: 'Failed to fetch conversation' };
+      return await res.json();
+    } catch (e: any) {
+      return { status: false, message: e.message || 'Error fetching conversation' };
+    }
+  },
+
+  /**
+   * Sends a live chat message from a customer to a driver.
+   */
+  async sendLiveChatMessage(
+    customerUuid: string,
+    driverUuid: string,
+    message: string,
+    languageCode = 'bn',
+    token?: string
+  ): Promise<{ status: boolean; message: string; data?: any }> {
+    const authToken = token || getStoredAuthToken();
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
+
+      const res = await fetch(AppUrls.proxy.liveChatSend, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          platform: 'web',
+          language_code: languageCode,
+          action_when: 'live_chat_message_send',
+          sender_type: 'CUSTOMER',
+          sender_uuid: customerUuid,
+          receiver_type: 'DRIVER',
+          receiver_uuid: driverUuid,
+          message: message,
+          file: '',
+        }),
+      });
+
+      if (!res.ok) return { status: false, message: 'Failed to send message' };
+      return await res.json();
+    } catch (e: any) {
+      return { status: false, message: e.message || 'Error sending message' };
+    }
+  },
 };
 

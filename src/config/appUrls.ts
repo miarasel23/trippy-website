@@ -42,6 +42,8 @@ export const AppUrls = {
     customerLocations: '/api/customer/locations',
     giveReview: '/api/customer/review',
     privacyPolicyTermsCondition: '/api/v1/global-api/privacy-policy-terms-condition/list',
+    liveChatSend: '/api/v1/live-chat/send',
+    liveChatConversation: '/api/v1/live-chat/conversation',
   },
 
   // Direct Backend API Endpoints (used by Next.js server route handlers / reverse proxies)
@@ -68,6 +70,8 @@ export const AppUrls = {
     customerDriverTrackGet: `${API_BASE_URL}/v1/customer-driver-track/get`,
     saveCustomerDriverTrack: `${API_BASE_URL}/v1/customer-driver-track/create`,
     privacyPolicyTermsCondition: `${API_BASE_URL}/v1/global-api/privacy-policy-terms-condition/list`,
+    liveChatSend: `${API_BASE_URL}/v1/live-chat/send`,
+    liveChatConversation: `${API_BASE_URL}/v1/live-chat/conversation`,
   },
 };
 

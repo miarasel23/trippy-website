@@ -29,6 +29,7 @@ import {
   ZoomIn,
   Eye,
   CameraOff,
+  Copy,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { usePolicySupport } from '@/hooks/usePolicySupport';
@@ -180,16 +181,7 @@ export const TrackingPortal: React.FC = () => {
   // In-app Driver Chat state
   const [chatMessages, setChatMessages] = useState<
     Array<{ id: string; sender: 'driver' | 'customer'; text: string; time: string }>
-  >([
-    {
-      id: '1',
-      sender: 'driver',
-      text: isBn
-        ? 'আসসালামু আলাইকুম, আমি আপনার পিকআপ পয়েন্টের দিকে আসছি।'
-        : 'Hello! I am on the way to pick you up in HIACE (Dhaka-Metro-cha-54-1400).',
-      time: '12:55 PM',
-    },
-  ]);
+  >([]);
   const [chatInput, setChatInput] = useState<string>('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -659,34 +651,66 @@ export const TrackingPortal: React.FC = () => {
   }, [isCompleted, isReviewed, hasReviewed]);
 
   // Send message handler
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const msg = (textToSend || chatInput).trim();
     if (!msg) return;
 
+    // Optimistic UI update
     const newMsg = {
       id: String(Date.now()),
       sender: 'customer' as const,
       text: msg,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-
     setChatMessages((prev) => [...prev, newMsg]);
     setChatInput('');
 
-    setTimeout(() => {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: String(Date.now() + 1),
-          sender: 'driver' as const,
-          text: isBn
-            ? 'ধন্যবাদ! আমি পিকআপে পৌঁছে কল দিচ্ছি।'
-            : 'Got it! Arriving at your pickup shortly.',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-    }, 1500);
+    if (effectiveCustomerUuid && effectiveDriverUuid) {
+      await customerTripService.sendLiveChatMessage(
+        effectiveCustomerUuid,
+        effectiveDriverUuid,
+        msg,
+        language,
+        token || undefined
+      );
+    }
   };
+
+  // Poll for live chat messages when chat modal is open
+  useEffect(() => {
+    if (!isChatModalOpen || !effectiveCustomerUuid || !effectiveDriverUuid) return;
+    
+    let isMounted = true;
+    
+    const fetchChat = async () => {
+      const res = await customerTripService.fetchLiveChatConversation(
+        effectiveCustomerUuid,
+        effectiveDriverUuid,
+        language,
+        token || undefined
+      );
+      
+      if (!isMounted) return;
+      
+      if (res.status && res.data && Array.isArray(res.data.messages)) {
+        const fetchedMessages = res.data.messages.map((m: any) => ({
+          id: m.uuid || String(Math.random()),
+          sender: (m.sender_type || '').toUpperCase() === 'CUSTOMER' ? 'customer' : 'driver',
+          text: m.message || '',
+          time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }));
+        setChatMessages(fetchedMessages);
+      }
+    };
+    
+    fetchChat();
+    const interval = setInterval(fetchChat, 5000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isChatModalOpen, effectiveCustomerUuid, effectiveDriverUuid, language, token]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -974,9 +998,16 @@ export const TrackingPortal: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <span className="text-xs font-mono font-bold bg-white text-slate-900 border border-slate-300 px-2.5 py-1 rounded-lg shadow-2xs">
-                    {carPlate}
-                  </span>
+                  <div 
+                    className="flex items-center gap-1.5 cursor-pointer text-slate-400 hover:text-emerald-600 transition-colors" 
+                    onClick={() => typeof window !== 'undefined' && navigator.clipboard.writeText(carPlate)} 
+                    title={isBn ? 'কপি করুন' : 'Copy'}
+                  >
+                    <span className="text-xs font-mono font-bold text-slate-900">
+                      {carPlate}
+                    </span>
+                    <Copy className="w-3.5 h-3.5" />
+                  </div>
                 </div>
 
                 {/* Always Display Total Amount in Front of Customer */}
@@ -1452,9 +1483,16 @@ export const TrackingPortal: React.FC = () => {
                         {carType}
                       </span>
                     </div>
-                    <span className="text-xs font-mono font-bold bg-white text-slate-900 border border-slate-300 px-3 py-1 rounded-lg shadow-2xs">
-                      {carPlate}
-                    </span>
+                    <div 
+                      className="flex items-center gap-1.5 cursor-pointer text-slate-400 hover:text-emerald-600 transition-colors" 
+                      onClick={() => typeof window !== 'undefined' && navigator.clipboard.writeText(carPlate)} 
+                      title={isBn ? 'কপি করুন' : 'Copy'}
+                    >
+                      <span className="text-xs font-mono font-bold text-slate-900">
+                        {carPlate}
+                      </span>
+                      <Copy className="w-3.5 h-3.5" />
+                    </div>
                   </div>
 
                   {/* Vehicle Photos Gallery or "No Image" Fallback */}
