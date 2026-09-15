@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Download, Menu, X, Globe, User, LogOut, ChevronDown, Car, Compass } from 'lucide-react';
@@ -56,13 +56,13 @@ export const Header: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isUserMenuOpen]);
 
-  const navLinks = [
+  const navLinks = useMemo(() => [
     { label: t.nav.home, href: '/' },
     { label: t.nav.booking, href: '/booking' },
     { label: t.nav.fleet, href: '/fleet' },
     { label: t.nav.tracking, href: '/tracking' },
     { label: t.nav.app, href: '/app' },
-  ];
+  ], [t.nav]);
 
   return (
     <header className="site-header sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-slate-200 transition-all duration-300 shadow-sm">

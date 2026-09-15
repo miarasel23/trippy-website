@@ -6,6 +6,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from 'react';
 import { RentalTrip } from '@/types/customerApi';
 import {
@@ -148,7 +149,8 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
-    if (!hasLoadedInitialCacheRef.current && !activeTrip) return;
+    // Only write cache after initial restore is complete to avoid race condition
+    if (!hasLoadedInitialCacheRef.current) return;
     if (activeTrip) {
       try {
         const json = JSON.stringify(activeTrip);
@@ -183,7 +185,11 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
     activeTripRef.current = activeTrip;
   }, [activeTrip]);
 
-  const customerUuid = user?.uuid || getActiveCustomerUuid();
+  // Memoized to avoid calling localStorage on every render
+  const customerUuid = useMemo(
+    () => user?.uuid || getActiveCustomerUuid(),
+    [user]
+  );
 
   /**
    * Refreshes active trip via /api/v1/rental-trip/rental-bid-trip-list_for_customer
@@ -315,31 +321,31 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [refreshActiveTrip]);
 
-  const openRadarModal = () => {
+  const openRadarModal = useCallback(() => {
     setIsRadarModalOpen(true);
-  };
+  }, []);
 
-  const closeRadarModal = () => {
+  const closeRadarModal = useCallback(() => {
     setIsRadarModalOpen(false);
-  };
+  }, []);
 
-  const dismissOverlay = () => {
+  const dismissOverlay = useCallback(() => {
     setIsOverlayVisible(false);
-  };
+  }, []);
 
-  const showOverlay = () => {
+  const showOverlay = useCallback(() => {
     setIsOverlayVisible(true);
     setIsMinimized(false);
-  };
+  }, []);
 
-  const clearActiveTrip = () => {
+  const clearActiveTrip = useCallback(() => {
     clearAllTripRelatedStorage();
     setActiveTrip(null);
     setBidsCount(0);
     setIsRadarModalOpen(false);
-  };
+  }, []);
 
-  const setActiveTripManually = (trip: RentalTrip | null) => {
+  const setActiveTripManually = useCallback((trip: RentalTrip | null) => {
     if (trip && isTripReviewed(trip, trip.uuid)) {
       clearAllTripRelatedStorage(trip.uuid);
       setActiveTrip(null);
@@ -386,7 +392,8 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
         setBidsCount(0);
       }
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <ActiveTripContext.Provider

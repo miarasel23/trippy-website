@@ -93,6 +93,17 @@ const CAR_NAMES: Record<string, string> = {
   HIACE: 'Toyota Hiace',
 };
 
+// Static lookup — avoids deep ternary chain on every render
+const SERVICE_NAME_MAP: Record<string, string> = {
+  RIDE_SHARE: 'Ride Share',
+  INTER_CITY_RENTER: 'Intercity',
+  RETURN: 'Return',
+  HOURLY: 'Hourly',
+  AIRPORT_RENTER: 'Airport',
+  WEDDING_CAR: 'Wedding',
+  PACKAGE_DELIVERY: 'Delivery',
+};
+
 export const HeroBookingWidget: React.FC = () => {
   const router = useRouter();
   const { t } = useLanguage();
@@ -119,22 +130,7 @@ export const HeroBookingWidget: React.FC = () => {
           const loaded: ApiServiceItem[] = Object.entries(json.data).map(([k, v]: [string, any]) => ({
             key: k,
             service_name: v.service_name || k,
-            name:
-              k === 'RIDE_SHARE'
-                ? 'Ride Share'
-                : k === 'INTER_CITY_RENTER'
-                  ? 'Intercity'
-                  : k === 'RETURN'
-                    ? 'Return'
-                    : k === 'HOURLY'
-                      ? 'Hourly'
-                      : k === 'AIRPORT_RENTER'
-                        ? 'Airport'
-                        : k === 'WEDDING_CAR'
-                          ? 'Wedding'
-                          : k === 'PACKAGE_DELIVERY'
-                            ? 'Delivery'
-                            : (v.service_name || k).replace(/_/g, ' '),
+            name: SERVICE_NAME_MAP[k] ?? (v.service_name || k).replace(/_/g, ' '),
             avatar: v.avatar || null,
             cars: v.cars || [],
           }));
