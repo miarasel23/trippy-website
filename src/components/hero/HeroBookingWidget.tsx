@@ -10,7 +10,6 @@ import { ArrowRight, Check, X, MapPin, Navigation, Sparkles } from 'lucide-react
 import { useLanguage } from '@/context/LanguageContext';
 import { AppUrls, getImageUrl } from '@/config/appUrls';
 import driverFoundPage from '@/assets/driver_found_page.png';
-import selectingPage from '@/assets/selecting_page.png';
 
 interface ApiCarItem {
   uuid: string;
@@ -124,18 +123,18 @@ export const HeroBookingWidget: React.FC = () => {
               k === 'RIDE_SHARE'
                 ? 'Ride Share'
                 : k === 'INTER_CITY_RENTER'
-                ? 'Intercity'
-                : k === 'RETURN'
-                ? 'Return'
-                : k === 'HOURLY'
-                ? 'Hourly'
-                : k === 'AIRPORT_RENTER'
-                ? 'Airport'
-                : k === 'WEDDING_CAR'
-                ? 'Wedding'
-                : k === 'PACKAGE_DELIVERY'
-                ? 'Delivery'
-                : (v.service_name || k).replace(/_/g, ' '),
+                  ? 'Intercity'
+                  : k === 'RETURN'
+                    ? 'Return'
+                    : k === 'HOURLY'
+                      ? 'Hourly'
+                      : k === 'AIRPORT_RENTER'
+                        ? 'Airport'
+                        : k === 'WEDDING_CAR'
+                          ? 'Wedding'
+                          : k === 'PACKAGE_DELIVERY'
+                            ? 'Delivery'
+                            : (v.service_name || k).replace(/_/g, ' '),
             avatar: v.avatar || null,
             cars: v.cars || [],
           }));
@@ -218,7 +217,7 @@ export const HeroBookingWidget: React.FC = () => {
 
   return (
     <div className="booking-widget-card bg-white border border-slate-200 rounded-2xl p-6 shadow-xl">
-      
+
       {/* Service Tabs loaded from /v1/rental-trip/rental-info */}
       <div className="flex bg-slate-100 p-1.5 rounded-xl gap-1.5 mb-5 border border-slate-200 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {serviceList.map((srv) => {
@@ -229,11 +228,10 @@ export const HeroBookingWidget: React.FC = () => {
               key={srv.key}
               type="button"
               onClick={() => handleServiceChange(srv.key)}
-              className={`flex-1 min-w-[96px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                isSelected
-                  ? 'bg-black text-white shadow-sm'
-                  : 'text-slate-600 hover:text-black hover:bg-slate-200/60'
-              }`}
+              className={`flex-1 min-w-[96px] py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${isSelected
+                ? 'bg-black text-white shadow-sm'
+                : 'text-slate-600 hover:text-black hover:bg-slate-200/60'
+                }`}
             >
               {avatarUrl ? (
                 <div className="relative w-5 h-5 flex-shrink-0">
@@ -315,11 +313,10 @@ export const HeroBookingWidget: React.FC = () => {
                   key={car.uuid || idx}
                   type="button"
                   onClick={() => handleCarSelect(idx)}
-                  className={`p-2 rounded-xl flex flex-col items-center text-center transition-all border ${
-                    isSelected
-                      ? 'bg-slate-50 border-black ring-1 ring-black shadow-sm'
-                      : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                  }`}
+                  className={`p-2 rounded-xl flex flex-col items-center text-center transition-all border ${isSelected
+                    ? 'bg-slate-50 border-black ring-1 ring-black shadow-sm'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
                 >
                   <div className="w-full h-12 overflow-hidden rounded-md mb-1.5 relative flex items-center justify-center bg-slate-100 p-1">
                     {carAvatarUrl ? (
@@ -354,23 +351,13 @@ export const HeroBookingWidget: React.FC = () => {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => {}}
-                  className={`p-2 rounded-xl flex flex-col items-center text-center transition-all border ${
-                    isSelected
-                      ? 'bg-slate-50 border-black ring-1 ring-black shadow-sm'
-                      : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                  }`}
+                  onClick={() => { }}
+                  className={`p-2 rounded-xl flex flex-col items-center text-center transition-all border ${isSelected
+                    ? 'bg-slate-50 border-black ring-1 ring-black shadow-sm'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
                 >
-                  <div className="w-full h-12 overflow-hidden rounded-md mb-1.5 relative flex items-center justify-center bg-slate-100">
-                      <div
-                        className="w-full h-36 bg-contain bg-no-repeat transition-transform"
-                        style={{
-                          backgroundImage: `url(${selectingPage.src})`,
-                          backgroundPosition: v.imagePosition,
-                        transform: `scale(${v.scale || 1.6})`,
-                      }}
-                    />
-                  </div>
+
                   <span className="text-xs font-bold text-slate-900 leading-tight truncate w-full">
                     {localizedVehicle?.name || v.name}
                   </span>
@@ -428,33 +415,30 @@ export const HeroBookingWidget: React.FC = () => {
           <button
             type="button"
             onClick={() => handleChipClick(chipBase)}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${
-              fare === chipBase
-                ? 'bg-black border-black text-white'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
+            className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${fare === chipBase
+              ? 'bg-black border-black text-white'
+              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
           >
             {t.common.currency} {chipBase}
           </button>
           <button
             type="button"
             onClick={() => handleChipClick(chip10)}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${
-              fare === chip10
-                ? 'bg-black border-black text-white'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
+            className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${fare === chip10
+              ? 'bg-black border-black text-white'
+              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
           >
             {t.common.currency} {chip10} (+10%)
           </button>
           <button
             type="button"
             onClick={() => handleChipClick(chip20)}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${
-              fare === chip20
-                ? 'bg-black border-black text-white'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
+            className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${fare === chip20
+              ? 'bg-black border-black text-white'
+              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
           >
             {t.common.currency} {chip20} (+20%)
           </button>
