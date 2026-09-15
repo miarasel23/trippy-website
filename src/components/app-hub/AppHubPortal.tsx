@@ -6,9 +6,9 @@ import { Badge } from '../common/Badge';
 import { QrCodeBox } from '../common/QrCodeBox';
 import { MessageSquare, Star, Clock, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import chatPage from '@/assets/chat_page.png';
-import tripCompletedPage from '@/assets/trip_completed_and_review_page.png';
-import tripHistoryPage from '@/assets/trip_history_page.png';
+import chatPage from '@/assets/playstore_screenshots/11_seamless_driver_chat.png';
+import tripCompletedPage from '@/assets/playstore_screenshots/12_transparent_fare_and_reviews.png';
+import tripHistoryPage from '@/assets/playstore_screenshots/13_complete_trip_history.png';
 
 export const AppHubPortal: React.FC = () => {
   const { t } = useLanguage();
@@ -101,77 +101,83 @@ export const AppHubPortal: React.FC = () => {
         </div>
 
         {/* 3 Core In-App Screenshots Trio */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-10 mb-24">
           
           {/* Card 1: In-App Chat */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-7 flex flex-col justify-between shadow-xl hover:border-slate-300 transition-all">
-            <div>
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mb-5">
-                <MessageSquare className="w-6 h-6" />
+          <div className="group bg-white rounded-[2.5rem] p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 border border-slate-100/80">
+            <div className="mb-10">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200/50 flex items-center justify-center text-emerald-600 mb-6 group-hover:scale-110 group-hover:from-emerald-500 group-hover:to-emerald-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                <MessageSquare className="w-7 h-7" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 font-heading mb-2">
+              <h3 className="text-2xl font-bold text-slate-900 font-heading mb-3 tracking-tight">
                 {t.appHub.featureChatTitle}
               </h3>
-              <p className="text-slate-600 text-sm leading-relaxed mb-6">
+              <p className="text-slate-500 text-sm leading-relaxed">
                 {t.appHub.featureChatDesc}
               </p>
             </div>
 
-            <div className="bg-slate-100 border-4 border-slate-200 rounded-2xl overflow-hidden shadow-md relative h-80">
-              <Image
-                src={chatPage.src}
-                alt="In-App Driver Chat Screenshot"
-                fill
-                className="object-cover object-top"
-              />
+            <div className="relative w-full aspect-[9/19] bg-gradient-to-b from-slate-100 to-slate-200/50 rounded-[2rem] p-2 sm:p-3 shadow-inner border-4 border-white">
+              <div className="relative w-full h-full rounded-[1.5rem] overflow-hidden bg-black shadow-2xl">
+                <Image
+                  src={chatPage.src}
+                  alt="In-App Driver Chat Screenshot"
+                  fill
+                  className="object-contain"
+                />
+              </div>
             </div>
           </div>
 
           {/* Card 2: Receipts & Reviews */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-7 flex flex-col justify-between shadow-xl hover:border-slate-300 transition-all">
-            <div>
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mb-5">
-                <Star className="w-6 h-6" />
+          <div className="group bg-white rounded-[2.5rem] p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 border border-slate-100/80">
+            <div className="mb-10">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200/50 flex items-center justify-center text-amber-600 mb-6 group-hover:scale-110 group-hover:from-amber-400 group-hover:to-amber-500 group-hover:text-white transition-all duration-300 shadow-sm">
+                <Star className="w-7 h-7" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 font-heading mb-2">
+              <h3 className="text-2xl font-bold text-slate-900 font-heading mb-3 tracking-tight">
                 {t.appHub.featureReceiptTitle}
               </h3>
-              <p className="text-slate-600 text-sm leading-relaxed mb-6">
+              <p className="text-slate-500 text-sm leading-relaxed">
                 {t.appHub.featureReceiptDesc}
               </p>
             </div>
 
-            <div className="bg-slate-100 border-4 border-slate-200 rounded-2xl overflow-hidden shadow-md relative h-80">
-              <Image
-                src={tripCompletedPage.src}
-                alt="Trip Completed & Reviews Screenshot"
-                fill
-                className="object-cover object-top"
-              />
+            <div className="relative w-full aspect-[9/19] bg-gradient-to-b from-slate-100 to-slate-200/50 rounded-[2rem] p-2 sm:p-3 shadow-inner border-4 border-white">
+              <div className="relative w-full h-full rounded-[1.5rem] overflow-hidden bg-black shadow-2xl">
+                <Image
+                  src={tripCompletedPage.src}
+                  alt="Trip Completed & Reviews Screenshot"
+                  fill
+                  className="object-contain"
+                />
+              </div>
             </div>
           </div>
 
           {/* Card 3: Trip History */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-7 flex flex-col justify-between shadow-xl hover:border-slate-300 transition-all">
-            <div>
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 mb-5">
-                <Clock className="w-6 h-6 text-brand-primary" />
+          <div className="group bg-white rounded-[2.5rem] p-6 sm:p-8 flex flex-col justify-between shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 border border-slate-100/80">
+            <div className="mb-10">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200/50 flex items-center justify-center text-blue-600 mb-6 group-hover:scale-110 group-hover:from-blue-500 group-hover:to-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                <Clock className="w-7 h-7" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 font-heading mb-2">
+              <h3 className="text-2xl font-bold text-slate-900 font-heading mb-3 tracking-tight">
                 {t.appHub.featureHistoryTitle}
               </h3>
-              <p className="text-slate-600 text-sm leading-relaxed mb-6">
+              <p className="text-slate-500 text-sm leading-relaxed">
                 {t.appHub.featureHistoryDesc}
               </p>
             </div>
 
-            <div className="bg-slate-100 border-4 border-slate-200 rounded-2xl overflow-hidden shadow-md relative h-80">
-              <Image
-                src={tripHistoryPage.src}
-                alt="Trip History Screenshot"
-                fill
-                className="object-cover object-top"
-              />
+            <div className="relative w-full aspect-[9/19] bg-gradient-to-b from-slate-100 to-slate-200/50 rounded-[2rem] p-2 sm:p-3 shadow-inner border-4 border-white">
+              <div className="relative w-full h-full rounded-[1.5rem] overflow-hidden bg-black shadow-2xl">
+                <Image
+                  src={tripHistoryPage.src}
+                  alt="Trip History Screenshot"
+                  fill
+                  className="object-contain"
+                />
+              </div>
             </div>
           </div>
 
