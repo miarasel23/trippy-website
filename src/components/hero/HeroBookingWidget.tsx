@@ -9,6 +9,8 @@ import { DriverBid } from '@/types/booking';
 import { ArrowRight, Check, X, MapPin, Navigation, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { AppUrls, getImageUrl } from '@/config/appUrls';
+import driverFoundPage from '@/assets/driver_found_page.png';
+import selectingPage from '@/assets/selecting_page.png';
 
 interface ApiCarItem {
   uuid: string;
@@ -194,7 +196,7 @@ export const HeroBookingWidget: React.FC = () => {
         completedRides: 210,
         carModel: activeCars[selectedCarIndex]?.car_type || 'Toyota Hiace Microbus',
         licensePlate: 'Dhaka-Metro-cha-54-1400',
-        avatarUrl: '/driver_found_page.png',
+        avatarUrl: driverFoundPage.src,
         proposedFare: fare,
         driverFare: Math.max(100, fare - 10),
         timeAwayMins: 4,
@@ -360,11 +362,11 @@ export const HeroBookingWidget: React.FC = () => {
                   }`}
                 >
                   <div className="w-full h-12 overflow-hidden rounded-md mb-1.5 relative flex items-center justify-center bg-slate-100">
-                    <div
-                      className="w-full h-36 bg-contain bg-no-repeat transition-transform"
-                      style={{
-                        backgroundImage: "url('/selecting_page.png')",
-                        backgroundPosition: v.imagePosition,
+                      <div
+                        className="w-full h-36 bg-contain bg-no-repeat transition-transform"
+                        style={{
+                          backgroundImage: `url(${selectingPage.src})`,
+                          backgroundPosition: v.imagePosition,
                         transform: `scale(${v.scale || 1.6})`,
                       }}
                     />

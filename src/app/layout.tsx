@@ -44,6 +44,9 @@ export const viewport = {
   initialScale: 1,
 };
 
+import iconSvg from '@/assets/images/Icon.svg';
+import faviconSvg from '@/assets/favicon.svg';
+
 export const metadata: Metadata = {
   title: {
     default: 'Trippy - Ride Sharing, Intercity Travel & Set Your Own Fare in Bangladesh',
@@ -64,12 +67,11 @@ export const metadata: Metadata = {
   authors: [{ name: 'Trippy Technologies Bangladesh Ltd.' }],
   icons: {
     icon: [
-      { url: '/images/Icon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico' },
+      { url: iconSvg.src, type: 'image/svg+xml' },
+      { url: faviconSvg.src, type: 'image/svg+xml' },
     ],
-    shortcut: '/images/Icon.svg',
-    apple: '/images/Icon.svg',
+    shortcut: iconSvg.src,
+    apple: iconSvg.src,
   },
 };
 

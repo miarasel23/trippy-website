@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Phone, Shield, MapPin } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import trippyLogo from '@/assets/images/trippy_logo.svg';
 
 export const Footer: React.FC = () => {
   const { t } = useLanguage();
@@ -19,7 +20,7 @@ export const Footer: React.FC = () => {
             <Link href="/" className="inline-flex items-center mb-4 group" aria-label="Trippy Home">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/trippy_logo.svg"
+                src={trippyLogo.src}
                 alt="Trippy"
                 width={140}
                 height={38}

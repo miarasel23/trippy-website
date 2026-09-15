@@ -82,9 +82,9 @@ export const AdminSupportChat: React.FC = () => {
         if (!isOpenRef.current && fetchedMessages.length > 0) {
            const lastMsg = fetchedMessages[fetchedMessages.length - 1];
            if (lastMessageIdRef.current && lastMsg.id !== lastMessageIdRef.current) {
-             const lastIdx = fetchedMessages.findIndex(m => m.id === lastMessageIdRef.current);
+             const lastIdx = fetchedMessages.findIndex((m: any) => m.id === lastMessageIdRef.current);
              const newMsgs = lastIdx === -1 ? fetchedMessages : fetchedMessages.slice(lastIdx + 1);
-             const adminNewMsgs = newMsgs.filter(m => m.sender === 'admin');
+             const adminNewMsgs = newMsgs.filter((m: any) => m.sender === 'admin');
              if (adminNewMsgs.length > 0) {
                setUnreadCount(prev => prev + adminNewMsgs.length);
              }

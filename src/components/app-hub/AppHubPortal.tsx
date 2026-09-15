@@ -6,6 +6,9 @@ import { Badge } from '../common/Badge';
 import { QrCodeBox } from '../common/QrCodeBox';
 import { MessageSquare, Star, Clock, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import chatPage from '@/assets/chat_page.png';
+import tripCompletedPage from '@/assets/trip_completed_and_review_page.png';
+import tripHistoryPage from '@/assets/trip_history_page.png';
 
 export const AppHubPortal: React.FC = () => {
   const { t } = useLanguage();
@@ -116,7 +119,7 @@ export const AppHubPortal: React.FC = () => {
 
             <div className="bg-slate-100 border-4 border-slate-200 rounded-2xl overflow-hidden shadow-md relative h-80">
               <Image
-                src="/chat_page.png"
+                src={chatPage.src}
                 alt="In-App Driver Chat Screenshot"
                 fill
                 className="object-cover object-top"
@@ -140,7 +143,7 @@ export const AppHubPortal: React.FC = () => {
 
             <div className="bg-slate-100 border-4 border-slate-200 rounded-2xl overflow-hidden shadow-md relative h-80">
               <Image
-                src="/trip_completed_and_review_page.png"
+                src={tripCompletedPage.src}
                 alt="Trip Completed & Reviews Screenshot"
                 fill
                 className="object-cover object-top"
@@ -164,7 +167,7 @@ export const AppHubPortal: React.FC = () => {
 
             <div className="bg-slate-100 border-4 border-slate-200 rounded-2xl overflow-hidden shadow-md relative h-80">
               <Image
-                src="/trip_history_page.png"
+                src={tripHistoryPage.src}
                 alt="Trip History Screenshot"
                 fill
                 className="object-cover object-top"

@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import toyotaPremio from '@/assets/cars/toyota_premio.png';
+import toyotaPremioWheel from '@/assets/cars/toyota_premio_wheel.png';
 
 interface CityDriveBackgroundProps {
   variant?: 'hero' | 'ambient' | 'banner';
@@ -391,7 +393,7 @@ const RealToyotaPremio: React.FC = () => {
       {/* 2. Authentic Toyota Premio Body */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/cars/toyota_premio.png"
+        src={toyotaPremio.src}
         alt="Toyota Premio"
         width={240}
         height={76.5}
@@ -410,7 +412,7 @@ const RealToyotaPremio: React.FC = () => {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/cars/toyota_premio_wheel.png"
+          src={toyotaPremioWheel.src}
           alt="Premio Rear Wheel"
           width={35}
           height={35}
@@ -430,7 +432,7 @@ const RealToyotaPremio: React.FC = () => {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/cars/toyota_premio_wheel.png"
+          src={toyotaPremioWheel.src}
           alt="Premio Front Wheel"
           width={35}
           height={35}
