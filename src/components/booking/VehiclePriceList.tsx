@@ -92,6 +92,31 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
   const validDropoffs = dropoffUuids.filter(id => id && id.trim().length > 0 && !id.startsWith('custom-'));
   const hasRequiredLocations = validPickups.length > 0 && validDropoffs.length > 0;
 
+  /** Helper functions for calculating minimum and maximum booking fares */
+  const getCarMinFare = (car: CarInfo): number => {
+    if (car.rent_calculation?.minimum_booking_price)
+      return Math.round(car.rent_calculation.minimum_booking_price);
+    const ps = car.price_sets?.[0];
+    return ps ? Math.round(ps.minimum_booking_price) : 300;
+  };
+
+  const getCarMaxFare = (car: CarInfo): number => {
+    if (car.rent_calculation?.maximum_booking_price)
+      return Math.round(car.rent_calculation.maximum_booking_price);
+    return getCarMinFare(car) * 2;
+  };
+
+  // Customer offer range: estimated fare is the minimum, customer can increase up to at least +100%
+  const getOfferMin = (car: CarInfo): number => getCarMinFare(car);
+  const getOfferMax = (car: CarInfo): number => {
+    const minFare = getCarMinFare(car);
+    const maxCalc = car.rent_calculation?.maximum_booking_price
+      ? Math.round(car.rent_calculation.maximum_booking_price)
+      : 0;
+    // Minimum 100% increase (2x estimated fare) or higher if backend maximum_booking_price exists
+    return Math.max(minFare * 2, maxCalc);
+  };
+
   /** Cars coming from trip-price-details-customer API */
   const [apiCars, setApiCars] = useState<CarInfo[] | null>(null);
   /** Distance extracted from API response distance.total_km */
@@ -100,6 +125,12 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
   const [apiPickupToDropKm, setApiPickupToDropKm] = useState<number>(0);
   const [isCalculating, setIsCalculating] = useState(false);
   const sliderRef = useRef<HTMLDivElement>(null);
+
+  // Keep a stable ref to the current selectedCar
+  const selectedCarRef = useRef<CarInfo | null>(selectedCar);
+  useEffect(() => {
+    selectedCarRef.current = selectedCar;
+  }, [selectedCar]);
 
   const scrollSlider = (dir: 'left' | 'right') => {
     sliderRef.current?.scrollBy({ left: dir === 'left' ? -290 : 290, behavior: 'smooth' });
@@ -139,13 +170,31 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
           result.data[serviceName] ?? Object.values(result.data)[0];
 
         if (serviceData && Array.isArray(serviceData.cars) && serviceData.cars.length > 0) {
-          setApiCars(serviceData.cars as CarInfo[]);
+          const newCars = serviceData.cars as CarInfo[];
+          setApiCars(newCars);
 
           // Extract distance from first car (all cars share the same route)
           const dist = serviceData.cars[0]?.distance;
           if (dist) {
             setApiTotalKm(dist.total_km ?? 0);
             setApiPickupToDropKm(dist.pickup_to_dropoff_km ?? 0);
+          }
+
+          // If a vehicle was already selected, update it to the newly calculated car & base fare
+          if (selectedCarRef.current) {
+            const prevType = selectedCarRef.current.car_type;
+            const prevUuid = selectedCarRef.current.uuid;
+            const matching = newCars.find(
+              (c) =>
+                (prevType && c.car_type === prevType) ||
+                (prevUuid && c.uuid === prevUuid)
+            );
+
+            if (matching) {
+              const newFare = getCarMinFare(matching);
+              onSelectCar(matching, newFare);
+              onChangeFare(newFare);
+            }
           }
         } else {
           setApiCars(null);
@@ -162,35 +211,38 @@ export const VehiclePriceList: React.FC<VehiclePriceListProps> = ({
 
   useEffect(() => { fetchPriceDetails(); }, [fetchPriceDetails]);
 
+  // Keep selectedCar and proposedFare synchronized whenever apiCars updates
+  useEffect(() => {
+    if (!selectedCar || !apiCars || apiCars.length === 0) return;
+
+    const matchingCar = apiCars.find(
+      (c) =>
+        (selectedCar.car_type && c.car_type === selectedCar.car_type) ||
+        (selectedCar.uuid && c.uuid === selectedCar.uuid)
+    );
+
+    if (matchingCar) {
+      const currentMin = getCarMinFare(selectedCar);
+      const newMin = getCarMinFare(matchingCar);
+      const isRefDifferent = selectedCar !== matchingCar;
+      const isFareDifferent = currentMin !== newMin;
+      const isCalcDifferent =
+        selectedCar.rent_calculation?.minimum_booking_price !==
+        matchingCar.rent_calculation?.minimum_booking_price;
+
+      if (isRefDifferent && (isFareDifferent || isCalcDifferent)) {
+        onSelectCar(matchingCar, newMin);
+        onChangeFare(newMin);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiCars]);
+
   /* ── Helpers ──────────────────────────────────────────────────────────── */
   const displayCars = apiCars ?? (serviceCategory?.cars ?? []);
 
   // Effective distance to show (prefer total_km, then pickup_to_dropoff_km)
   const distanceKm = apiTotalKm > 0 ? apiTotalKm : apiPickupToDropKm > 0 ? apiPickupToDropKm : 0;
-
-  const getCarMinFare = (car: CarInfo): number => {
-    if (car.rent_calculation?.minimum_booking_price)
-      return Math.round(car.rent_calculation.minimum_booking_price);
-    const ps = car.price_sets?.[0];
-    return ps ? Math.round(ps.minimum_booking_price) : 300;
-  };
-
-  const getCarMaxFare = (car: CarInfo): number => {
-    if (car.rent_calculation?.maximum_booking_price)
-      return Math.round(car.rent_calculation.maximum_booking_price);
-    return getCarMinFare(car) * 2;
-  };
-
-  // Customer offer range: estimated fare is the minimum, customer can increase up to at least +100%
-  const getOfferMin = (car: CarInfo): number => getCarMinFare(car);
-  const getOfferMax = (car: CarInfo): number => {
-    const minFare = getCarMinFare(car);
-    const maxCalc = car.rent_calculation?.maximum_booking_price
-      ? Math.round(car.rent_calculation.maximum_booking_price)
-      : 0;
-    // Minimum 100% increase (2x estimated fare) or higher if backend maximum_booking_price exists
-    return Math.max(minFare * 2, maxCalc);
-  };
 
   const handleSelect = (car: CarInfo) => {
     const fare = getCarMinFare(car);

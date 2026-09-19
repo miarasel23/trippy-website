@@ -101,7 +101,7 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const resolvedParams = await params;
+    const resolvedParams = (await params) || ({} as any);
     const pathSegments = resolvedParams.path || [];
     const targetUrl = new URL(resolveBackendUrl(pathSegments, 'GET'));
     const fullPathStr = pathSegments.join('/');
@@ -137,7 +137,17 @@ export async function GET(
       headers,
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {
+        status: response.ok,
+        message: text || `Backend responded with HTTP ${response.status}`,
+        data: null,
+      };
+    }
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
     return NextResponse.json(
@@ -156,7 +166,7 @@ export async function POST(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const resolvedParams = await params;
+    const resolvedParams = (await params) || ({} as any);
     const pathSegments = resolvedParams.path || [];
     const targetUrl = resolveBackendUrl(pathSegments, 'POST');
     const fullPathStr = pathSegments.join('/');
@@ -270,7 +280,17 @@ export async function POST(
       body: finalBody,
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {
+        status: response.ok,
+        message: text || `Backend responded with HTTP ${response.status}`,
+        data: null,
+      };
+    }
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
     return NextResponse.json(

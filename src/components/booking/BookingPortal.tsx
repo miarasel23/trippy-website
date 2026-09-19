@@ -280,10 +280,25 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     }
   }, [activeTrip?.uuid]);
 
-  const handleSelectCar = (car: CarInfo, baseFare: number) => {
+  const handleSelectCar = React.useCallback((car: CarInfo, baseFare: number) => {
     setSelectedCar(car);
     setProposedFare(baseFare);
-  };
+  }, []);
+
+  // Reset selected vehicle if locations are cleared
+  useEffect(() => {
+    const validPickups = pickupLocations.filter(
+      (p) => p.uuid && p.uuid.trim().length > 0 && !p.uuid.startsWith('custom-')
+    );
+    const validDropoffs = dropoffLocations.filter(
+      (d) => d.uuid && d.uuid.trim().length > 0 && !d.uuid.startsWith('custom-')
+    );
+    if (validPickups.length === 0 || validDropoffs.length === 0) {
+      if (selectedCar) {
+        setSelectedCar(null);
+      }
+    }
+  }, [pickupLocations, dropoffLocations, selectedCar]);
 
 
   // Re-edit location directly from map click or drag

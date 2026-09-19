@@ -5,9 +5,14 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
+        protocol: 'https',
+        hostname: 'apitrippy.online',
+        pathname: '/**',
+      },
+      {
         protocol: 'http',
         hostname: '3.209.161.158',
-        pathname: '/api/assets/uploads/images/**',
+        pathname: '/**',
       },
     ],
   },
