@@ -149,27 +149,8 @@ const TripsContent: React.FC = () => {
       (isBn ? 'স্ট্যান্ডার্ড গাড়ি' : 'Vehicle');
 
     return (
-      <div className="py-8 bg-slate-950/95 min-h-screen">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="mb-4 flex items-center justify-between">
-            <Link
-              href="/"
-              className="text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors"
-            >
-              <span>← {isBn ? 'হোমে ফিরে যান' : 'Back to Home'}</span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => refreshActiveTrip()}
-              disabled={isRefreshing}
-              className="text-xs font-semibold text-slate-400 hover:text-emerald-400 flex items-center gap-1 transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isBn ? 'রিফ্রেশ' : 'Refresh'}</span>
-            </button>
-          </div>
-
+      <div className="py-8 bg-slate-50/60 min-h-screen relative overflow-hidden bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]">
+        <div className="max-w-xl mx-auto px-4 sm:px-6">
           <LiveBiddingRadarView
             tripUuid={currentTrip.uuid || ''}
             customerUuid={effectiveCustomerUuid}
@@ -215,6 +196,7 @@ const TripsContent: React.FC = () => {
       </div>
     );
   }
+
 
   // ── 2. If Trip is in Progress (ACCEPTED, ON_THE_WAY, STARTED) ────────────────
   if (isTripActive && currentTrip) {

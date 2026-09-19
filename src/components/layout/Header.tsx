@@ -16,6 +16,7 @@ export const Header: React.FC = () => {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const { language, setLanguage, t } = useLanguage();
@@ -23,7 +24,16 @@ export const Header: React.FC = () => {
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const { activeTrip, bidsCount } = useActiveTrip();
 
+  // Prevent SSR/client hydration mismatch for client-only state
+  // (activeTrip from storage, isAuthenticated from persisted Redux)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isUserAuth = mounted && isAuthenticated;
+
   const showActiveTripPill = Boolean(
+    mounted &&
     activeTrip &&
     activeTrip.trip_status !== 'CANCELLED' &&
     activeTrip.trip_status !== 'CANCELED' &&
@@ -169,7 +179,7 @@ export const Header: React.FC = () => {
             )}
 
             {/* Login Button OR Authenticated User Dropdown */}
-            {!isAuthenticated ? (
+            {!isUserAuth ? (
               <button
                 type="button"
                 onClick={() => dispatch(openLoginModal())}
@@ -250,7 +260,7 @@ export const Header: React.FC = () => {
           {/* Mobile Menu Button, Mobile Auth & Quick Language Switcher */}
           <div className="flex md:hidden items-center gap-2">
             {/* Quick Auth icon for mobile */}
-            {!isAuthenticated ? (
+            {!isUserAuth ? (
               <button
                 type="button"
                 onClick={() => dispatch(openLoginModal())}
@@ -299,7 +309,7 @@ export const Header: React.FC = () => {
           <div className="md:hidden py-4 border-t border-slate-200 bg-white rounded-2xl mb-4 px-4 shadow-xl animate-fade-in">
             <nav className="flex flex-col gap-2">
               {/* If authenticated in mobile, show profile header */}
-              {isAuthenticated && user && (
+              {isUserAuth && user && (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl mb-2 flex items-center justify-between">
                   <div>
                     <div className="text-xs font-bold text-slate-900">{user.full_name}</div>
@@ -402,7 +412,7 @@ export const Header: React.FC = () => {
               </div>
 
               <div className="pt-3 mt-2 border-t border-slate-200 flex flex-col gap-2">
-                {!isAuthenticated ? (
+                {!isUserAuth ? (
                   <button
                     type="button"
                     onClick={() => {

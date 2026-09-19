@@ -73,11 +73,11 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
   const isHourly = serviceType === 'HOURLY';
   const isRideShare = serviceType === 'RIDE_SHARE';
 
-  // Minimum allowed start time: now for RIDE_SHARE, or now + 2 hours for all scheduled/non-rideshare services
-  const minLeadMs = isRideShare ? 0 : 2 * 3600 * 1000;
+  // Minimum allowed start time: now for RIDE_SHARE, or now + 2h20m for all scheduled services
+  const minLeadMs = isRideShare ? 0 : (2 * 3600 + 20 * 60) * 1000; // 2 hours 20 minutes
   const minAllowedDate = new Date(Date.now() + minLeadMs);
 
-  // Automatically select current time + 2 hours for non-rideshare trips, or now for rideshare if past
+  // Auto-default: current time + 2h20m for non-rideshare trips, or now for rideshare
   React.useEffect(() => {
     const now = Date.now();
     const minRequiredTs = now + minLeadMs;
@@ -112,7 +112,7 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
     } else if (type === 'today_evening') {
       const evening = new Date();
       evening.setHours(18, 0, 0, 0);
-      // Ensure it respects 2-hour lead time
+      // Ensure it respects 2h20m lead time
       const minDate = new Date(now.getTime() + minLeadMs);
       if (evening < minDate) {
         evening.setDate(evening.getDate() + 1);
@@ -141,18 +141,18 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
   const presets: { key: 'earliest' | 'today_evening' | 'tomorrow_morning'; label: string; labelBn: string }[] = [
     {
       key: 'earliest',
-      label: isRideShare ? '⚡ Ride Now' : '⏱️ Earliest (+2 Hours)',
-      labelBn: isRideShare ? '⚡ এখনই যাত্রা' : '⏱️ দ্রুততম (২ ঘন্টা পর)',
+      label: isRideShare ? '⚡ Ride Now' : '⏱️ Earliest (+2h 20m)',
+      labelBn: isRideShare ? '⚡ এখনই যাত্রা' : '⏱️ দ্রুততম (২ঘ ২০ মিনিট পর)',
     },
     { key: 'today_evening',    label: '🌆 This Evening (6:00 PM)',     labelBn: '🌆 আজ সন্ধ্যায় (৬:০০ PM)' },
     { key: 'tomorrow_morning', label: '🌅 Tomorrow Morning (9:00 AM)', labelBn: '🌅 কাল সকালে (৯:০০ AM)' },
   ];
 
-  // Helper check if selected start time is in the past or less than 2 hours for scheduled rides
+  // Helper: check if selected start time is in the past or less than 2h20m for scheduled rides
   const nowTs = Date.now();
   const startTs = startDatetime ? new Date(startDatetime.replace(' ', 'T')).getTime() : 0;
   const isPastTime = !isRideShare && startTs > 0 && startTs < (nowTs - 60 * 1000);
-  const isStartTimeTooEarly = !isRideShare && startTs > 0 && startTs < (nowTs + 2 * 3600 * 1000 - 60 * 1000);
+  const isStartTimeTooEarly = !isRideShare && startTs > 0 && startTs < (nowTs + minLeadMs - 60 * 1000);
 
   const startDisplay = formatDisplayLabel(startDatetime);
   const endDisplay   = formatDisplayLabel(endDatetime);
@@ -177,7 +177,7 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
         <div className="flex items-center gap-1.5">
           {!isRideShare && (
             <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-              {isBn ? 'কমপক্ষে ২ ঘন্টা আগে' : 'Min 2h Advance'}
+              {isBn ? 'কমপক্ষে ২ঘ ২০মি আগে' : 'Min 2h 20m Advance'}
             </span>
           )}
           <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
@@ -218,7 +218,7 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
             <span className="text-[10px] font-bold text-slate-500">
               {isRideShare
                 ? (isBn ? 'ন্যূনতম: এখন' : 'Min: Now')
-                : (isBn ? 'ন্যূনতম: ২ ঘন্টা পর' : 'Min: 2h later')}
+                : (isBn ? 'ন্যূনতম: ২ঘ ২০মি পর' : 'Min: +2h 20m')}
             </span>
           </div>
           <input
@@ -335,39 +335,64 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
       </div>
 
       {isPastTime && (
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-red-800 bg-red-50 border border-red-300 rounded-xl px-3 py-2">
-          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-red-600" />
-          <span>
-            {isBn
-              ? isRideShare
-                ? 'অতীতের সময় নির্বাচন করা যাবে না। রাইড শেয়ারের জন্য বর্তমান সময় বা ভবিষ্যতের সময় নির্বাচন করুন।'
-                : 'অতীতের তারিখ বা সময় নির্বাচন করা যাবে না। অনুগ্রহ করে বর্তমান বা ভবিষ্যতের সময় নির্ধারণ করুন।'
-              : isRideShare
-                ? 'Cannot select a past time. For Ride Share, please select the current time or later.'
-                : 'Cannot select a past date or time. Please select a current or future departure time.'}
-          </span>
+        <div className="flex items-start gap-3 text-sm font-semibold text-red-900 bg-red-50 border-2 border-red-400 rounded-2xl px-4 py-3 shadow-sm ring-2 ring-red-200 animate-pulse">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500 mt-0.5" />
+          <div>
+            <p className="font-extrabold text-red-700 text-xs uppercase tracking-wide mb-0.5">
+              {isBn ? '⛔ অবৈধ সময়' : '⛔ Invalid Time Selected'}
+            </p>
+            <p className="text-xs text-red-800 leading-snug">
+              {isBn
+                ? 'অতীতের সময় নির্বাচন করা যাবে না। অনুগ্রহ করে বর্তমান বা ভবিষ্যতের সময় নির্ধারণ করুন।'
+                : 'You cannot select a past date or time. Please pick a current or future departure time.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setQuickSchedule('earliest')}
+              className="mt-1.5 text-[11px] font-bold text-red-600 underline underline-offset-2 hover:text-red-800 transition-colors"
+            >
+              {isBn ? '→ স্বয়ংক্রিয়ভাবে সংশোধন করুন' : '→ Auto-fix to earliest valid time'}
+            </button>
+          </div>
         </div>
       )}
 
       {isStartTimeTooEarly && (
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-xl px-3 py-2">
-          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
-          <span>
-            {isBn
-              ? 'নোট: ইন্টারসিটি/রিটার্ন ট্রিপের জন্য শিডিউল কমপক্ষে বর্তমান সময় থেকে ২ ঘন্টা পরের হতে হবে।'
-              : 'Notice: Non-rideshare services require departure scheduled at least 2 hours in advance.'}
-          </span>
+        <div className="flex items-start gap-3 text-sm font-semibold text-amber-900 bg-amber-50 border-2 border-amber-400 rounded-2xl px-4 py-3 shadow-sm ring-2 ring-amber-200">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-500 mt-0.5" />
+          <div>
+            <p className="font-extrabold text-amber-700 text-xs uppercase tracking-wide mb-0.5">
+              {isBn ? '⚠️ সময় খুব কম' : '⚠️ Departure Too Soon'}
+            </p>
+            <p className="text-xs text-amber-800 leading-snug">
+              {isBn
+                ? 'ইন্টারসিটি, হার্লি ও রিটার্ন ট্রিপের জন্য শিডিউল কমপক্ষে বর্তমান সময় থেকে ২ ঘন্টা ২০ মিনিট পরের হতে হবে।'
+                : 'Scheduled, Intercity, Hourly, and Return trips require at least 2 hours 20 minutes advance notice from now.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setQuickSchedule('earliest')}
+              className="mt-1.5 text-[11px] font-bold text-amber-700 underline underline-offset-2 hover:text-amber-900 transition-colors"
+            >
+              {isBn ? '→ দ্রুততম সময় সেট করুন' : '→ Set to earliest valid time (+2h 20m)'}
+            </button>
+          </div>
         </div>
       )}
 
       {isReturn && !endDatetime && (
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
-          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>
-            {isBn
-              ? 'রিটার্ন ট্রিপের জন্য ফেরার তারিখ ও সময় প্রদান করা বাধ্যতামূলক।'
-              : 'Return date and time is mandatory for round trips.'}
-          </span>
+        <div className="flex items-start gap-3 text-sm font-semibold text-amber-900 bg-amber-50 border-2 border-amber-400 rounded-2xl px-4 py-3 shadow-sm ring-2 ring-amber-200">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-500 mt-0.5" />
+          <div>
+            <p className="font-extrabold text-amber-700 text-xs uppercase tracking-wide mb-0.5">
+              {isBn ? '⚠️ ফেরার সময় প্রয়োজন' : '⚠️ Return Time Required'}
+            </p>
+            <p className="text-xs text-amber-800 leading-snug">
+              {isBn
+                ? 'রিটার্ন ট্রিপের জন্য ফেরার তারিখ ও সময় প্রদান করা বাধ্যতামূলক। অনুগ্রহ করে ফেরার সময় নির্বাচন করুন।'
+                : 'A return date and time is required for round trips. Please select a return time above.'}
+            </p>
+          </div>
         </div>
       )}
     </div>

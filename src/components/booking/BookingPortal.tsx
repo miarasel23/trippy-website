@@ -67,7 +67,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
   // 3. Date and Time schedule state (Bangladesh Time format)
   const [startDatetime, setStartDatetime] = useState<string>(() => {
     const isRide = selectedService === 'RIDE_SHARE';
-    const initDate = isRide ? new Date() : new Date(Date.now() + 2 * 3600 * 1000);
+    const initDate = isRide ? new Date() : new Date(Date.now() + (2 * 3600 + 20 * 60) * 1000); // +2h 20m
     return formatDateTimeToApi(initDate);
   });
   const [endDatetime, setEndDatetime] = useState<string>(() => {
