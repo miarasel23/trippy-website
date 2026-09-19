@@ -10,7 +10,6 @@ import { openLoginModal, logout } from '@/features/auth/store/authSlice';
 import { useActiveTrip } from '@/features/trips/context/ActiveTripContext';
 import { isTripReviewed } from '@/shared/utils/tripStorage';
 
-import trippyLogo from '@/assets/images/trippy_logo.svg';
 
 export const Header: React.FC = () => {
   const pathname = usePathname();
@@ -77,7 +76,7 @@ export const Header: React.FC = () => {
             <Link href="/" className="inline-flex items-center py-1 flex-shrink-0" aria-label="Trippy">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={trippyLogo.src}
+                src="/images/trippy_logo.svg"
                 alt="Trippy"
                 width={140}
                 height={38}

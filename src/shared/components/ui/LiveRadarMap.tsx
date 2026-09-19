@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useLanguage } from '@/context/LanguageContext';
-import driverFoundPage from '@/assets/driver_found_page.png';
 
 export const LiveRadarMap: React.FC = () => {
   const { t } = useLanguage();
@@ -97,7 +96,7 @@ export const LiveRadarMap: React.FC = () => {
         <div className="bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-xl flex items-center gap-3 animate-slide-up">
           <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-black flex-shrink-0 relative">
             <Image
-              src={driverFoundPage.src}
+              src="/images/driver_found_page.png"
               alt="Driver"
               width={44}
               height={44}

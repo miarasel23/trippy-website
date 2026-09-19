@@ -44,8 +44,7 @@ export const viewport = {
   initialScale: 1,
 };
 
-import iconSvg from '@/assets/images/Icon.svg';
-import faviconSvg from '@/assets/favicon.svg';
+
 
 export const metadata: Metadata = {
   title: {
@@ -67,11 +66,11 @@ export const metadata: Metadata = {
   authors: [{ name: 'Trippy Technologies Bangladesh Ltd.' }],
   icons: {
     icon: [
-      { url: iconSvg.src, type: 'image/svg+xml' },
-      { url: faviconSvg.src, type: 'image/svg+xml' },
+      { url: '/images/Icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
     ],
-    shortcut: iconSvg.src,
-    apple: iconSvg.src,
+    shortcut: '/images/Icon.svg',
+    apple: '/images/Icon.svg',
   },
 };
 

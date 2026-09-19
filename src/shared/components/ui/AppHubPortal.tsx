@@ -6,9 +6,6 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { QrCodeBox } from '@/shared/components/ui/QrCodeBox';
 import { MessageSquare, Star, Clock, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import chatPage from '@/assets/playstore_screenshots/11_seamless_driver_chat.png';
-import tripCompletedPage from '@/assets/playstore_screenshots/12_transparent_fare_and_reviews.png';
-import tripHistoryPage from '@/assets/playstore_screenshots/13_complete_trip_history.png';
 
 export const AppHubPortal: React.FC = () => {
   const { t } = useLanguage();
@@ -120,7 +117,7 @@ export const AppHubPortal: React.FC = () => {
             <div className="relative w-full aspect-[9/19] bg-gradient-to-b from-slate-100 to-slate-200/50 rounded-[2rem] p-2 sm:p-3 shadow-inner border-4 border-white">
               <div className="relative w-full h-full rounded-[1.5rem] overflow-hidden bg-black shadow-2xl">
                 <Image
-                  src={chatPage.src}
+                  src="/playstore_screenshots/11_seamless_driver_chat.png"
                   alt="In-App Driver Chat Screenshot"
                   fill
                   className="object-contain"
@@ -146,7 +143,7 @@ export const AppHubPortal: React.FC = () => {
             <div className="relative w-full aspect-[9/19] bg-gradient-to-b from-slate-100 to-slate-200/50 rounded-[2rem] p-2 sm:p-3 shadow-inner border-4 border-white">
               <div className="relative w-full h-full rounded-[1.5rem] overflow-hidden bg-black shadow-2xl">
                 <Image
-                  src={tripCompletedPage.src}
+                  src="/playstore_screenshots/12_transparent_fare_and_reviews.png"
                   alt="Trip Completed & Reviews Screenshot"
                   fill
                   className="object-contain"
@@ -172,7 +169,7 @@ export const AppHubPortal: React.FC = () => {
             <div className="relative w-full aspect-[9/19] bg-gradient-to-b from-slate-100 to-slate-200/50 rounded-[2rem] p-2 sm:p-3 shadow-inner border-4 border-white">
               <div className="relative w-full h-full rounded-[1.5rem] overflow-hidden bg-black shadow-2xl">
                 <Image
-                  src={tripHistoryPage.src}
+                  src="/playstore_screenshots/13_complete_trip_history.png"
                   alt="Trip History Screenshot"
                   fill
                   className="object-contain"

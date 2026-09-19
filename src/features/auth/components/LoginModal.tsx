@@ -11,7 +11,6 @@ import {
 } from '@/features/auth/store/authSlice';
 import { useLanguage } from '@/context/LanguageContext';
 import { X, Phone, Lock, ArrowRight, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
-import faviconSvg from '@/assets/favicon.svg';
 
 export const LoginModal: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -171,7 +170,7 @@ export const LoginModal: React.FC = () => {
           <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center shadow-xs flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={faviconSvg.src}
+              src="/favicon.svg"
               alt="Trippy"
               className="w-7 h-7 object-contain"
             />

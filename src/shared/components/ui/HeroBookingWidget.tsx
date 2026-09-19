@@ -9,7 +9,6 @@ import { DriverBid } from '@/features/booking/types/booking';
 import { ArrowRight, Check, X, MapPin, Navigation, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { AppUrls, getImageUrl } from '@/shared/config/appUrls';
-import driverFoundPage from '@/assets/driver_found_page.png';
 
 interface ApiCarItem {
   uuid: string;
@@ -191,7 +190,7 @@ export const HeroBookingWidget: React.FC = () => {
         completedRides: 210,
         carModel: activeCars[selectedCarIndex]?.car_type || 'Toyota Hiace Microbus',
         licensePlate: 'Dhaka-Metro-cha-54-1400',
-        avatarUrl: driverFoundPage.src,
+        avatarUrl: '/images/driver_found_page.png',
         proposedFare: fare,
         driverFare: Math.max(100, fare - 10),
         timeAwayMins: 4,
