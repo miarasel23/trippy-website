@@ -3,10 +3,19 @@
  * Maintained centrally for the entire Trippy web application.
  */
 
+// development
+// export const API_BASE_URL =
+//   process.env.BACKEND_API_BASE_URL ||
+//   process.env.NEXT_PUBLIC_API_BASE_URL ||
+//   'http://3.209.161.158/api';
+
+// production
+
+
 export const API_BASE_URL =
   process.env.BACKEND_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'http://3.209.161.158/api';
+  'https://apitrippy.online';
 
 export const IMAGE_BASE_URL = `${API_BASE_URL}/assets/uploads/images`;
 export const CHAT_IMAGE_BASE_URL = `${API_BASE_URL}/`;
