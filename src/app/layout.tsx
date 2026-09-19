@@ -1,15 +1,15 @@
 import type { Metadata } from 'next';
 import { Outfit, Inter, JetBrains_Mono, Hind_Siliguri } from 'next/font/google';
 import './globals.css';
-import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer';
+import { Header } from '@/shared/components/layout/Header';
+import { Footer } from '@/shared/components/layout/Footer';
 import { LanguageProvider } from '@/context/LanguageContext';
-import { ReduxProvider } from '@/redux/provider';
-import { AuthPromptManager } from '@/components/auth/AuthPromptManager';
-import { LoginModal } from '@/components/auth/LoginModal';
-import { ActiveTripProvider } from '@/context/ActiveTripContext';
-import { ActiveTripGlobalOverlay } from '@/components/booking/ActiveTripGlobalOverlay';
-import { AdminSupportChat } from '@/components/chat/AdminSupportChat';
+import { ReduxProvider } from '@/store/provider';
+import { AuthPromptManager } from '@/features/auth/components/AuthPromptManager';
+import { LoginModal } from '@/features/auth/components/LoginModal';
+import { ActiveTripProvider } from '@/features/trips/context/ActiveTripContext';
+import { ActiveTripGlobalOverlay } from '@/features/trips/components/ActiveTripGlobalOverlay';
+import { AdminSupportChat } from '@/features/chat/components/AdminSupportChat';
 
 const outfit = Outfit({
   subsets: ['latin'],

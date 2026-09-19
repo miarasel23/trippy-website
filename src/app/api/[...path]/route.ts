@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { API_BASE_URL, AppUrls } from '@/config/appUrls';
+import { API_BASE_URL, AppUrls } from '@/shared/config/appUrls';
 
 const BACKEND_URL = API_BASE_URL;
 

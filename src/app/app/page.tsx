@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { AppHubPortal } from '@/components/app-hub/AppHubPortal';
+import { AppHubPortal } from '@/shared/components/ui/AppHubPortal';
 
 export const metadata: Metadata = {
   title: 'Trippy App - Mobile Experience, Driver Chat & Downloads',

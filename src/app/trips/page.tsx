@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { TripsPortal } from '@/components/trips/TripsPortal';
+import { TripsPortal } from '@/features/trips/components/TripsPortal';
 
 export const metadata: Metadata = {
   title: 'My Trips & Live Bidding Radar | Trippy Bangladesh',

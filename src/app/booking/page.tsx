@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { RideBookingGuide } from '@/components/booking/RideBookingGuide';
+import { RideBookingGuide } from '@/features/booking/components/RideBookingGuide';
 
 export const metadata: Metadata = {
   title: 'How to Book a Car Step-by-Step | Trippy Bangladesh',

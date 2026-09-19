@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { FleetView } from '@/components/fleet/FleetView';
+import { FleetView } from '@/features/fleet/components/FleetView';
 
 export const metadata: Metadata = {
   title: 'Vehicle Fleet & Bangladesh Intercity Travel Corridors',

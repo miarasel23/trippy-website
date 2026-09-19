@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { PolicyTermsView } from '@/components/legal/PolicyTermsView';
+import { PolicyTermsView } from '@/shared/components/ui/PolicyTermsView';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy & Terms - Trippy',

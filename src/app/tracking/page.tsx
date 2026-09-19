@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { TrackingPortal } from '@/components/tracking/TrackingPortal';
+import { TrackingPortal } from '@/features/tracking/components/TrackingPortal';
 
 export const metadata: Metadata = {
   title: 'Live Trip Tracking & Passenger Safety Portal',

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AppUrls } from '@/config/appUrls';
+import { AppUrls } from '@/shared/config/appUrls';
 
 const BACKEND_URL = AppUrls.backend.sendOtpCustomer;
 
