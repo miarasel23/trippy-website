@@ -23,6 +23,7 @@ export const Footer: React.FC = () => {
                 alt="Trippy"
                 width={140}
                 height={38}
+                loading="lazy"
                 className="h-9 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03]"
               />
             </Link>

@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useActiveTrip } from '@/features/trips/context/ActiveTripContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch } from '@/store/hooks';
+import { openLoginModal } from '@/features/auth/store/authSlice';
 import { LiveBiddingRadarView } from '@/features/bidding/components/LiveBiddingRadarView';
 import Image from 'next/image';
 import { TripReviewModal } from '@/features/bidding/components/TripReviewModal';
@@ -26,6 +28,8 @@ import {
   ShieldCheck,
   Star,
   CheckCircle2,
+  User,
+  LogIn,
 } from 'lucide-react';
 import { Badge } from '@/shared/components/ui/Badge';
 import { formatTripServiceType } from '@/shared/utils/serviceFormat';
@@ -36,7 +40,10 @@ const TripsContent: React.FC = () => {
   const router = useRouter();
   const { language } = useLanguage();
   const isBn = language === 'bn';
-  const { token } = useAppSelector((state) => state.auth);
+  const dispatch = useAppDispatch();
+  const { token, isAuthenticated } = useAppSelector((state) => state.auth);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const {
     activeTrip: contextActiveTrip,
@@ -96,6 +103,50 @@ const TripsContent: React.FC = () => {
     );
   }
 
+  // ── Auth Gate: Show login prompt if user is not authenticated ─────────────
+  if (mounted && !isAuthenticated) {
+    return (
+      <div className="py-16 bg-slate-50 min-h-[85vh] flex items-center">
+        <div className="max-w-sm mx-auto px-4 sm:px-6 text-center space-y-6">
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
+            <User className="w-10 h-10 stroke-[1.5]" />
+          </div>
+
+          <div>
+            <Badge variant="primary" className="mb-3">
+              {isBn ? 'লগইন প্রয়োজন' : 'Login Required'}
+            </Badge>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-heading mb-2">
+              {isBn ? 'আপনার ট্রিপ দেখতে লগইন করুন' : 'Sign in to View Your Trips'}
+            </h1>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              {isBn
+                ? 'আপনার রাইড ইতিহাস, চলমান ট্রিপ ও লাইভ ট্র্যাকিং দেখতে আপনার অ্যাকাউন্টে প্রবেশ করুন।'
+                : 'Access your ride history, active trips and live tracking by signing in to your account.'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => dispatch(openLoginModal())}
+            className="w-full py-3.5 px-6 rounded-2xl bg-black hover:bg-slate-800 text-white font-bold text-sm shadow-lg shadow-black/10 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            <LogIn className="w-4 h-4" />
+            <span>{isBn ? 'লগইন করুন' : 'Sign In'}</span>
+          </button>
+
+          <Link
+            href="/booking"
+            className="w-full py-3 px-6 rounded-2xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-sm flex items-center justify-center gap-2 transition-all"
+          >
+            <Car className="w-4 h-4 text-slate-500" />
+            <span>{isBn ? 'রাইড বুক করুন' : 'Book a Ride'}</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   // ── 1. If an active requested trip is found: Show Live Bidding Radar ────────
   const rawStatus = (currentTrip?.trip_status || '').toUpperCase();
   const isTripRequested = Boolean(currentTrip && rawStatus === 'REQUESTED');
@@ -114,9 +165,6 @@ const TripsContent: React.FC = () => {
      rawStatus === 'FIRST_COMPLETED')
   );
 
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState<boolean>(false);
-  const [hasReviewed, setHasReviewed] = useState<boolean>(false);
-
   // Auto redirect active trips (ACCEPTED, ON_THE_WAY, STARTED) to live tracking
   useEffect(() => {
     if (isTripActive && currentTrip?.uuid) {
@@ -127,13 +175,6 @@ const TripsContent: React.FC = () => {
       router.push(`/tracking?trip_uuid=${currentTrip.uuid}${driverId ? `&driver_uuid=${driverId}` : ''}`);
     }
   }, [isTripActive, currentTrip?.uuid, currentTrip?.accepted_driver?.driver_uuid, currentTrip?.drivers, router]);
-
-  // If completed and not yet reviewed, auto-open review modal
-  useEffect(() => {
-    if (isTripCompleted && currentTrip && !isTripReviewed(currentTrip, currentTrip.uuid) && !hasReviewed) {
-      setIsReviewModalOpen(true);
-    }
-  }, [isTripCompleted, currentTrip, hasReviewed]);
 
   if (isTripRequested && currentTrip) {
     const pickupAddress =
@@ -242,145 +283,6 @@ const TripsContent: React.FC = () => {
     );
   }
 
-  // ── 3. If Trip is Completed: Show Completion Card & Review Option ──────────
-  if (isTripCompleted && currentTrip) {
-    const activeDriver =
-      currentTrip.accepted_driver ||
-      (currentTrip.drivers && currentTrip.drivers.length > 0 ? currentTrip.drivers[0] : null);
-    const driverId = activeDriver?.driver_uuid || '';
-    const driverName = activeDriver?.name || activeDriver?.driver_name || 'Md Rasel Mia';
-    const driverPhoto = activeDriver?.profile_picture || '/images/car-placeholder.png';
-    const carPlate = activeDriver?.car_reg_number || 'Dhaka-Metro-cha-54-1400';
-    const totalFare = activeDriver?.total_amount || currentTrip.offer_amount || 0;
-
-    const pickupAddress =
-      currentTrip.pickup_locations?.[0]?.address || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point');
-    const dropoffAddress =
-      currentTrip.dropoff_locations?.[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
-
-    return (
-      <div className="py-12 bg-slate-50 min-h-[85vh]">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 space-y-6">
-          
-          {/* Header Banner */}
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 mx-auto rounded-3xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-700 shadow-sm">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
-            <Badge variant="primary">
-              {isBn ? 'ট্রিপ সফলভাবে সম্পন্ন' : 'Trip Safely Completed'}
-            </Badge>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
-              {isBn ? 'আপনার যাত্রা সম্পন্ন হয়েছে' : 'Your Journey is Complete'}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-              {isBn
-                ? 'নিরাপদ ভ্রমণের জন্য ধন্যবাদ। অনুগ্রহ করে চালকের সেবার মান রেটিং করুন।'
-                : 'Thank you for riding with Trippy. Please rate your driver to help maintain safety and excellence.'}
-            </p>
-          </div>
-
-          {/* Trip Summary Card */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-5">
-            {/* Driver Profile */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-emerald-500 bg-slate-100 relative">
-                  <Image
-                    src={getImageUrl(driverPhoto)}
-                    alt={driverName}
-                    fill
-                    className="object-cover"
-                    sizes="48px"
-                  />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">{driverName}</h3>
-                  <p className="text-xs text-slate-400 font-mono">{carPlate}</p>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                  {isBn ? 'মোট ভাড়া' : 'Total Fare'}
-                </span>
-                <span className="text-lg font-black text-slate-900">
-                  {isBn ? `৳ ${totalFare}` : `BDT ${totalFare}`}
-                </span>
-              </div>
-            </div>
-
-            {/* Route */}
-            <div className="space-y-2 bg-slate-50 rounded-2xl p-4 text-xs">
-              <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-700 truncate">{pickupAddress}</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-700 truncate">{dropoffAddress}</span>
-              </div>
-            </div>
-
-            {/* Review Action */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-              {currentTrip.given_review || hasReviewed ? (
-                <div className="w-full sm:flex-1 py-3 px-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold text-center flex items-center justify-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>{isBn ? 'রিভিউ সম্পন্ন হয়েছে (★ 5.0)' : 'Review Submitted (★ 5.0)'}</span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsReviewModalOpen(true)}
-                  className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>{isBn ? 'চালকের রিভিউ ও রেটিং দিন' : 'Rate Driver & Leave Review'}</span>
-                </button>
-              )}
-
-              <Link
-                href="/booking"
-                onClick={() => {
-                  clearActiveTrip();
-                  setSpecificTrip(null);
-                }}
-                className="w-full sm:w-auto py-3.5 px-6 rounded-2xl bg-black hover:bg-slate-800 text-white font-bold text-xs sm:text-sm text-center transition-all flex items-center justify-center gap-1.5"
-              >
-                <span>{isBn ? 'নতুন রাইড বুক করুন' : 'Book Another Ride'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </div>
-
-          {/* Review Modal */}
-          {driverId && currentTrip.uuid && (
-            <TripReviewModal
-              isOpen={isReviewModalOpen}
-              onClose={() => setIsReviewModalOpen(false)}
-              tripUuid={currentTrip.uuid}
-              driverUuid={driverId}
-              driverName={driverName}
-              driverPhoto={driverPhoto}
-              carPlate={carPlate}
-              serviceName={currentTrip.service_name}
-              totalFare={totalFare}
-              onReviewSubmitted={() => {
-                setHasReviewed(true);
-                setIsReviewModalOpen(false);
-                if (currentTrip.uuid) {
-                  markTripReviewed(currentTrip.uuid);
-                  clearAllTripRelatedStorage(currentTrip.uuid);
-                }
-                refreshActiveTrip();
-              }}
-            />
-          )}
-        </div>
-      </div>
-    );
-  }
 
   // ── 2. All Trips List View with Review Status Check & Total Amount ───────
   const [customerTrips, setCustomerTrips] = useState<RentalTrip[]>([]);

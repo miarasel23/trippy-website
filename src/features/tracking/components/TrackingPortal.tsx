@@ -1785,7 +1785,7 @@ export const TrackingPortal: React.FC = () => {
                     {msg.file && (
                       <div className="mb-2">
                         {msg.file.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                          <img src={`${CHAT_IMAGE_BASE_URL}${msg.file}`} alt="attachment" className="max-w-[200px] rounded-lg object-cover" />
+                          <img src={`${CHAT_IMAGE_BASE_URL}${msg.file}`} alt="attachment" loading="lazy" className="max-w-[200px] rounded-lg object-cover" />
                         ) : (
                           <a href={`${CHAT_IMAGE_BASE_URL}${msg.file}`} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
                             View Attachment
