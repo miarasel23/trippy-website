@@ -26,6 +26,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { openLoginModal, logout } from '@/features/auth/store/authSlice';
 import { useActiveTrip } from '@/features/trips/context/ActiveTripContext';
 import { isTripReviewed } from '@/shared/utils/tripStorage';
+import { getImageUrl } from '@/shared/config/appUrls';
 
 
 export const Header: React.FC = () => {
@@ -47,6 +48,11 @@ export const Header: React.FC = () => {
   }, []);
 
   const isUserAuth = mounted && isAuthenticated;
+  const userPhoto =
+    user?.profile_picture ||
+    (user as any)?.profile_image ||
+    (user as any)?.avatar ||
+    (user as any)?.image;
 
   const showActiveTripPill = Boolean(
     mounted &&
@@ -128,12 +134,12 @@ export const Header: React.FC = () => {
           {/* Right: Action CTAs, Language Switcher & Authentication */}
           <div className="hidden lg:flex items-center gap-2.5 xl:gap-3 flex-shrink-0 ml-auto pl-6 lg:pl-10">
             {/* Language Switcher Pill */}
-            <div className="flex items-center bg-slate-100 border border-slate-200 rounded-xl p-1 gap-1 text-xs">
+            <div className="flex items-center bg-slate-100 border border-slate-300 p-1 gap-1 text-xs">
               <Globe className="w-3.5 h-3.5 ml-1.5 text-slate-500" />
               <button
                 type="button"
                 onClick={() => setLanguage('en')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                className={`px-2.5 py-1 font-bold transition-all ${
                   language === 'en'
                     ? 'bg-black text-white shadow-sm'
                     : 'text-slate-600 hover:text-black'
@@ -144,7 +150,7 @@ export const Header: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setLanguage('bn')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                className={`px-2.5 py-1 font-bold transition-all ${
                   language === 'bn'
                     ? 'bg-black text-white shadow-sm'
                     : 'text-slate-600 hover:text-black'
@@ -213,8 +219,21 @@ export const Header: React.FC = () => {
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 transition-all text-left shadow-xs whitespace-nowrap"
                   aria-expanded={isUserMenuOpen}
                 >
-                  <div className="w-7 h-7 rounded-lg bg-black text-white text-xs font-bold flex items-center justify-center font-heading flex-shrink-0">
-                    {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                  <div className="w-7 h-7 rounded-lg bg-black text-white text-xs font-bold flex items-center justify-center font-heading flex-shrink-0 relative overflow-hidden">
+                    <span className="select-none">
+                      {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                    </span>
+                    {userPhoto && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={getImageUrl(userPhoto)}
+                        alt={user?.full_name || 'User'}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
                   </div>
                   <span className="text-xs font-bold text-slate-900 max-w-[150px] truncate">
                     {user?.full_name || 'User'}
@@ -276,12 +295,23 @@ export const Header: React.FC = () => {
 
           {/* Mobile Menu Button, Mobile Auth & Quick Language Switcher */}
           <div className="flex md:hidden items-center gap-2">
+            {/* Mobile Language Switcher Tab */}
+            <button
+              type="button"
+              onClick={() => setLanguage(language === 'en' ? 'bn' : 'en')}
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs font-bold text-slate-900 flex items-center gap-1.5 transition-colors"
+              aria-label="Toggle language"
+            >
+              <Globe className="w-3.5 h-3.5 text-slate-600" />
+              <span>{language === 'en' ? 'বাংলা' : 'EN'}</span>
+            </button>
+
             {/* Quick Auth icon for mobile */}
             {!isUserAuth ? (
               <button
                 type="button"
                 onClick={() => dispatch(openLoginModal())}
-                className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 flex items-center gap-1"
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs font-bold text-slate-800 flex items-center gap-1 transition-colors"
                 aria-label="Login"
               >
                 <User className="w-3.5 h-3.5" />
@@ -291,10 +321,23 @@ export const Header: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="w-7 h-7 rounded-lg bg-black text-white text-xs font-bold flex items-center justify-center font-heading"
+                className="w-7 h-7 bg-black text-white text-xs font-bold flex items-center justify-center font-heading border border-black relative overflow-hidden flex-shrink-0"
                 aria-label="User Profile"
               >
-                {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                <span className="select-none">
+                  {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                </span>
+                {userPhoto && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={getImageUrl(userPhoto)}
+                    alt={user?.full_name || 'User'}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                )}
               </button>
             )}
 
@@ -310,25 +353,35 @@ export const Header: React.FC = () => {
 
         </div>
 
-        {/* Mobile Dropdown Menu (Premium App Drawer Style) */}
+        {/* Mobile Dropdown Menu (Sharp, Professional Executive Style) */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-slate-200/90 bg-white rounded-3xl mb-4 px-4 sm:px-5 shadow-2xl animate-fade-in ring-1 ring-black/5">
+          <div className="md:hidden py-4 border-t border-slate-200 bg-white mb-4 px-4 sm:px-5 shadow-xl animate-fade-in border border-slate-200">
             <div className="flex flex-col gap-3">
-              {/* 1. Authenticated User Profile Card (Elevated Premium Glassmorphism) */}
+              {/* 1. Authenticated User Profile Card */}
               {isUserAuth && user ? (
-                <div className="p-4 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white rounded-2xl shadow-lg relative overflow-hidden">
-                  {/* Subtle Background Glow Accent */}
-                  <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none" />
-
+                <div className="p-4 bg-slate-900 text-white shadow-md relative overflow-hidden border border-slate-800">
                   <div className="flex items-center justify-between relative z-10 pb-3 border-b border-slate-700/70">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-white text-slate-950 font-black text-base flex items-center justify-center font-heading shadow-md ring-2 ring-emerald-400/40">
-                        {user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                      <div className="w-10 h-10 bg-white text-slate-950 font-black text-base flex items-center justify-center font-heading border border-emerald-400/40 relative overflow-hidden flex-shrink-0">
+                        <span className="select-none">
+                          {user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                        </span>
+                        {userPhoto && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={getImageUrl(userPhoto)}
+                            alt={user.full_name || 'User'}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        )}
                       </div>
                       <div>
                         <div className="text-sm font-extrabold text-white tracking-tight flex items-center gap-1.5 font-heading">
                           <span>{user.full_name}</span>
-                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30" />
+                          <span className="inline-block w-2 h-2 bg-emerald-400" />
                         </div>
                         <div className="text-xs text-slate-300 font-mono flex items-center gap-1 mt-0.5">
                           <Phone className="w-3 h-3 text-slate-400" />
@@ -343,7 +396,7 @@ export const Header: React.FC = () => {
                         dispatch(logout());
                         setIsMobileMenuOpen(false);
                       }}
-                      className="px-2.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1"
+                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1"
                       title={t.auth.logout}
                     >
                       <LogOut className="w-3.5 h-3.5 text-red-400" />
@@ -355,16 +408,16 @@ export const Header: React.FC = () => {
                   <Link
                     href="/trips"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="mt-3 py-2 px-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl flex items-center justify-between text-xs font-bold text-white transition-all group"
+                    className="mt-3 py-2 px-3 bg-white/10 hover:bg-white/15 border border-white/10 flex items-center justify-between text-xs font-bold text-white transition-all group"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-emerald-500/30 text-white flex items-center justify-center">
+                      <div className="w-6 h-6 bg-emerald-500/30 text-white flex items-center justify-center">
                         <Car className="w-3.5 h-3.5 text-white" />
                       </div>
                       <span>{language === 'bn' ? 'আমার ট্রিপসমূহ ও হিস্ট্রি' : 'My Trips & History'}</span>
                     </div>
                     {activeTrip && activeTrip.trip_status === 'REQUESTED' ? (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-black uppercase animate-pulse">
+                      <span className="px-2 py-0.5 bg-emerald-500 text-slate-950 text-[10px] font-black uppercase animate-pulse">
                         {language === 'bn' ? 'চলমান বিড' : 'Active'}
                       </span>
                     ) : (
@@ -374,9 +427,9 @@ export const Header: React.FC = () => {
                 </div>
               ) : (
                 /* Guest Sign-in Card */
-                <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl flex items-center justify-between">
+                <div className="p-4 bg-slate-50 border border-slate-200 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center">
+                    <div className="w-10 h-10 bg-slate-200 text-slate-600 flex items-center justify-center border border-slate-300">
                       <User className="w-5 h-5" />
                     </div>
                     <div>
@@ -394,7 +447,7 @@ export const Header: React.FC = () => {
                       setIsMobileMenuOpen(false);
                       dispatch(openLoginModal());
                     }}
-                    className="px-3 py-1.5 bg-black hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                    className="px-3 py-1.5 bg-black hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
                   >
                     <User className="w-3.5 h-3.5" />
                     <span>{t.auth.login}</span>
@@ -411,7 +464,7 @@ export const Header: React.FC = () => {
                       : `/tracking?trip_uuid=${activeTrip.uuid}`
                   }
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-3 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 rounded-2xl flex items-center justify-between text-emerald-950 font-bold text-xs transition-all shadow-xs"
+                  className="p-3 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 flex items-center justify-between text-emerald-950 font-bold text-xs transition-all shadow-xs"
                 >
                   <div className="flex items-center gap-2.5">
                     <span className="relative flex h-2.5 w-2.5">
@@ -441,8 +494,8 @@ export const Header: React.FC = () => {
                 </Link>
               )}
 
-              {/* 3. Navigation List (Icons, Clean Badges, Active Highlight) */}
-              <nav className="flex flex-col gap-1 pt-1">
+              {/* 3. Navigation List (Unified, Sharp Rows with Exact Left & Right Alignment) */}
+              <nav className="flex flex-col border border-slate-200 divide-y divide-slate-100 bg-white">
                 {navLinks.map((link) => {
                   const isActive = pathname === link.href;
                   const Icon = link.icon;
@@ -451,27 +504,27 @@ export const Header: React.FC = () => {
                       key={link.href}
                       href={link.href}
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className={`px-3.5 py-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-between group ${
+                      className={`w-full px-4 py-3 flex items-center justify-between text-sm transition-all group ${
                         isActive
-                          ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
-                          : 'text-slate-700 hover:bg-slate-50 hover:text-black'
+                          ? 'bg-slate-900 text-white font-bold'
+                          : 'text-slate-800 hover:bg-slate-50 hover:text-black font-medium'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                          className={`w-8 h-8 flex items-center justify-center border transition-colors ${
                             isActive
-                              ? 'bg-white/20 text-white'
-                              : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200 group-hover:text-black'
+                              ? 'border-white/20 bg-white/10 text-white'
+                              : 'border-slate-200 bg-slate-50 text-slate-600 group-hover:border-slate-300 group-hover:text-black'
                           }`}
                         >
                           <Icon className="w-4 h-4" />
                         </div>
-                        <span className="tracking-tight">{link.label}</span>
+                        <span className="tracking-tight text-sm">{link.label}</span>
                       </div>
 
                       {isActive ? (
-                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                        <span className="w-2 h-2 bg-emerald-400" />
                       ) : (
                         <ChevronRight className="w-4 h-4 text-slate-400 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
                       )}
@@ -480,25 +533,29 @@ export const Header: React.FC = () => {
                 })}
               </nav>
 
-              {/* 4. Bottom Controls: Emergency/Support Quick Action & App CTA */}
-              <div className="pt-2 mt-1 border-t border-slate-100 flex flex-col gap-2.5">
+              {/* 4. Bottom Controls: Exact Same Left-Right Alignment */}
+              <div className="flex flex-col gap-2.5 pt-1">
 
                 {/* Quick 24/7 Helpline & SOS strip */}
-                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <div className="grid grid-cols-2 gap-2">
                   <a
                     href="tel:01997709990"
-                    className="px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-center flex items-center justify-center gap-1.5 text-xs font-bold text-slate-800 transition-colors"
+                    className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-xs font-bold text-slate-800 transition-colors"
                   >
-                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>{language === 'bn' ? 'হেল্পলাইন' : 'Helpline'}</span>
+                    <div className="w-8 h-8 flex items-center justify-center border border-emerald-200 bg-emerald-50 text-emerald-700 flex-shrink-0">
+                      <Phone className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="truncate tracking-tight">{language === 'bn' ? 'হেল্পলাইন' : 'Helpline'}</span>
                   </a>
 
                   <a
                     href="tel:999"
-                    className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl text-center flex items-center justify-center gap-1.5 text-xs font-bold text-red-600 transition-colors"
+                    className="w-full px-4 py-2.5 bg-red-50/50 hover:bg-red-100/70 border border-red-200 flex items-center gap-3 text-xs font-bold text-red-700 transition-colors"
                   >
-                    <Shield className="w-3.5 h-3.5 text-red-600" />
-                    <span>{language === 'bn' ? 'জরুরী ৯৯৯' : 'SOS 999'}</span>
+                    <div className="w-8 h-8 flex items-center justify-center border border-red-200 bg-red-100/60 text-red-600 flex-shrink-0">
+                      <Shield className="w-4 h-4 text-red-600" />
+                    </div>
+                    <span className="truncate tracking-tight">{language === 'bn' ? 'জরুরী ৯৯৯' : 'SOS 999'}</span>
                   </a>
                 </div>
 
@@ -506,7 +563,7 @@ export const Header: React.FC = () => {
                 <Link
                   href="/app"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="w-full py-3 px-4 rounded-2xl bg-black hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-black/10 transition-all active:scale-[0.99]"
+                  className="w-full py-3 px-4 bg-black hover:bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.99]"
                 >
                   <Download className="w-4 h-4 text-emerald-400" />
                   <span>{t.common.getTheApp}</span>

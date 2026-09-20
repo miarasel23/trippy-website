@@ -28,71 +28,76 @@ export const AppHubPortal: React.FC = () => {
           </p>
 
           {/* Download Store Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-4 mb-10">
-            {/* Google Play */}
-            <button
-              type="button"
-              onClick={() => alert('Downloading Trippy Customer App for Android (v2.4.0 APK)...')}
-              className="bg-black text-white hover:bg-slate-900 border border-black rounded-2xl p-3 px-6 flex items-center gap-3.5 transition-all hover:-translate-y-0.5 shadow-md group"
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-10 max-w-xl mx-auto lg:max-w-none">
+            {/* Google Play — Customer App */}
+            <a
+              href="https://play.google.com/store/apps/details?id=com.trippy.user"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-black text-white hover:bg-neutral-900 border border-neutral-900 p-3 px-4 flex items-center gap-3 transition-all hover:-translate-y-0.5 shadow-sm group w-full h-full min-h-[64px]"
             >
-              <svg className="w-7 h-7 fill-white" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 fill-white flex-shrink-0" viewBox="0 0 24 24">
                 <path d="M3.609 1.814L13.793 12 3.61 22.186a2.38 2.38 0 0 1-.22-.986V2.8a2.38 2.38 0 0 1 .22-.986zM15.207 13.414l2.586 2.586-13.414 7.75c-.32.185-.68.25-1.03.25L15.207 13.414zm0-2.828L3.35 2c.35 0 .71.065 1.03.25l13.414 7.75-2.586 2.586zm1.414 1.414l3.18-1.836a1.76 1.76 0 0 1 0 3.05l-3.18 1.836V12z" />
               </svg>
-              <div className="text-left">
-                <span className="text-[10px] text-slate-300 block uppercase font-bold tracking-wider">
+              <div className="text-left min-w-0">
+                <span className="text-[9px] text-neutral-400 block uppercase font-bold tracking-wider leading-none mb-0.5">
                   {t.appHub.getItOn}
                 </span>
-                <strong className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">
+                <strong className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-400 transition-colors leading-tight block">
                   {t.appHub.googlePlay}
                 </strong>
               </div>
-            </button>
+            </a>
 
             {/* Apple App Store */}
-            <button
-              type="button"
-              onClick={() => alert('Opening Trippy on Apple App Store...')}
-              className="bg-black text-white hover:bg-slate-900 border border-black rounded-2xl p-3 px-6 flex items-center gap-3.5 transition-all hover:-translate-y-0.5 shadow-md group"
+            <a
+              href="https://apps.apple.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-black text-white hover:bg-neutral-900 border border-neutral-900 p-3 px-4 flex items-center gap-3 transition-all hover:-translate-y-0.5 shadow-sm group w-full h-full min-h-[64px]"
             >
-              <svg className="w-7 h-7 fill-white" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 fill-white flex-shrink-0" viewBox="0 0 24 24">
                 <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.63-.77 1.06-1.85.94-2.93-1 .04-2.13.67-2.77 1.43-.57.66-.99 1.75-.86 2.8 1.1.09 2.06-.53 2.69-1.3" />
               </svg>
-              <div className="text-left">
-                <span className="text-[10px] text-slate-300 block uppercase font-bold tracking-wider">
+              <div className="text-left min-w-0">
+                <span className="text-[9px] text-neutral-400 block uppercase font-bold tracking-wider leading-none mb-0.5">
                   {t.appHub.downloadOn}
                 </span>
-                <strong className="text-sm font-bold text-white group-hover:text-white transition-colors">
+                <strong className="text-xs sm:text-sm font-bold text-white group-hover:text-white transition-colors leading-tight block">
                   {t.appHub.appStore}
                 </strong>
               </div>
-            </button>
+            </a>
 
-            {/* Direct APK */}
-            <button
-              type="button"
-              onClick={() => alert('Downloading verified direct APK build...')}
-              className="bg-black text-white hover:bg-slate-900 border border-black rounded-2xl p-3 px-6 flex items-center gap-3.5 transition-all hover:-translate-y-0.5 shadow-md group"
+            {/* Direct APK — spans 2 cols on mobile, 1 col on lg */}
+            <a
+              href="https://play.google.com/store/apps/details?id=com.trippy.user"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="col-span-2 lg:col-span-1 bg-black text-white hover:bg-neutral-900 border border-neutral-900 p-3 px-4 flex items-center justify-center gap-3 transition-all hover:-translate-y-0.5 shadow-sm group w-full min-h-[64px]"
             >
-              <svg className="w-7 h-7 fill-emerald-400" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 fill-emerald-400 flex-shrink-0" viewBox="0 0 24 24">
                 <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
               </svg>
-              <div className="text-left">
-                <span className="text-[10px] text-slate-300 block uppercase font-bold tracking-wider">
+              <div className="text-left min-w-0">
+                <span className="text-[9px] text-neutral-400 block uppercase font-bold tracking-wider leading-none mb-0.5">
                   {t.appHub.directAndroid}
                 </span>
-                <strong className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">
+                <strong className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-400 transition-colors leading-tight block">
                   {t.appHub.downloadApk}
                 </strong>
               </div>
-            </button>
+            </a>
           </div>
 
-          {/* QR Code */}
+          {/* QR Codes — Single code, choose after scanning */}
           <div className="flex justify-center">
             <QrCodeBox
-              title={t.appHub.qrTitle}
-              subtitle={t.appHub.qrSubtitle}
-              category={t.appHub.qrCategory}
+              url="https://trippybd.com/get-app"
+              link="/get-app"
+              title="Install on Phone Instantly"
+              subtitle="Scan to choose Customer or Rider app"
+              category="POINT CAMERA & SCAN"
             />
           </div>
         </div>
