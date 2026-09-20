@@ -259,7 +259,17 @@ export async function POST(
       const formParams = new URLSearchParams();
       for (const [key, val] of Object.entries(bodyObj)) {
         if (val === undefined || val === null) continue;
-        if (Array.isArray(val) || (typeof val === 'object' && val !== null && !(val instanceof File) && !(val instanceof Blob))) {
+        if (Array.isArray(val)) {
+          // Send arrays as repeated params: key=val1&key=val2
+          // For single-element arrays (common for location UUIDs), send the value directly
+          if (val.length === 1) {
+            formParams.append(key, String(val[0]));
+          } else {
+            for (const item of val) {
+              formParams.append(key, String(item));
+            }
+          }
+        } else if (typeof val === 'object' && val !== null && !(val instanceof File) && !(val instanceof Blob)) {
           formParams.append(key, JSON.stringify(val));
         } else {
           formParams.append(key, String(val));
