@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   Star,
   CheckCircle2,
+  XCircle,
   User,
   LogIn,
 } from 'lucide-react';
@@ -360,6 +361,11 @@ const TripsContent: React.FC = () => {
                 status === 'ACCEPTED' ||
                 status === 'ON_THE_WAY';
               const isItemRequested = status === 'REQUESTED';
+              const isItemCancelled =
+                status === 'CANCELLED' ||
+                status === 'CANCELED' ||
+                status === 'TRIP_CANCELLED' ||
+                status === 'CANCEL';
 
               const activeDriver =
                 tripItem.accepted_driver ||
@@ -381,13 +387,35 @@ const TripsContent: React.FC = () => {
               const needsReview =
                 isItemCompleted && !isTripReviewed(tripItem, tripItem.uuid);
 
+              // Dynamic styling based on trip status:
+              // - Completed: Light green card (bg-emerald-50/75 border-emerald-200)
+              // - Cancelled: Red card (bg-red-50/80 border-red-200)
+              // - Active/Default: Clean white card
+              const cardClasses = isItemCancelled
+                ? 'bg-red-50/80 border-red-200/90 hover:border-red-300'
+                : isItemCompleted
+                ? 'bg-emerald-50/75 border-emerald-200/90 hover:border-emerald-300'
+                : 'bg-white border-slate-200/90 hover:border-slate-300';
+
+              const dividerBorder = isItemCancelled
+                ? 'border-red-200/60'
+                : isItemCompleted
+                ? 'border-emerald-200/60'
+                : 'border-slate-100';
+
+              const routeBoxClasses = isItemCancelled
+                ? 'bg-white/85 border border-red-200/60'
+                : isItemCompleted
+                ? 'bg-white/85 border border-emerald-200/60'
+                : 'bg-slate-50 border border-transparent';
+
               return (
                 <div
                   key={tripItem.uuid || tripItem.id}
-                  className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 hover:shadow-md transition-all"
+                  className={`rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 hover:shadow-md transition-all border ${cardClasses}`}
                 >
                   {/* Top Row: Service name, Date & Total Fare */}
-                  <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div className={`flex items-start justify-between gap-3 pb-3 border-b ${dividerBorder}`}>
                     <div>
                       {(() => {
                         const itemServiceInfo = formatTripServiceType(
@@ -408,7 +436,9 @@ const TripsContent: React.FC = () => {
                             <span
                               className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                                 isItemCompleted
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : isItemCancelled
+                                  ? 'bg-red-100 text-red-800 border border-red-300'
                                   : isItemActive
                                   ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse'
                                   : isItemRequested
@@ -416,7 +446,11 @@ const TripsContent: React.FC = () => {
                                   : 'bg-slate-100 text-slate-600'
                               }`}
                             >
-                              {status}
+                              {isItemCancelled
+                                ? (isBn ? 'বাতিলকৃত ট্রিপ' : 'CANCELLED')
+                                : isItemCompleted
+                                ? (isBn ? 'সম্পন্ন' : 'COMPLETED')
+                                : status}
                             </span>
                           </div>
                         );
@@ -431,14 +465,16 @@ const TripsContent: React.FC = () => {
                       <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
                         {isBn ? 'সর্বমোট ভাড়া' : 'TOTAL FARE'}
                       </span>
-                      <span className="text-base sm:text-lg font-black text-slate-900 font-heading">
+                      <span className={`text-base sm:text-lg font-black font-heading ${
+                        isItemCancelled ? 'text-red-900 line-through opacity-80' : 'text-slate-900'
+                      }`}>
                         BDT {fare}
                       </span>
                     </div>
                   </div>
 
                   {/* Route Row */}
-                  <div className="space-y-2 bg-slate-50 rounded-2xl p-3.5 text-xs">
+                  <div className={`space-y-2 rounded-2xl p-3.5 text-xs ${routeBoxClasses}`}>
                     <div className="flex items-start gap-2.5">
                       <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
@@ -508,9 +544,16 @@ const TripsContent: React.FC = () => {
                       )}
 
                       {isItemCompleted && !needsReview && (
-                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1">
+                        <span className="text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-xl flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                           <span>{isBn ? 'রিভিউ সম্পন্ন' : 'Reviewed ★ 5.0'}</span>
+                        </span>
+                      )}
+
+                      {isItemCancelled && (
+                        <span className="text-xs font-bold text-red-800 bg-red-100 border border-red-300 px-3 py-1.5 rounded-xl flex items-center gap-1">
+                          <XCircle className="w-3.5 h-3.5 text-red-600" />
+                          <span>{isBn ? 'বাতিলকৃত ট্রিপ' : 'Trip Cancelled'}</span>
                         </span>
                       )}
 
