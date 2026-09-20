@@ -242,38 +242,42 @@ export const FleetCatalog: React.FC<FleetCatalogProps> = ({
           </p>
         </div>
 
-        {/* Service Type Filter Tabs (Specific Services Only - No "All" Tab) */}
+        {/* Service Type Filter Tabs (Horizontal Scrollable Bar) */}
         {showFilterBar && (
-          <div className="flex justify-center gap-2 flex-wrap mb-12">
-            {serviceEntries.map(([key, srv]) => {
-              const meta = SERVICE_META[key] || {
-                bn: srv.service_name || key.replace(/_/g, ' '),
-                en: srv.service_name || key.replace(/_/g, ' '),
-              };
-              const isSelected = selectedService === key;
+          <div className="w-full mb-12">
+            <div className="w-full overflow-x-auto pb-3 pt-1 scroll-smooth [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300 hover:[&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100/80 [&::-webkit-scrollbar-track]:rounded-full">
+              <div className="flex items-center gap-2.5 min-w-max px-2 sm:px-4 mx-auto w-fit">
+                {serviceEntries.map(([key, srv]) => {
+                  const meta = SERVICE_META[key] || {
+                    bn: srv.service_name || key.replace(/_/g, ' '),
+                    en: srv.service_name || key.replace(/_/g, ' '),
+                  };
+                  const isSelected = selectedService === key;
 
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSelectedService(key)}
-                  className={`py-2.5 px-5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-black border-black text-white shadow-sm'
-                      : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-black'
-                  }`}
-                >
-                  <span>{isBn ? meta.bn : meta.en}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {srv.cars.length}
-                  </span>
-                </button>
-              );
-            })}
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedService(key)}
+                      className={`py-2.5 px-5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap cursor-pointer select-none ${
+                        isSelected
+                          ? 'bg-black border-black text-white shadow-sm'
+                          : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-black'
+                      }`}
+                    >
+                      <span>{isBn ? meta.bn : meta.en}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                          isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {srv.cars.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
 
