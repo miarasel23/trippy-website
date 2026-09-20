@@ -11,9 +11,9 @@ export const Footer: React.FC = () => {
   return (
     <footer className="site-footer bg-white border-t border-slate-200 pt-16 pb-8 mt-24 text-slate-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-10 lg:gap-10 mb-12">
-          
+
           {/* Col 1: Brand Bio (Full width on mobile/tablet, 2 cols on desktop) */}
           <div className="col-span-2 lg:col-span-2 order-1">
             <Link href="/" className="inline-flex items-center mb-4 group" aria-label="Trippy Home">
@@ -94,7 +94,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="border-t border-slate-200 pt-8 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} {t.common.brandName} Technologies Bangladesh Ltd. {t.common.allRightsReserved}</p>
+          <p>© {new Date().getFullYear()} Reflex IT Global Solution Ltd. {t.common.allRightsReserved} Trade License No: TRAD/DSCC/201556/005829</p>
           <p className="flex items-center gap-2">
             <span>{t.footer.cities}</span>
           </p>
