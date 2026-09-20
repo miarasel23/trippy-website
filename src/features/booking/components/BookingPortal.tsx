@@ -394,7 +394,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       if (endTs <= startTs) {
         alert(
           isBn
-            ? 'ফেরার সময় অবশ্যই যাত্রার শুরুর সময়ের পরের হতে হবে।'
+            ? 'ফেরার সময় অবশ্যই যাত্রার শুরুর সময়ের পরের হতে হবে।'
             : 'Return date and time must be later than departure time.'
         );
         return;
@@ -404,7 +404,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     const priceSet = selectedCar.price_sets?.[0];
     if (!priceSet) {
       alert(
-        isBn ? 'গাড়ির প্রাইস সেট পাওয়া যায়নি।' : 'Car price set not found.'
+        isBn ? 'গাড়ির প্রাইস সেট পাওয়া যায়নি।' : 'Car price set not found.'
       );
       return;
     }
@@ -418,6 +418,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
 
     const payload = {
       service_name: selectedService,
+      servive_type: selectedService,   // backend uses this typo-field too
       start_datetime: effectiveStartDatetime,
       ...(selectedService === 'RETURN' ? { end_datetime: endDatetime } : {}),
       ...(selectedService === 'HOURLY' ? { hours_booked: hoursBooked || '4' } : {}),
@@ -430,35 +431,62 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       dropoff_location_uuid: validDropoffs,
       price_set_uuid: priceSet.uuid,
       offer_ammount: proposedFare,
+      offer_amount: proposedFare,      // send both spellings
       ...(note.trim() ? { note: note.trim() } : {}),
     };
 
-    const res = await customerTripService.createRentalTrip(payload);
+    let res: { status: boolean; message: string; data?: any };
+    try {
+      res = await customerTripService.createRentalTrip(payload);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      alert(
+        isBn
+          ? `ট্রিপ তৈরি করতে ত্রুটি হয়েছে: ${err?.message || 'নেটওয়ার্ক সমস্যা'}`
+          : `Trip creation error: ${err?.message || 'Network error'}`
+      );
+      return;
+    }
     setIsSubmitting(false);
+
+    // ── Guard: If API returned status:false, show error and stop ──────────────
+    if (!res || res.status === false) {
+      const errMsg = res?.message || (isBn ? 'ট্রিপ তৈরি ব্যর্থ হয়েছে। আবার চেষ্টা করুন।' : 'Trip creation failed. Please try again.');
+      // Log full response for debugging
+      console.error('[Trippy] createRentalTrip failed:', res);
+      alert(errMsg);
+      return;
+    }
 
     const formattedPickup =
       pickupLocations
         .filter((p) => p.address)
         .map((p) => p.address)
-        .join(' → ') || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point');
+        .join(' → ') || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point');
     const formattedDropoff =
-      dropoffLocations[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
+      dropoffLocations[0]?.address || (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
 
     let createdTripUuid = '';
-    if (res && res.status !== false) {
-      if (res.data && typeof res.data === 'object') {
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          createdTripUuid = res.data[0]?.uuid || res.data[0]?.trip_uuid || '';
-        } else {
-          createdTripUuid = res.data.uuid || res.data.trip_uuid || res.data.rental_trip_uuid || '';
-        }
-      }
-      if (!createdTripUuid) {
-        createdTripUuid = (res as any).uuid || (res as any).trip_uuid || '';
+    if (res.data && typeof res.data === 'object') {
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        createdTripUuid = res.data[0]?.uuid || res.data[0]?.trip_uuid || '';
+      } else {
+        createdTripUuid = res.data.uuid || res.data.trip_uuid || res.data.rental_trip_uuid || '';
       }
     }
     if (!createdTripUuid) {
-      createdTripUuid = `trip-${Date.now()}`;
+      createdTripUuid = (res as any).uuid || (res as any).trip_uuid || '';
+    }
+
+    // ── Guard: No UUID returned — trip was not created ─────────────────────
+    if (!createdTripUuid) {
+      console.error('[Trippy] createRentalTrip succeeded but no UUID in response:', res);
+      alert(
+        isBn
+          ? 'ট্রিপ তৈরি হয়েছে, কিন্তু ট্রিপ আইডি পাওয়া যায়নি। অনুগ্রহ করে "আমার ট্রিপস" পেজে চেক করুন।'
+          : 'Trip was created, but no trip ID was returned. Please check "My Trips" page.'
+      );
+      return;
     }
 
     // Clean old trip and date data from localStorage upon new trip creation
@@ -522,6 +550,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       }
     });
   };
+
 
 
   return (
