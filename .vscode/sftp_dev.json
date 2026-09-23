@@ -1,0 +1,10 @@
+{
+  "name": "TRIPPY-BACKEND",
+  "host": "3.209.161.158",
+  "protocol": "sftp",
+  "port": 22,
+  "username": "developer",
+  "password": "Trippy@2379##",
+  "remotePath": "/trippy-backend",
+  "uploadOnSave": false
+}

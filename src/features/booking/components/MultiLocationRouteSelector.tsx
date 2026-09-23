@@ -39,48 +39,7 @@ interface SingleLocationFieldProps {
 
 // Popular locations in Bangladesh for instant 1-click selection on click
 const DEFAULT_POPULAR_LOCATIONS: LocationSearchResult[] = [
-  {
-    uuid: '2b809f83-681d-4bb8-a2be-779dcb64c440',
-    place_id: 'ChIJ3-Bm22XBVTcRf-4xUi7WhZA',
-    address: 'Senpara Porbota, Mirpur 10, Dhaka, Bangladesh',
-    latitude: 23.804553,
-    longitude: 90.3701579,
-  },
-  {
-    uuid: '87fbc635-e85c-4f4e-bc4a-a136ffbab3c6',
-    place_id: 'ChIJJ3cCAADHVTcRnf62vZTOlOs',
-    address: '37 Eastern Rd, Dhaka 1212, Bangladesh',
-    latitude: 23.8103308,
-    longitude: 90.4124933,
-  },
-  {
-    uuid: '2c81229b-2fc4-46e9-b539-448b73c85fd3',
-    place_id: 'ChIJO1Q4uqfHVTcRLteW0krx1ZE',
-    address: 'Gulshan 2 Circle, Dhaka, Bangladesh',
-    latitude: 23.7947536,
-    longitude: 90.4143085,
-  },
-  {
-    uuid: '1bafeb4d-a0bf-44d5-abb6-d0a95f8ef4cf',
-    place_id: 'ChIJh-Ts-wc0VTcRSkHUmZWbBl0',
-    address: 'Barisal Sadar, Barisal, Bangladesh',
-    latitude: 22.7132876,
-    longitude: 90.3496278,
-  },
-  {
-    uuid: 'a8680823-331c-453d-96fa-ca50e1272cb4',
-    place_id: 'ChIJAQAAADA0VTcRkou_foSDILE',
-    address: 'Hazrat Shahjalal International Airport, Dhaka',
-    latitude: 23.84335,
-    longitude: 90.40348,
-  },
-  {
-    uuid: 'c8192301-44ab-4cd2-b7e1-88f1920192aa',
-    place_id: 'ChIJh734898V-TCR89410dks',
-    address: 'Uttara Sector 7, Dhaka, Bangladesh',
-    latitude: 23.8698,
-    longitude: 90.3984,
-  },
+
 ];
 
 const SingleLocationField: React.FC<SingleLocationFieldProps> = ({
@@ -155,11 +114,10 @@ const SingleLocationField: React.FC<SingleLocationFieldProps> = ({
       <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200/90 rounded-2xl p-2.5 sm:p-3 focus-within:border-black focus-within:ring-1 focus-within:ring-black/10 transition-all">
         {/* Type Icon Indicator */}
         <span
-          className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 border ${
-            isPickup
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              : 'bg-red-50 text-red-600 border-red-200'
-          }`}
+          className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 border ${isPickup
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            : 'bg-red-50 text-red-600 border-red-200'
+            }`}
         >
           {isPickup ? (
             <Navigation className="w-3.5 h-3.5" />
@@ -238,8 +196,8 @@ const SingleLocationField: React.FC<SingleLocationFieldProps> = ({
                 ? 'অনুসন্ধান ফলাফল'
                 : 'Search Results'
               : language === 'bn'
-              ? 'জনপ্রিয় লোকেশন নির্বাচন করুন'
-              : 'Popular Locations in Bangladesh'}
+                ? 'জনপ্রিয় লোকেশন নির্বাচন করুন'
+                : 'Popular Locations in Bangladesh'}
           </div>
           {suggestions.map((item, idx) => (
             <button
@@ -409,8 +367,8 @@ export const MultiLocationRouteSelector: React.FC<MultiLocationRouteSelectorProp
                 ? `পিকআপ পয়েন্ট #${activeMapTarget.index + 1} ম্যাপে পরিবর্তন`
                 : `Adjust Pickup Point #${activeMapTarget.index + 1} on Map`
               : isBn
-              ? 'ড্রপঅফ গন্তব্য ম্যাপে পরিবর্তন'
-              : 'Adjust Dropoff Destination on Map'
+                ? 'ড্রপঅফ গন্তব্য ম্যাপে পরিবর্তন'
+                : 'Adjust Dropoff Destination on Map'
           }
           initialLocation={
             activeMapTarget.type === 'pickup'
