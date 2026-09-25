@@ -23,7 +23,7 @@ function getStoredAuthToken(): string | null {
 }
 
 export function getActiveCustomerUuid(): string {
-  if (typeof window === 'undefined') return '3810b347-ab60-4004-891d-81060cf4135c';
+  if (typeof window === 'undefined') return '';
   try {
     const userStr =
       localStorage.getItem('trippy_auth_user') ||
@@ -33,10 +33,7 @@ export function getActiveCustomerUuid(): string {
       if (u?.uuid) return u.uuid;
     }
   } catch {}
-  return (
-    localStorage.getItem('trippy_customer_uuid') ||
-    '3810b347-ab60-4004-891d-81060cf4135c'
-  );
+  return localStorage.getItem('trippy_customer_uuid') || '';
 }
 
 /**
@@ -319,10 +316,13 @@ export const customerTripService = {
     token?: string
   ): Promise<RentalTrip[]> {
     const authToken = token || getStoredAuthToken();
-    const headers: Record<string, string> = {};
-    if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`;
+    // Do not call protected customer trip list endpoint without token or customer UUID (avoids 401 Unauthorized)
+    if (!authToken || !customerUuid) {
+      return [];
     }
+    const headers: Record<string, string> = {
+      Authorization: authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`,
+    };
 
     try {
       const query = `platform=web&language_code=${languageCode}&customer_uuid=${customerUuid}&trip_status=${tripStatus}&action_when=rental_bid_trip_list_for_customer`;
@@ -370,14 +370,14 @@ export const customerTripService = {
   ): Promise<{ status: boolean; data?: RentalTrip | null; message?: string }> {
     const authToken = token || getStoredAuthToken();
     const targetCustomerUuid = customerUuid || getActiveCustomerUuid();
+    // Do not call single trip bids endpoint if unauthenticated or missing trip UUID
+    if (!authToken || !targetCustomerUuid || !tripUuid) {
+      return { status: false, data: null, message: 'Unauthenticated or missing parameters' };
+    }
     const headers: Record<string, string> = {
       Accept: 'application/json',
+      Authorization: authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`,
     };
-    if (authToken) {
-      headers.Authorization = authToken.startsWith('Bearer ')
-        ? authToken
-        : `Bearer ${authToken}`;
-    }
 
     try {
       const query = new URLSearchParams({

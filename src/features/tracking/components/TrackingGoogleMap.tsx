@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { LocationModel } from '@/features/trips/types/customerApi';
 import { useLanguage } from '@/context/LanguageContext';
-import { GOOGLE_MAPS_API_KEY } from '@/shared/config/appUrls';
+import { loadGoogleMapsScript } from '@/shared/lib/googleMapsLoader';
 import {
   Navigation,
   MapPin,
@@ -54,40 +54,6 @@ interface TrackingGoogleMapProps {
 
 const DEFAULT_CENTER = { lat: 23.8014, lng: 90.3763 }; // Senpara Parbata Lane, Mirpur 10, Dhaka
 
-let isGoogleScriptLoaded = false;
-let isGoogleScriptLoading = false;
-const scriptLoadCallbacks: Array<() => void> = [];
-
-function loadGoogleMapsScript(callback: () => void) {
-  if (typeof window === 'undefined') return;
-
-  if (window.google && window.google.maps) {
-    callback();
-    return;
-  }
-
-  scriptLoadCallbacks.push(callback);
-
-  if (isGoogleScriptLoading) return;
-  isGoogleScriptLoading = true;
-
-  const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,geometry&loading=async`;
-  script.async = true;
-  script.defer = true;
-  script.onload = () => {
-    isGoogleScriptLoaded = true;
-    isGoogleScriptLoading = false;
-    scriptLoadCallbacks.forEach((cb) => cb());
-    scriptLoadCallbacks.length = 0;
-  };
-  script.onerror = () => {
-    console.error('Failed to load Google Maps script');
-    isGoogleScriptLoading = false;
-  };
-  document.head.appendChild(script);
-}
-
 export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
   pickupLocation,
   dropoffLocation,
@@ -119,7 +85,7 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
-  const directionsRendererRef = useRef<any>(null);
+  const routePolylineRef = useRef<any>(null);
   const driverMarkerRef = useRef<any>(null);
   const riderMarkerRef = useRef<any>(null);
   const pickupMarkerRef = useRef<any>(null);
@@ -146,6 +112,7 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
   useEffect(() => {
     loadGoogleMapsScript(() => {
       if (!mapContainerRef.current || mapInstanceRef.current) return;
+      if (typeof (window as any).google?.maps?.Map !== 'function') return;
 
       try {
         const initialCenter = driverLocation
@@ -155,7 +122,7 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
         const map = new window.google.maps.Map(mapContainerRef.current, {
           center: initialCenter,
           zoom: 14,
-          mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+          mapTypeId: (window.google?.maps?.MapTypeId?.ROADMAP || 'roadmap') as any,
           disableDefaultUI: true,
           zoomControl: false,
           streetViewControl: false,
@@ -183,16 +150,14 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
 
         mapInstanceRef.current = map;
 
-        const directionsRenderer = new window.google.maps.DirectionsRenderer({
-          map,
-          suppressMarkers: true,
-          polylineOptions: {
-            strokeColor: '#059669',
-            strokeWeight: 6,
-            strokeOpacity: 0.85,
-          },
+        // Modern Route Polyline (replaces deprecated DirectionsRenderer)
+        const routePolyline = new window.google.maps.Polyline({
+          map: null,
+          strokeColor: '#059669',
+          strokeWeight: 6,
+          strokeOpacity: 0.85,
         });
-        directionsRendererRef.current = directionsRenderer;
+        routePolylineRef.current = routePolyline;
 
         setMapLoaded(true);
       } catch (err) {
@@ -413,11 +378,10 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
       }
     }
 
-    // E. Directions Route from Pickup to Dropoff - ONLY recalculate when route actually changes
+    // E. Route from Pickup to Dropoff - ONLY recalculate when route actually changes
     if (
       pickupLocation?.address &&
       dropoffLocation?.address &&
-      directionsRendererRef.current &&
       routeChanged
     ) {
       lastRouteKeyRef.current = currentRouteKey;
@@ -426,11 +390,14 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
         {
           origin: pPos,
           destination: dPos,
-          travelMode: window.google.maps.TravelMode.DRIVING,
+          travelMode: (window.google?.maps?.TravelMode?.DRIVING || 'DRIVING') as any,
         },
         (result: any, status: any) => {
-          if (status === window.google.maps.DirectionsStatus.OK) {
-            directionsRendererRef.current.setDirections(result);
+          if (status === 'OK' || status === window.google?.maps?.DirectionsStatus?.OK) {
+            if (result?.routes?.[0]?.overview_path) {
+              routePolylineRef.current?.setPath(result.routes[0].overview_path);
+              routePolylineRef.current?.setMap(map);
+            }
           }
         }
       );

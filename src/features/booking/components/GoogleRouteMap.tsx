@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { LocationSearchResult } from '@/features/trips/types/customerApi';
 import { useLanguage } from '@/context/LanguageContext';
 import { MapPin, Navigation, Route, Sparkles, ZoomIn, ZoomOut, Locate } from 'lucide-react';
-import { GOOGLE_MAPS_API_KEY } from '@/shared/config/appUrls';
+import { loadGoogleMapsScript } from '@/shared/lib/googleMapsLoader';
 
 declare global {
   interface Window {
@@ -27,41 +27,6 @@ interface GoogleRouteMapProps {
 // Bangladesh center fallback
 const DEFAULT_CENTER = { lat: 23.8103, lng: 90.4125 }; // Dhaka
 
-// Global script loading tracker
-let isGoogleScriptLoaded = false;
-let isGoogleScriptLoading = false;
-const scriptLoadCallbacks: Array<() => void> = [];
-
-function loadGoogleMapsScript(callback: () => void) {
-  if (typeof window === 'undefined') return;
-
-  if (window.google && window.google.maps) {
-    callback();
-    return;
-  }
-
-  scriptLoadCallbacks.push(callback);
-
-  if (isGoogleScriptLoading) return;
-  isGoogleScriptLoading = true;
-
-  const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,geometry&loading=async`;
-  script.async = true;
-  script.defer = true;
-  script.onload = () => {
-    isGoogleScriptLoaded = true;
-    isGoogleScriptLoading = false;
-    scriptLoadCallbacks.forEach((cb) => cb());
-    scriptLoadCallbacks.length = 0;
-  };
-  script.onerror = () => {
-    console.error('Failed to load Google Maps script');
-    isGoogleScriptLoading = false;
-  };
-  document.head.appendChild(script);
-}
-
 export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
   pickupLocations,
   dropoffLocations,
@@ -75,7 +40,7 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
-  const directionsRendererRef = useRef<any>(null);
+  const routePolylineRef = useRef<any>(null);
   const fallbackPolylineRef = useRef<any>(null);
 
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -88,11 +53,12 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
   useEffect(() => {
     loadGoogleMapsScript(() => {
       if (!mapContainerRef.current || mapInstanceRef.current) return;
+      if (typeof (window as any).google?.maps?.Map !== 'function') return;
 
       const map = new window.google.maps.Map(mapContainerRef.current, {
         center: DEFAULT_CENTER,
         zoom: 12,
-        mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+        mapTypeId: (window.google?.maps?.MapTypeId?.ROADMAP || 'roadmap') as any,
         disableDefaultUI: true, // Clean custom Trippy UI
         zoomControl: false,
         streetViewControl: false,
@@ -115,17 +81,14 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
 
       mapInstanceRef.current = map;
 
-      // Directions renderer
-      const renderer = new window.google.maps.DirectionsRenderer({
-        map,
-        suppressMarkers: true, // We render custom Trippy branded markers
-        polylineOptions: {
-          strokeColor: '#059669', // Trippy Emerald
-          strokeWeight: 5,
-          strokeOpacity: 0.85,
-        },
+      // Modern Route Polyline (replaces deprecated DirectionsRenderer)
+      const routePolyline = new window.google.maps.Polyline({
+        map: null,
+        strokeColor: '#059669', // Trippy Emerald
+        strokeWeight: 5,
+        strokeOpacity: 0.85,
       });
-      directionsRendererRef.current = renderer;
+      routePolylineRef.current = routePolyline;
 
       // Fallback polyline if Directions API unavailable
       const fallbackPolyline = new window.google.maps.Polyline({
@@ -202,7 +165,7 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
         title: `পিকআপ: ${loc.address}`,
         draggable: true,
         icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
+          path: window.google?.maps?.SymbolPath?.CIRCLE ?? 0,
           scale: 10,
           fillColor: '#10b981', // Emerald green
           fillOpacity: 1,
@@ -272,7 +235,7 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
         title: isBn ? `ড্রপঅফ: ${loc.address}` : `Dropoff: ${loc.address}`,
         draggable: true,
         icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
+          path: window.google?.maps?.SymbolPath?.CIRCLE ?? 0,
           scale: 10,
           fillColor: '#ef4444', // Red
           fillOpacity: 1,
@@ -359,13 +322,20 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
           destination,
           waypoints,
           optimizeWaypoints: false,
-          travelMode: window.google.maps.TravelMode.DRIVING,
+          travelMode: (window.google?.maps?.TravelMode?.DRIVING || 'DRIVING') as any,
         },
         (result: any, status: any) => {
-          if (status === window.google.maps.DirectionsStatus.OK && result) {
-            directionsRendererRef.current?.setDirections(result);
+          if ((status === 'OK' || status === window.google?.maps?.DirectionsStatus?.OK) && result) {
+            // Modern direct route polyline rendering (no deprecated DirectionsRenderer)
+            if (result.routes?.[0]?.overview_path) {
+              routePolylineRef.current?.setPath(result.routes[0].overview_path);
+              routePolylineRef.current?.setMap(map);
+            }
             if (fallbackPolylineRef.current) {
               fallbackPolylineRef.current.setMap(null);
+            }
+            if (result.routes?.[0]?.bounds) {
+              map.fitBounds(result.routes[0].bounds, { top: 50, bottom: 50, left: 50, right: 50 });
             }
 
             // Calculate total distance and duration from route legs
@@ -434,20 +404,20 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
       // Only pickup exists
       map.setCenter({ lat: validPickups[0].latitude, lng: validPickups[0].longitude });
       map.setZoom(14);
-      directionsRendererRef.current?.set('directions', null);
+      routePolylineRef.current?.setMap(null);
       if (fallbackPolylineRef.current) fallbackPolylineRef.current.setMap(null);
       setRouteInfo({ distanceKm: null, durationText: null });
     } else if (validDropoffs.length > 0) {
       // Only dropoff exists
       map.setCenter({ lat: validDropoffs[0].latitude, lng: validDropoffs[0].longitude });
       map.setZoom(14);
-      directionsRendererRef.current?.set('directions', null);
+      routePolylineRef.current?.setMap(null);
       if (fallbackPolylineRef.current) fallbackPolylineRef.current.setMap(null);
       setRouteInfo({ distanceKm: null, durationText: null });
     } else {
       map.setCenter(DEFAULT_CENTER);
       map.setZoom(12);
-      directionsRendererRef.current?.set('directions', null);
+      routePolylineRef.current?.setMap(null);
       if (fallbackPolylineRef.current) fallbackPolylineRef.current.setMap(null);
       setRouteInfo({ distanceKm: null, durationText: null });
     }

@@ -201,13 +201,21 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
    * ONLY updates React state and re-renders if new data is found or data is lost.
    */
   const refreshActiveTrip = useCallback(async (): Promise<RentalTrip | null> => {
+    const effectiveToken =
+      token || (typeof window !== 'undefined' ? localStorage.getItem('trippy_auth_token') : null);
+
+    // Skip network request completely if not logged in to prevent 401 Unauthorized
+    if (!effectiveToken || !customerUuid) {
+      return null;
+    }
+
     try {
       // 1. Query /api/v1/rental-trip/rental-bid-trip-list_for_customer
       const trips = await customerTripService.fetchBids(
         customerUuid,
         language,
         'REQUESTED',
-        token || undefined
+        effectiveToken
       );
 
       let nextTrip: RentalTrip | null = null;
@@ -245,7 +253,7 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
           activeTripRef.current.uuid,
           language,
           'ALL',
-          token || undefined
+          effectiveToken
         );
         if (singleRes.status && singleRes.data) {
           const sTrip = singleRes.data;
@@ -326,6 +334,14 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   // Initial load + gentle fallback check (60s if active trip is handled by Socket.IO, 25s if idle)
   useEffect(() => {
     let isMounted = true;
+    const effectiveToken =
+      token || (typeof window !== 'undefined' ? localStorage.getItem('trippy_auth_token') : null);
+
+    // If not logged in, do not query or poll for customer active trips (prevents 401 Unauthorized)
+    if (!effectiveToken || !customerUuid) {
+      setIsLoading(false);
+      return;
+    }
 
     const check = async () => {
       if (!isMounted) return;
@@ -350,7 +366,7 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [refreshActiveTrip]);
+  }, [refreshActiveTrip, token, customerUuid]);
 
   const openRadarModal = useCallback(() => {
     setIsRadarModalOpen(true);
