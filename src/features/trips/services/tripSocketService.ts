@@ -124,15 +124,6 @@ export function getTripSocket(options?: TripSocketOptions): Socket {
     lastEventSignature = signature;
     lastEventTimestamp = now;
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[Socket.IO] Received rental-bid-trip-single for trip: ${trip.uuid}`, {
-        status: trip.trip_status,
-        bidsCount: trip.drivers?.length ?? 0,
-        seenCount: trip.seen_driver_count ?? trip.seen_drivers?.length ?? 0,
-        fare: trip.offer_amount,
-      });
-    }
-
     const listeners = activeTripSubscriptions.get(trip.uuid);
     if (listeners && listeners.size > 0) {
       listeners.forEach((callback) => {

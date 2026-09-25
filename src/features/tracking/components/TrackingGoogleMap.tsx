@@ -3,7 +3,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { LocationModel } from '@/features/trips/types/customerApi';
 import { useLanguage } from '@/context/LanguageContext';
-import { loadGoogleMapsScript } from '@/shared/lib/googleMapsLoader';
+import {
+  loadGoogleMapsScript,
+  createMapMarker,
+  setMarkerPosition,
+  removeMarker,
+} from '@/shared/lib/googleMapsLoader';
 import {
   Navigation,
   MapPin,
@@ -122,6 +127,7 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
         const map = new window.google.maps.Map(mapContainerRef.current, {
           center: initialCenter,
           zoom: 14,
+          mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || 'DEMO_MAP_ID',
           mapTypeId: (window.google?.maps?.MapTypeId?.ROADMAP || 'roadmap') as any,
           disableDefaultUI: true,
           zoomControl: false,
@@ -129,23 +135,6 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
           mapTypeControl: false,
           fullscreenControl: false,
           gestureHandling: 'greedy',
-          styles: [
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }],
-            },
-            {
-              featureType: 'transit',
-              elementType: 'labels.icon',
-              stylers: [{ visibility: 'simplified' }],
-            },
-            {
-              featureType: 'road',
-              elementType: 'geometry',
-              stylers: [{ lightness: 20 }],
-            },
-          ],
         });
 
         mapInstanceRef.current = map;
@@ -191,9 +180,9 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
       anchor: new window.google.maps.Point(19, 48),
     });
 
-    // Helper: Create Top-Down Vehicle Marker SVG (Car or Motorcycle matching user design)
-    const createVehicleIcon = (isBike: boolean) => {
-      const svgContent = isBike
+    // Helper: Get vehicle SVG string
+    const getVehicleSvg = (isBike: boolean) =>
+      isBike
         ? `
         <svg xmlns="http://www.w3.org/2000/svg" width="48" height="64" viewBox="0 0 48 64">
           <defs>
@@ -202,38 +191,25 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
             </filter>
           </defs>
           <g filter="url(#bikeShadow)">
-            <!-- Front Wheel -->
             <rect x="21" y="4" width="6" height="14" rx="3" fill="#0f172a"/>
-            <!-- Front Fender (Red) -->
             <path d="M20 13 C20 9.5, 28 9.5, 28 13 L27 18 L21 18 Z" fill="#ef4444"/>
-            <!-- Yellow Headlight -->
             <circle cx="24" cy="9.5" r="2.5" fill="#fbbf24"/>
-            <!-- Handlebars & Grips -->
             <rect x="8" y="17" width="32" height="3.5" rx="1.75" fill="#334155"/>
             <rect x="7" y="16" width="5" height="5.5" rx="1.5" fill="#0f172a"/>
             <rect x="36" y="16" width="5" height="5.5" rx="1.5" fill="#0f172a"/>
-            <!-- Side Mirrors -->
             <circle cx="6" cy="15" r="2" fill="#94a3b8"/>
             <circle cx="42" cy="15" r="2" fill="#94a3b8"/>
-            <!-- Dual Exhaust Pipes -->
             <rect x="15" y="42" width="3.5" height="11" rx="1.5" fill="#64748b"/>
             <rect x="29.5" y="42" width="3.5" height="11" rx="1.5" fill="#64748b"/>
-            <!-- Rear Wheel -->
             <rect x="21" y="46" width="6" height="15" rx="3" fill="#0f172a"/>
-            <!-- Green Bike Body / Fuel Tank -->
             <path d="M19 19 C16 23, 16 31, 18 34 C19 35, 29 35, 30 34 C32 31, 32 23, 29 19 Z" fill="#22c55e" stroke="#15803d" stroke-width="1.5"/>
             <circle cx="24" cy="23" r="2" fill="#e2e8f0"/>
-            <!-- Rider Shoulders / Jacket -->
             <path d="M13 24 C14 21, 20 19, 24 19 C28 19, 34 21, 35 24 C36 29, 34 35, 31 37 C29 38, 19 38, 17 37 C14 35, 12 29, 13 24 Z" fill="#1e293b"/>
-            <!-- Rider Helmet (Red with Dark Visor) -->
             <circle cx="24" cy="27" r="7" fill="#ef4444" stroke="#991b1b" stroke-width="1"/>
             <path d="M19 25 C19 22, 29 22, 29 25 C29 27, 19 27, 19 25 Z" fill="#0f172a"/>
-            <!-- Seat Panel (Silver Gray) -->
             <rect x="20" y="36" width="8" height="11" rx="2.5" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1"/>
-            <!-- Blue GPS Location Dot & Heading Arrow -->
             <circle cx="24" cy="41.5" r="5" fill="#2563eb" stroke="#ffffff" stroke-width="1.5"/>
             <polygon points="18,36.5 21,39.5 19,40.5" fill="#3b82f6"/>
-            <!-- Rear Taillight (Red) -->
             <rect x="21.5" y="48" width="5" height="3" rx="1.5" fill="#ef4444"/>
           </g>
         </svg>`
@@ -245,41 +221,36 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
             </filter>
           </defs>
           <g filter="url(#carShadow)">
-            <!-- 4 Black Wheels / Tires -->
             <rect x="4" y="11" width="6" height="14" rx="2.5" fill="#0f172a"/>
             <rect x="38" y="11" width="6" height="14" rx="2.5" fill="#0f172a"/>
             <rect x="4" y="39" width="6" height="14" rx="2.5" fill="#0f172a"/>
             <rect x="38" y="39" width="6" height="14" rx="2.5" fill="#0f172a"/>
-
-            <!-- Main Green Car Body -->
             <path d="M12 7 C12 5, 36 5, 36 7 C40 9, 41 21, 41 34 C41 47, 40 57, 36 59 C36 61, 12 61, 12 59 C8 57, 7 47, 7 34 C7 21, 8 9, 12 7 Z" fill="#22c55e" stroke="#15803d" stroke-width="1.5"/>
-
-            <!-- Red Front Hood / Cab (Winged top hood matching image) -->
             <path d="M10 13 C10 7, 14 4.5, 24 4.5 C34 4.5, 38 7, 38 13 C38 17.5, 36 21, 35 22 C33 22, 15 22, 13 22 C12 21, 10 17.5, 10 13 Z" fill="#ef4444"/>
-
-            <!-- Yellow Headlights -->
             <circle cx="13.5" cy="5" r="2.2" fill="#fbbf24"/>
             <circle cx="34.5" cy="5" r="2.2" fill="#fbbf24"/>
-
-            <!-- Curved Front Windshield -->
             <path d="M13 20 C13 15, 35 15, 35 20 C35 22, 13 22, 13 20 Z" fill="#0f172a"/>
-
-            <!-- Center Roof (Light Silver Gray Panel) -->
             <rect x="13" y="21" width="22" height="23" rx="3.5" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1"/>
-
-            <!-- Blue GPS Location Dot with Direction Arrow (Matching user design) -->
             <circle cx="24" cy="32.5" r="6" fill="#2563eb" stroke="#ffffff" stroke-width="1.5"/>
             <polygon points="17,25 21,29 18,30" fill="#3b82f6"/>
-
-            <!-- Curved Rear Windshield -->
             <path d="M13 44 C13 48, 35 48, 35 44 C35 43, 13 43, 13 44 Z" fill="#0f172a"/>
-
-            <!-- Rear Taillights (Red) -->
             <rect x="11.5" y="58" width="5" height="2.5" rx="1" fill="#ef4444"/>
             <rect x="31.5" y="58" width="5" height="2.5" rx="1" fill="#ef4444"/>
           </g>
         </svg>`;
 
+    const createVehicleElement = (isBike: boolean) => {
+      const div = document.createElement('div');
+      div.style.width = '48px';
+      div.style.height = '64px';
+      div.style.cursor = 'pointer';
+      div.innerHTML = getVehicleSvg(isBike).trim();
+      return div;
+    };
+
+    // Helper: Create Top-Down Vehicle Marker SVG for legacy fallback
+    const createVehicleIcon = (isBike: boolean) => {
+      const svgContent = getVehicleSvg(isBike);
       return {
         url: `data:image/svg+xml;utf-8,${encodeURIComponent(svgContent.trim())}`,
         scaledSize: new window.google.maps.Size(48, 64),
@@ -300,37 +271,47 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
 
     // A. Pickup Marker
     if (!pickupMarkerRef.current) {
-      pickupMarkerRef.current = new window.google.maps.Marker({
+      pickupMarkerRef.current = createMapMarker({
         position: pPos,
         map,
         title: pickupLocation?.address || 'Pickup Point',
-        icon: createPinIcon('#059669', 'A'),
+        pinOptions: {
+          background: '#059669',
+          borderColor: '#ffffff',
+          glyphColor: '#ffffff',
+          glyph: 'A',
+        },
+        legacyIcon: createPinIcon('#059669', 'A'),
       });
     } else if (routeChanged) {
-      pickupMarkerRef.current.setPosition(pPos);
-      pickupMarkerRef.current.setTitle(pickupLocation?.address || 'Pickup Point');
+      setMarkerPosition(pickupMarkerRef.current, pPos);
     }
     bounds.extend(pPos);
     hasPoints = true;
 
     // B. Dropoff Marker
     if (!dropoffMarkerRef.current) {
-      dropoffMarkerRef.current = new window.google.maps.Marker({
+      dropoffMarkerRef.current = createMapMarker({
         position: dPos,
         map,
         title: dropoffLocation?.address || 'Dropoff Point',
-        icon: createPinIcon('#dc2626', 'B'),
+        pinOptions: {
+          background: '#dc2626',
+          borderColor: '#ffffff',
+          glyphColor: '#ffffff',
+          glyph: 'B',
+        },
+        legacyIcon: createPinIcon('#dc2626', 'B'),
       });
     } else if (routeChanged) {
-      dropoffMarkerRef.current.setPosition(dPos);
-      dropoffMarkerRef.current.setTitle(dropoffLocation?.address || 'Dropoff Point');
+      setMarkerPosition(dropoffMarkerRef.current, dPos);
     }
     bounds.extend(dPos);
     hasPoints = true;
 
     // C. Person / Rider Location Marker - Removed from Google Map as requested
     if (riderMarkerRef.current) {
-      riderMarkerRef.current.setMap(null);
+      removeMarker(riderMarkerRef.current);
       riderMarkerRef.current = null;
       lastRiderPosRef.current = null;
     }
@@ -350,19 +331,24 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
 
       if (driverMarkerRef.current) {
         if (posChanged) {
-          driverMarkerRef.current.setPosition(drvPos);
+          setMarkerPosition(driverMarkerRef.current, drvPos);
           lastDriverPosRef.current = { lat: newLat, lng: newLng };
         }
         if (bikeChanged) {
-          driverMarkerRef.current.setIcon(createVehicleIcon(isMotorcycle));
+          if ('content' in driverMarkerRef.current) {
+            driverMarkerRef.current.content = createVehicleElement(isMotorcycle);
+          } else if (typeof driverMarkerRef.current.setIcon === 'function') {
+            driverMarkerRef.current.setIcon(createVehicleIcon(isMotorcycle));
+          }
           lastIsBikeRef.current = isMotorcycle;
         }
       } else {
-        driverMarkerRef.current = new window.google.maps.Marker({
+        driverMarkerRef.current = createMapMarker({
           position: drvPos,
           map,
           title: `${driverName} (${carPlate})`,
-          icon: createVehicleIcon(isMotorcycle),
+          content: createVehicleElement(isMotorcycle),
+          legacyIcon: createVehicleIcon(isMotorcycle),
           zIndex: 999,
         });
         lastDriverPosRef.current = { lat: newLat, lng: newLng };
@@ -372,7 +358,7 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
     } else {
       // Remove driver marker when status is ACCEPTED (driver location not shown yet)
       if (driverMarkerRef.current) {
-        driverMarkerRef.current.setMap(null);
+        removeMarker(driverMarkerRef.current);
         driverMarkerRef.current = null;
         lastDriverPosRef.current = null;
       }

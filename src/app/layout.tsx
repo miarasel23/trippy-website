@@ -10,6 +10,7 @@ import { LoginModal } from '@/features/auth/components/LoginModal';
 import { ActiveTripProvider } from '@/features/trips/context/ActiveTripContext';
 import { ActiveTripGlobalOverlay } from '@/features/trips/components/ActiveTripGlobalOverlay';
 import { AdminSupportChat } from '@/features/chat/components/AdminSupportChat';
+import { ConsoleFilter } from '@/shared/components/common/ConsoleFilter';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -82,6 +83,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable} ${hindSiliguri.variable}`}>
       <body className="bg-white text-slate-900 font-body min-h-screen flex flex-col antialiased">
+        <ConsoleFilter />
         <LanguageProvider>
           <ReduxProvider>
             <ActiveTripProvider>

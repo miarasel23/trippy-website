@@ -4,7 +4,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { LocationSearchResult } from '@/features/trips/types/customerApi';
 import { useLanguage } from '@/context/LanguageContext';
 import { MapPin, Navigation, Route, Sparkles, ZoomIn, ZoomOut, Locate } from 'lucide-react';
-import { loadGoogleMapsScript } from '@/shared/lib/googleMapsLoader';
+import {
+  loadGoogleMapsScript,
+  createMapMarker,
+  removeMarker,
+  openMarkerInfoWindow,
+} from '@/shared/lib/googleMapsLoader';
 
 declare global {
   interface Window {
@@ -58,6 +63,7 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
       const map = new window.google.maps.Map(mapContainerRef.current, {
         center: DEFAULT_CENTER,
         zoom: 12,
+        mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || 'DEMO_MAP_ID',
         mapTypeId: (window.google?.maps?.MapTypeId?.ROADMAP || 'roadmap') as any,
         disableDefaultUI: true, // Clean custom Trippy UI
         zoomControl: false,
@@ -65,18 +71,6 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
         mapTypeControl: false,
         fullscreenControl: false,
         gestureHandling: 'greedy',
-        styles: [
-          {
-            featureType: 'poi',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }],
-          },
-          {
-            featureType: 'transit',
-            elementType: 'labels.icon',
-            stylers: [{ visibility: 'simplified' }],
-          },
-        ],
       });
 
       mapInstanceRef.current = map;
@@ -133,7 +127,7 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
 
   // 2. Clear existing markers
   const clearMarkers = useCallback(() => {
-    markersRef.current.forEach((marker) => marker.setMap(null));
+    markersRef.current.forEach((marker) => removeMarker(marker));
     markersRef.current = [];
   }, []);
 
@@ -159,50 +153,6 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
       bounds.extend(position);
 
       const labelText = validPickups.length > 1 ? `P${idx + 1}` : 'P';
-      const marker = new window.google.maps.Marker({
-        position,
-        map,
-        title: `পিকআপ: ${loc.address}`,
-        draggable: true,
-        icon: {
-          path: window.google?.maps?.SymbolPath?.CIRCLE ?? 0,
-          scale: 10,
-          fillColor: '#10b981', // Emerald green
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2.5,
-        },
-        label: {
-          text: labelText,
-          color: '#ffffff',
-          fontWeight: 'bold',
-          fontSize: '11px',
-        },
-      });
-
-      // Drag marker to adjust location
-      marker.addListener('dragend', (e: any) => {
-        const lat = e.latLng.lat();
-        const lng = e.latLng.lng();
-        const geocoder = new window.google.maps.Geocoder();
-        geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
-          let address = loc.address;
-          let placeId = loc.place_id || '';
-          if (status === 'OK' && results?.[0]) {
-            address = results[0].formatted_address;
-            placeId = results[0].place_id;
-          }
-          onMapLocationSelect?.('pickup', idx, {
-            ...loc,
-            address,
-            place_id: placeId,
-            latitude: lat,
-            longitude: lng,
-          });
-        });
-      });
-
-      // Info Window
       const infoWindow = new window.google.maps.InfoWindow({
         content: `
           <div style="font-family: inherit; padding: 4px 6px; max-width: 200px;">
@@ -218,7 +168,48 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
           </div>
         `,
       });
-      marker.addListener('click', () => infoWindow.open(map, marker));
+
+      const marker = createMapMarker({
+        map,
+        position,
+        title: `পিকআপ: ${loc.address}`,
+        draggable: true,
+        pinOptions: {
+          background: '#10b981',
+          borderColor: '#ffffff',
+          glyphColor: '#ffffff',
+          glyph: labelText,
+        },
+        legacyIcon: {
+          path: window.google?.maps?.SymbolPath?.CIRCLE ?? 0,
+          scale: 10,
+          fillColor: '#10b981',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2.5,
+        },
+        onDragEnd: (lat: number, lng: number) => {
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+            let address = loc.address;
+            let placeId = loc.place_id || '';
+            if (status === 'OK' && results?.[0]) {
+              address = results[0].formatted_address;
+              placeId = results[0].place_id;
+            }
+            onMapLocationSelect?.('pickup', idx, {
+              ...loc,
+              address,
+              place_id: placeId,
+              latitude: lat,
+              longitude: lng,
+            });
+          });
+        },
+        onClick: () => {
+          openMarkerInfoWindow(infoWindow, map, marker);
+        },
+      });
 
       markersRef.current.push(marker);
     });
@@ -228,48 +219,6 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
       const loc = validDropoffs[0];
       const position = { lat: loc.latitude, lng: loc.longitude };
       bounds.extend(position);
-
-      const marker = new window.google.maps.Marker({
-        position,
-        map,
-        title: isBn ? `ড্রপঅফ: ${loc.address}` : `Dropoff: ${loc.address}`,
-        draggable: true,
-        icon: {
-          path: window.google?.maps?.SymbolPath?.CIRCLE ?? 0,
-          scale: 10,
-          fillColor: '#ef4444', // Red
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2.5,
-        },
-        label: {
-          text: 'D',
-          color: '#ffffff',
-          fontWeight: 'bold',
-          fontSize: '11px',
-        },
-      });
-
-      marker.addListener('dragend', (e: any) => {
-        const lat = e.latLng.lat();
-        const lng = e.latLng.lng();
-        const geocoder = new window.google.maps.Geocoder();
-        geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
-          let address = loc.address;
-          let placeId = loc.place_id || '';
-          if (status === 'OK' && results?.[0]) {
-            address = results[0].formatted_address;
-            placeId = results[0].place_id;
-          }
-          onMapLocationSelect?.('dropoff', 0, {
-            ...loc,
-            address,
-            place_id: placeId,
-            latitude: lat,
-            longitude: lng,
-          });
-        });
-      });
 
       const infoWindow = new window.google.maps.InfoWindow({
         content: `
@@ -286,7 +235,48 @@ export const GoogleRouteMap: React.FC<GoogleRouteMapProps> = ({
           </div>
         `,
       });
-      marker.addListener('click', () => infoWindow.open(map, marker));
+
+      const marker = createMapMarker({
+        map,
+        position,
+        title: isBn ? `ড্রপঅফ: ${loc.address}` : `Dropoff: ${loc.address}`,
+        draggable: true,
+        pinOptions: {
+          background: '#ef4444',
+          borderColor: '#ffffff',
+          glyphColor: '#ffffff',
+          glyph: 'D',
+        },
+        legacyIcon: {
+          path: window.google?.maps?.SymbolPath?.CIRCLE ?? 0,
+          scale: 10,
+          fillColor: '#ef4444',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2.5,
+        },
+        onDragEnd: (lat: number, lng: number) => {
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+            let address = loc.address;
+            let placeId = loc.place_id || '';
+            if (status === 'OK' && results?.[0]) {
+              address = results[0].formatted_address;
+              placeId = results[0].place_id;
+            }
+            onMapLocationSelect?.('dropoff', 0, {
+              ...loc,
+              address,
+              place_id: placeId,
+              latitude: lat,
+              longitude: lng,
+            });
+          });
+        },
+        onClick: () => {
+          openMarkerInfoWindow(infoWindow, map, marker);
+        },
+      });
 
       markersRef.current.push(marker);
     }
