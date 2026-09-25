@@ -45,6 +45,7 @@ import {
   RentalTrip,
   RentalDriverBid,
   DriverTrackingRecord,
+  LocationModel,
 } from '@/features/trips/types/customerApi';
 import { TripReviewModal } from '@/features/bidding/components/TripReviewModal';
 import { CarPhotoGalleryModal } from '@/features/bidding/components/CarPhotoGalleryModal';
@@ -52,48 +53,177 @@ import { TrackingGoogleMap } from '@/features/tracking/components/TrackingGoogle
 import { formatTripServiceType } from '@/shared/utils/serviceFormat';
 import { clearAllTripRelatedStorage, markTripReviewed, isTripReviewed } from '@/shared/utils/tripStorage';
 
-// Default trip fallback structure when active trip is loading or not yet cached
-const DEFAULT_API_TRIP: RentalTrip = {
-  id: 0,
-  uuid: '',
-  accepted_bid_uuid: '',
-  accepted_driver: {
-    rent_bid_uuid: '',
-    bid_amount: 0,
-    total_amount: 0,
-    insurance_charge_amount: 0,
-    customer_discount_amount: 0,
-    driver_uuid: '',
-    name: 'Driver',
-    email: '',
-    profile_picture: '',
-    country_code: 'BD',
-    is_active: 'ACTIVE',
-    phone: '',
-    bid_status: 'ACCEPTED',
-    has_bid: true,
-    review_status: false,
-    total_completed_trips: 0,
-    average_rating: 5.0,
-    rating_list: [],
-    car_photos: [],
-    car_reg_number: '',
-  },
-  total_bids: 0,
-  seen_driver_count: 0,
-  service_name: '',
-  payment_method: 'CASH',
-  start_datetime: '',
-  trip_status: 'ACCEPTED',
-  pickup_locations: [],
-  dropoff_locations: [],
-  drivers: [],
-  car_category: {
-    uuid: '',
-    car_type: '',
-    set_capacity: 4,
-    car_avatar: '',
-  },
+// ── SKELETON SHIMMER LOADER COMPONENT ──────────────────────────────────────────
+const TrackingSkeleton: React.FC<{ isBn: boolean }> = ({ isBn }) => {
+  return (
+    <div className="py-8 bg-slate-50/80 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Top Header Bar Shimmer */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <div className="h-5 w-28 rounded-full shimmer-effect" />
+              <div className="h-5 w-24 rounded-full shimmer-effect" />
+              <div className="h-4 w-20 rounded-md shimmer-effect" />
+            </div>
+            <div className="h-8 w-64 sm:w-80 rounded-2xl shimmer-effect" />
+            <div className="h-4 w-44 sm:w-60 rounded-lg shimmer-effect" />
+          </div>
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-36 rounded-2xl shimmer-effect" />
+            <div className="h-10 w-24 rounded-2xl shimmer-effect" />
+          </div>
+        </div>
+
+        {/* Status Stepper Skeleton */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <div className="w-8 h-8 rounded-xl shimmer-effect shrink-0" />
+                <div className="space-y-1.5 flex-1">
+                  <div className="h-3 w-16 rounded shimmer-effect" />
+                  <div className="h-2.5 w-24 rounded shimmer-effect" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Grid: Left Column (Driver & Route) + Right Column (Map Viewport) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column (4 cols) */}
+          <div className="lg:col-span-4 space-y-5">
+            {/* Driver Profile Card Skeleton */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-14 h-14 rounded-2xl shimmer-effect shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-4 w-32 rounded shimmer-effect" />
+                  <div className="h-3 w-20 rounded shimmer-effect" />
+                </div>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="h-2.5 w-16 rounded shimmer-effect" />
+                  <div className="h-3.5 w-24 rounded shimmer-effect" />
+                </div>
+                <div className="h-6 w-20 rounded-lg shimmer-effect" />
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="h-2.5 w-16 rounded shimmer-effect" />
+                  <div className="h-3 w-20 rounded shimmer-effect" />
+                </div>
+                <div className="h-6 w-24 rounded-lg shimmer-effect" />
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="h-11 rounded-2xl shimmer-effect" />
+                <div className="h-11 rounded-2xl shimmer-effect" />
+              </div>
+            </div>
+
+            {/* Route Locations Card Skeleton */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="h-3.5 w-28 rounded shimmer-effect" />
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-3 w-16 rounded shimmer-effect" />
+                    <div className="h-3 w-full rounded shimmer-effect" />
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-red-100 shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-3 w-16 rounded shimmer-effect" />
+                    <div className="h-3 w-full rounded shimmer-effect" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Fare Summary Card Skeleton */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex items-center justify-between">
+              <div className="space-y-1.5">
+                <div className="h-3 w-20 rounded shimmer-effect" />
+                <div className="h-5 w-28 rounded shimmer-effect" />
+              </div>
+              <div className="h-8 w-20 rounded-xl shimmer-effect" />
+            </div>
+          </div>
+
+          {/* Right Column: Large Map Viewport Skeleton (8 cols) */}
+          <div className="lg:col-span-8 space-y-4">
+            <div className="relative w-full h-[450px] sm:h-[540px] rounded-3xl overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center p-6">
+              {/* Animated pulsating radar circle */}
+              <div className="relative flex items-center justify-center mb-4">
+                <div className="w-20 h-20 rounded-full bg-emerald-100 animate-ping absolute" />
+                <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center relative">
+                  <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-md">
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  </div>
+                </div>
+              </div>
+              <h3 className="text-base font-extrabold text-slate-900 font-heading mb-1.5">
+                {isBn ? 'লাইভ রাইড ট্র্যাকিং লোড হচ্ছে...' : 'Loading Live Ride Tracking...'}
+              </h3>
+              <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
+                {isBn ? 'চালক ও ট্রিপের রিয়েল-টাইম তথ্য সংযুক্ত হচ্ছে' : 'Connecting to real-time driver telemetry and route'}
+              </p>
+
+              {/* Shimmer overlay across map viewport */}
+              <div className="absolute inset-0 shimmer-effect opacity-30 pointer-events-none" />
+            </div>
+
+            {/* Bottom Telemetry Gauges Skeleton */}
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 text-center space-y-2">
+                  <div className="h-2.5 w-14 rounded shimmer-effect mx-auto" />
+                  <div className="h-6 w-20 rounded shimmer-effect mx-auto" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── EMPTY STATE COMPONENT (When trip is not found or expired) ─────────────────
+const TrackingEmptyState: React.FC<{ isBn: boolean }> = ({ isBn }) => {
+  return (
+    <div className="py-20 bg-slate-50/80 min-h-screen flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-8 text-center shadow-lg space-y-5">
+        <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600 shadow-2xs">
+          <Car className="w-8 h-8" />
+        </div>
+        <div>
+          <h2 className="text-xl font-black text-slate-900 font-heading mb-1.5">
+            {isBn ? 'কোনো সক্রিয় রাইড পাওয়া যায়নি' : 'No Active Ride Found'}
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+            {isBn
+              ? 'আপনার কোনো চলমান রাইড ট্র্যাকিং নেই অথবা ট্রিপটি ইতিপূর্বে সম্পন্ন হয়েছে।'
+              : 'You do not have an active ongoing trip, or this trip has already completed.'}
+          </p>
+        </div>
+        <div className="pt-2">
+          <Link
+            href="/"
+            className="w-full py-3.5 px-6 rounded-2xl bg-black text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-900 transition-all shadow-md hover:scale-[1.02]"
+          >
+            <span>{isBn ? 'নতুন রাইড বুক করুন' : 'Book a New Ride'}</span>
+            <ArrowRight className="w-4 h-4 text-white" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export const TrackingPortal: React.FC = () => {
@@ -120,6 +250,8 @@ export const TrackingPortal: React.FC = () => {
     tripUuidParam || contextActiveTrip?.uuid || '';
 
   const [isMounted, setIsMounted] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -137,10 +269,11 @@ export const TrackingPortal: React.FC = () => {
         }
         return prev;
       });
+      setIsLoading(false);
     }
   }, [contextActiveTrip]);
-  const [speed, setSpeed] = useState<number>(45);
-  const [etaMinutes, setEtaMinutes] = useState<number>(12);
+  const [speed, setSpeed] = useState<number>(0);
+  const [etaMinutes, setEtaMinutes] = useState<number>(0);
   const [copied, setCopied] = useState<boolean>(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState<boolean>(false);
   const [hasReviewed, setHasReviewed] = useState<boolean>(false);
@@ -170,12 +303,7 @@ export const TrackingPortal: React.FC = () => {
     longitude: number;
     address: string;
     updated_at?: string;
-  }>({
-    latitude: 23.8013563,
-    longitude: 90.3763409,
-    address: '3 Senpara Parbata Lane, Dhaka, Bangladesh',
-    updated_at: '2026-09-12T13:10:27',
-  });
+  } | null>(null);
 
   // Return trip and service type logic
   const serviceTypeParam = searchParams.get('service_type');
@@ -204,53 +332,64 @@ export const TrackingPortal: React.FC = () => {
     let isMounted = true;
 
     const pollTripStatus = async () => {
-      if (!effectiveTripUuid || !effectiveCustomerUuid) return;
+      if (!effectiveTripUuid || !effectiveCustomerUuid) {
+        setIsLoading(false);
+        return;
+      }
 
-      const res = await customerTripService.fetchSingleTripBids(
-        effectiveCustomerUuid,
-        effectiveTripUuid,
-        language,
-        'ALL',
-        token || undefined
-      );
+      try {
+        const res = await customerTripService.fetchSingleTripBids(
+          effectiveCustomerUuid,
+          effectiveTripUuid,
+          language,
+          'ALL',
+          token || undefined
+        );
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      if (res.status && res.data) {
-        const currentTrip = res.data;
-        setTrip(currentTrip);
+        if (res.status && res.data) {
+          const currentTrip = res.data;
+          setTrip(currentTrip);
 
-        const status = (currentTrip.trip_status || '').toUpperCase();
+          const status = (currentTrip.trip_status || '').toUpperCase();
 
-        // If trip is strictly in REQUESTED bidding state, redirect back to trips/bidding radar
-        if (status === 'REQUESTED') {
-          router.push(`/trips?trip_uuid=${effectiveTripUuid}`);
-          return;
-        }
+          // If trip is strictly in REQUESTED bidding state, redirect back to trips/bidding radar
+          if (status === 'REQUESTED') {
+            router.push(`/trips?trip_uuid=${effectiveTripUuid}`);
+            return;
+          }
 
-        const isDone =
-          status === 'COMPLETED' ||
-          status === 'FINISHED' ||
-          status === 'TRIP_COMPLETED' ||
-          status === 'CANCELLED' ||
-          status === 'CANCELED' ||
-          status === 'TRIP_CANCELLED';
+          const isDone =
+            status === 'COMPLETED' ||
+            status === 'FINISHED' ||
+            status === 'TRIP_COMPLETED' ||
+            status === 'CANCELLED' ||
+            status === 'CANCELED' ||
+            status === 'TRIP_CANCELLED';
 
-        if (isDone) {
-          clearAllTripRelatedStorage(effectiveTripUuid);
-        } else {
-          if (typeof window !== 'undefined') {
-            try {
-              localStorage.setItem('trippy_has_active_ride', 'true');
-            } catch {}
+          if (isDone) {
+            clearAllTripRelatedStorage(effectiveTripUuid);
+          } else {
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem('trippy_has_active_ride', 'true');
+              } catch {}
+            }
+          }
+
+          // Check if review has been given
+          const isReviewed = isTripReviewed(currentTrip, effectiveTripUuid);
+
+          if (isDone && !isReviewed && !hasReviewed) {
+            setIsReviewModalOpen(true);
           }
         }
-
-        // Check if review has been given
-        const isReviewed = isTripReviewed(currentTrip, effectiveTripUuid);
-
-        if (isDone && !isReviewed && !hasReviewed) {
-          setIsReviewModalOpen(true);
+      } catch (err) {
+        console.error('Failed to poll trip status in tracking:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
         }
       }
     };
@@ -264,16 +403,14 @@ export const TrackingPortal: React.FC = () => {
     };
   }, [effectiveTripUuid, effectiveCustomerUuid, language, token, hasReviewed, pollIntervalMs]);
 
-  // Telemetry fluctuation simulator
+  // Gentle ETA update when driver is en route
   useEffect(() => {
+    if (!latestDriverLocation || !trip) return;
     const interval = setInterval(() => {
-      setSpeed(Math.floor(40 + Math.random() * 15));
-      if (Math.random() > 0.6) {
-        setEtaMinutes((prev) => (prev > 1 ? prev - 1 : prev));
-      }
-    }, 4000);
+      setEtaMinutes((prev) => (prev > 1 ? prev - 1 : prev));
+    }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [latestDriverLocation, trip]);
 
   const handleShareLink = () => {
     if (typeof window !== 'undefined') {
@@ -290,44 +427,42 @@ export const TrackingPortal: React.FC = () => {
       ? trip.drivers.find((d) => d.driver_uuid === driverUuidParam)
       : null) ||
     (trip?.drivers && trip.drivers.length > 0 ? trip.drivers[0] : null) ||
-    DEFAULT_API_TRIP.accepted_driver ||
     null;
 
   const driverName =
-    activeDriver?.name || activeDriver?.driver_name || 'Md Rasel Mia';
+    activeDriver?.name || activeDriver?.driver_name || (isBn ? 'চালক' : 'Driver');
   const driverPhoto =
     activeDriver?.profile_picture ||
     activeDriver?.profilePicture ||
     activeDriver?.driver_photo ||
-    DEFAULT_API_TRIP.accepted_driver?.profile_picture ||
-    '/images/car-placeholder.png';
+    '/images/avatar-placeholder.png';
   const driverRating = Number(
     activeDriver?.average_rating || activeDriver?.rating || 5.0
   ).toFixed(1);
   const completedRides =
     activeDriver?.total_completed_trips ||
     activeDriver?.totalCompletedTrips ||
-    9;
+    0;
   const carPlate =
     activeDriver?.car_reg_number ||
     activeDriver?.carRegNumber ||
     activeDriver?.car_plate ||
-    'Dhaka-Metro-cha-54-1400';
+    (isBn ? 'নম্বর প্রক্রিয়াধীন' : 'Reg. Pending');
   const carType =
-    trip?.car_category?.car_type || activeDriver?.car_model || 'HIACE';
+    trip?.car_category?.car_type || activeDriver?.car_model || (isBn ? 'স্ট্যান্ডার্ড গাড়ি' : 'Standard Vehicle');
   const carAvatar =
     trip?.car_category?.car_avatar ||
     (activeDriver as any)?.car_avatar ||
     (trip as any)?.car_service?.avatar ||
     null;
 
-  // Driver Phone: Check accepted_driver.phone, drivers[0].phone, fallback to 01997709990
+  // Driver Phone
   const driverPhone =
     (activeDriver?.phone && activeDriver.phone !== 'N/A' && activeDriver.phone.length > 4)
       ? activeDriver.phone
       : (trip?.drivers?.[0]?.phone && trip.drivers[0].phone !== 'N/A')
       ? trip.drivers[0].phone
-      : '01997709990';
+      : '';
 
   // Always show total_amount in front of customer
   const totalAmount =
@@ -335,15 +470,15 @@ export const TrackingPortal: React.FC = () => {
     trip?.total_amount ||
     activeDriver?.bid_amount ||
     trip?.offer_amount ||
-    747;
+    0;
 
-  // Driver UUID for live GPS tracking: URL param > activeDriver > accepted_driver > user sample driver UUID
+  // Driver UUID for live GPS tracking: URL param > activeDriver > accepted_driver
   const effectiveDriverUuid =
     driverUuidParam ||
     activeDriver?.driver_uuid ||
     trip?.accepted_driver?.driver_uuid ||
     (trip?.drivers && trip.drivers.length > 0 ? trip.drivers[0].driver_uuid : null) ||
-    'fcfa9476-27c5-4f67-8c30-59940d4b2fff';
+    '';
 
   // ── 3. Step-by-Step Lifecycle Status Logic (Website Way) ───────────────────
   const statusParam = searchParams.get('status')?.toUpperCase();
@@ -458,7 +593,7 @@ export const TrackingPortal: React.FC = () => {
                 latitude: lat,
                 longitude: lng,
                 address:
-                  latest.geolocation.address || '3 Senpara Parbata Lane, Dhaka, Bangladesh',
+                  latest.geolocation.address || '',
                 updated_at: latest.created_at || latest.updated_at,
               });
             }
@@ -499,18 +634,19 @@ export const TrackingPortal: React.FC = () => {
     rawServiceName.toUpperCase().includes('ROUND') ||
     rawServiceName.toUpperCase().includes('TWO_WAY');
 
-  const basePickupLocation = trip?.pickup_locations?.[0] || {
-    uuid: 'pickup',
-    latitude: '23.8014',
-    longitude: '90.3763',
-    address: 'Senpara Porbota, Mirpur 10., Dhaka, Bangladesh',
-  };
-  const baseDropoffLocation = trip?.dropoff_locations?.[0] || {
-    uuid: 'dropoff',
-    latitude: '23.7925',
-    longitude: '90.4078',
-    address: 'Gulshan 2, Dhaka, Bangladesh',
-  };
+  const rawPickup =
+    trip?.pickup_locations?.[0] ||
+    (trip as any)?.pickup_location ||
+    (trip as any)?.pickup ||
+    null;
+  const rawDropoff =
+    trip?.dropoff_locations?.[0] ||
+    (trip as any)?.dropoff_location ||
+    (trip as any)?.dropoff ||
+    null;
+
+  const basePickupLocation: LocationModel | null = rawPickup;
+  const baseDropoffLocation: LocationModel | null = rawDropoff;
 
   const shouldSwapLocations = isFirstCompleted && isReturnService;
 
@@ -522,14 +658,14 @@ export const TrackingPortal: React.FC = () => {
     : baseDropoffLocation;
 
   const pickupAddress =
-    activePickupLocation.address || 'Senpara Porbota, Mirpur 10., Dhaka, Bangladesh';
+    activePickupLocation?.address || (isBn ? 'পিকআপের স্থান' : 'Pickup Point');
   const dropoffAddress =
-    activeDropoffLocation.address || 'Gulshan 2, Dhaka, Bangladesh';
+    activeDropoffLocation?.address || (isBn ? 'গন্তব্যের স্থান' : 'Drop-off Destination');
 
   // Effective rider location (uses live GPS if permitted, otherwise designated pickup point)
   const effectiveRiderLocation = {
-    latitude: liveRiderGps?.latitude || Number(activePickupLocation.latitude) || 23.8045,
-    longitude: liveRiderGps?.longitude || Number(activePickupLocation.longitude) || 90.3701,
+    latitude: liveRiderGps?.latitude || (activePickupLocation?.latitude ? Number(activePickupLocation.latitude) : 0),
+    longitude: liveRiderGps?.longitude || (activePickupLocation?.longitude ? Number(activePickupLocation.longitude) : 0),
     address: liveRiderGps?.address || pickupAddress,
     isLiveGps: Boolean(liveRiderGps),
   };
@@ -585,9 +721,9 @@ export const TrackingPortal: React.FC = () => {
         title: isBn
           ? 'চালক পিকআপ পয়েন্টে আসছেন'
           : 'Driver is heading to pickup point',
-        desc: isBn
-          ? `চালক প্রায় ${etaMinutes} মিনিটের মধ্যে আপনার কাছে পৌঁছাবেন।`
-          : `Driver is arriving in approximately ${etaMinutes} minutes.`,
+        desc: etaMinutes > 0
+          ? (isBn ? `চালক প্রায় ${etaMinutes} মিনিটের মধ্যে আপনার কাছে পৌঁছাবেন।` : `Driver is arriving in approximately ${etaMinutes} minutes.`)
+          : (isBn ? 'চালক পিকআপ পয়েন্টের উদ্দেশ্যে রওনা হয়েছেন।' : 'Driver is on the way to the pickup location.'),
       };
     }
     return {
@@ -708,6 +844,14 @@ export const TrackingPortal: React.FC = () => {
     router.push('/');
   };
 
+  if (!isMounted || isLoading) {
+    return <TrackingSkeleton isBn={isBn} />;
+  }
+
+  if (!trip && !isLoading) {
+    return <TrackingEmptyState isBn={isBn} />;
+  }
+
   return (
     <div className="py-8 bg-slate-50/80 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
@@ -743,7 +887,9 @@ export const TrackingPortal: React.FC = () => {
               <div className="px-4 py-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-extrabold text-xs sm:text-sm font-heading flex items-center gap-2">
                 <Clock className="w-4 h-4 text-emerald-600" />
                 <span>
-                  {isBn ? `পৌঁছাতে বাকি ${etaMinutes} মিনিট` : `Arriving in ~${etaMinutes} mins`}
+                  {etaMinutes > 0
+                    ? (isBn ? `পৌঁছাতে বাকি ~${etaMinutes} মিনিট` : `Arriving in ~${etaMinutes} mins`)
+                    : (isBn ? 'চালক আসছেন' : 'Driver en route')}
                 </span>
               </div>
             ) : (
@@ -935,7 +1081,9 @@ export const TrackingPortal: React.FC = () => {
                       sizes="56px"
                       unoptimized
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/images/car-placeholder.png';
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = '/images/avatar-placeholder.png';
                       }}
                     />
                   </div>
@@ -1169,7 +1317,9 @@ export const TrackingPortal: React.FC = () => {
                           sizes="120px"
                           unoptimized
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/images/car-placeholder.png';
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = '/images/car-placeholder.png';
                           }}
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors flex items-center justify-center">
@@ -1436,7 +1586,9 @@ export const TrackingPortal: React.FC = () => {
                 sizes="64px"
                 unoptimized
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/images/car-placeholder.png';
+                  const target = e.currentTarget as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = '/images/avatar-placeholder.png';
                 }}
               />
             </div>
@@ -1502,7 +1654,9 @@ export const TrackingPortal: React.FC = () => {
                     sizes="40px"
                     unoptimized
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/images/car-placeholder.png';
+                      const target = e.currentTarget as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = '/images/avatar-placeholder.png';
                     }}
                   />
                 </div>

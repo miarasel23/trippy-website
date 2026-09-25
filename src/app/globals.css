@@ -1575,3 +1575,29 @@ body {
   animation: bounceShort 1.6s ease-in-out infinite;
   will-change: transform;
 }
+
+/* ==========================================================================
+   Shimmer & Skeleton Loading Animation
+   ========================================================================== */
+@keyframes shimmerWave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-effect {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 0%,
+    #e2e8f0 35%,
+    #cbd5e1 50%,
+    #e2e8f0 65%,
+    #f1f5f9 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerWave 1.8s ease-in-out infinite;
+}
+

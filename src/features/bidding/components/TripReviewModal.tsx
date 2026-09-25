@@ -31,14 +31,14 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
   onClose,
   tripUuid,
   driverUuid,
-  driverName = 'Md Rasel Mia',
+  driverName = '',
   driverPhoto,
-  carType = 'Hiace',
+  carType = '',
   carPlate,
-  serviceName = 'Ride share',
-  totalFare = 1597,
-  pickupAddress = 'Senpara Parbata, Mirpur 10, Dhaka',
-  dropoffAddress = 'Gazipur, Bangladesh',
+  serviceName = 'Ride',
+  totalFare = 0,
+  pickupAddress = '',
+  dropoffAddress = '',
   startTime,
   paymentMethod = 'CASH',
   onReviewSubmitted,
@@ -286,10 +286,16 @@ export const TripReviewModal: React.FC<TripReviewModalProps> = ({
               <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-200 bg-slate-100 mx-auto relative shadow-sm">
                 <Image
                   src={getImageUrl(driverPhoto)}
-                  alt={driverName}
+                  alt={driverName || 'Driver'}
                   fill
                   className="object-cover"
                   sizes="64px"
+                  unoptimized
+                  onError={(e) => {
+                    const target = e.currentTarget as HTMLImageElement;
+                    target.onerror = null;
+                    target.src = '/images/avatar-placeholder.png';
+                  }}
                 />
               </div>
 

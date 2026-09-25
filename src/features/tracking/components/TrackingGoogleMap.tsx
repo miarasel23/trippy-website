@@ -57,21 +57,21 @@ interface TrackingGoogleMapProps {
   className?: string;
 }
 
-const DEFAULT_CENTER = { lat: 23.8014, lng: 90.3763 }; // Senpara Parbata Lane, Mirpur 10, Dhaka
+const DEFAULT_CENTER = { lat: 23.8103, lng: 90.4125 }; // Dhaka Central fallback
 
 export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
   pickupLocation,
   dropoffLocation,
   driverLocation,
   riderLocation,
-  driverName = 'Driver',
-  carType = 'HIACE',
-  carPlate = 'Dhaka-Metro-cha-54-1400',
+  driverName = '',
+  carType = '',
+  carPlate = '',
   serviceName = 'RIDE_SHARE',
   tripStatus = 'IN_PROGRESS',
-  speed = 45,
-  etaMinutes = 12,
-  totalFare = 747,
+  speed = 0,
+  etaMinutes = 0,
+  totalFare = 0,
   onCallDriver,
   onChatDriver,
   className = '',
@@ -120,8 +120,18 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
       if (typeof (window as any).google?.maps?.Map !== 'function') return;
 
       try {
-        const initialCenter = driverLocation
-          ? { lat: driverLocation.latitude, lng: driverLocation.longitude }
+        const pLat = Number(pickupLocation?.latitude);
+        const pLng = Number(pickupLocation?.longitude);
+        const hasPickupCoord = !isNaN(pLat) && pLat !== 0 && !isNaN(pLng) && pLng !== 0;
+
+        const drvLat = Number(driverLocation?.latitude);
+        const drvLng = Number(driverLocation?.longitude);
+        const hasDriverCoord = !isNaN(drvLat) && drvLat !== 0 && !isNaN(drvLng) && drvLng !== 0;
+
+        const initialCenter = hasDriverCoord
+          ? { lat: drvLat, lng: drvLng }
+          : hasPickupCoord
+          ? { lat: pLat, lng: pLng }
           : DEFAULT_CENTER;
 
         const map = new window.google.maps.Map(mapContainerRef.current, {
@@ -259,55 +269,69 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
     };
 
     // Route key based on pickup and dropoff coordinates
-    const pLat = Number(pickupLocation?.latitude) || 23.8045;
-    const pLng = Number(pickupLocation?.longitude) || 90.3701;
-    const dLat = Number(dropoffLocation?.latitude) || 23.7947;
-    const dLng = Number(dropoffLocation?.longitude) || 90.4143;
-    const currentRouteKey = `${pLat.toFixed(5)},${pLng.toFixed(5)}->${dLat.toFixed(5)},${dLng.toFixed(5)}`;
+    const pLat = Number(pickupLocation?.latitude);
+    const pLng = Number(pickupLocation?.longitude);
+    const hasPickup = !isNaN(pLat) && pLat !== 0 && !isNaN(pLng) && pLng !== 0;
+
+    const dLat = Number(dropoffLocation?.latitude);
+    const dLng = Number(dropoffLocation?.longitude);
+    const hasDropoff = !isNaN(dLat) && dLat !== 0 && !isNaN(dLng) && dLng !== 0;
+
+    const currentRouteKey = `${hasPickup ? `${pLat.toFixed(5)},${pLng.toFixed(5)}` : ''}->${hasDropoff ? `${dLat.toFixed(5)},${dLng.toFixed(5)}` : ''}`;
     const routeChanged = lastRouteKeyRef.current !== currentRouteKey;
 
-    const pPos = new window.google.maps.LatLng(pLat, pLng);
-    const dPos = new window.google.maps.LatLng(dLat, dLng);
+    const pPos = hasPickup ? new window.google.maps.LatLng(pLat, pLng) : null;
+    const dPos = hasDropoff ? new window.google.maps.LatLng(dLat, dLng) : null;
 
     // A. Pickup Marker
-    if (!pickupMarkerRef.current) {
-      pickupMarkerRef.current = createMapMarker({
-        position: pPos,
-        map,
-        title: pickupLocation?.address || 'Pickup Point',
-        pinOptions: {
-          background: '#059669',
-          borderColor: '#ffffff',
-          glyphColor: '#ffffff',
-          glyph: 'A',
-        },
-        legacyIcon: createPinIcon('#059669', 'A'),
-      });
-    } else if (routeChanged) {
-      setMarkerPosition(pickupMarkerRef.current, pPos);
+    if (hasPickup && pPos) {
+      if (!pickupMarkerRef.current) {
+        pickupMarkerRef.current = createMapMarker({
+          position: pPos,
+          map,
+          title: pickupLocation?.address || 'Pickup Point',
+          pinOptions: {
+            background: '#059669',
+            borderColor: '#ffffff',
+            glyphColor: '#ffffff',
+            glyph: 'A',
+          },
+          legacyIcon: createPinIcon('#059669', 'A'),
+        });
+      } else if (routeChanged) {
+        setMarkerPosition(pickupMarkerRef.current, pPos);
+      }
+      bounds.extend(pPos);
+      hasPoints = true;
+    } else if (pickupMarkerRef.current) {
+      removeMarker(pickupMarkerRef.current);
+      pickupMarkerRef.current = null;
     }
-    bounds.extend(pPos);
-    hasPoints = true;
 
     // B. Dropoff Marker
-    if (!dropoffMarkerRef.current) {
-      dropoffMarkerRef.current = createMapMarker({
-        position: dPos,
-        map,
-        title: dropoffLocation?.address || 'Dropoff Point',
-        pinOptions: {
-          background: '#dc2626',
-          borderColor: '#ffffff',
-          glyphColor: '#ffffff',
-          glyph: 'B',
-        },
-        legacyIcon: createPinIcon('#dc2626', 'B'),
-      });
-    } else if (routeChanged) {
-      setMarkerPosition(dropoffMarkerRef.current, dPos);
+    if (hasDropoff && dPos) {
+      if (!dropoffMarkerRef.current) {
+        dropoffMarkerRef.current = createMapMarker({
+          position: dPos,
+          map,
+          title: dropoffLocation?.address || 'Dropoff Point',
+          pinOptions: {
+            background: '#dc2626',
+            borderColor: '#ffffff',
+            glyphColor: '#ffffff',
+            glyph: 'B',
+          },
+          legacyIcon: createPinIcon('#dc2626', 'B'),
+        });
+      } else if (routeChanged) {
+        setMarkerPosition(dropoffMarkerRef.current, dPos);
+      }
+      bounds.extend(dPos);
+      hasPoints = true;
+    } else if (dropoffMarkerRef.current) {
+      removeMarker(dropoffMarkerRef.current);
+      dropoffMarkerRef.current = null;
     }
-    bounds.extend(dPos);
-    hasPoints = true;
 
     // C. Person / Rider Location Marker - Removed from Google Map as requested
     if (riderMarkerRef.current) {
@@ -365,17 +389,16 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
     }
 
     // E. Route from Pickup to Dropoff - ONLY recalculate when route actually changes
-    if (
-      pickupLocation?.address &&
-      dropoffLocation?.address &&
-      routeChanged
-    ) {
+    const origin = (hasPickup && pPos) ? pPos : (pickupLocation?.address?.trim() || null);
+    const destination = (hasDropoff && dPos) ? dPos : (dropoffLocation?.address?.trim() || null);
+
+    if (origin && destination && routeChanged) {
       lastRouteKeyRef.current = currentRouteKey;
       const directionsService = new window.google.maps.DirectionsService();
       directionsService.route(
         {
-          origin: pPos,
-          destination: dPos,
+          origin,
+          destination,
           travelMode: (window.google?.maps?.TravelMode?.DRIVING || 'DRIVING') as any,
         },
         (result: any, status: any) => {
@@ -450,7 +473,7 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
   const displayAddress =
     driverLocation?.address ||
     pickupLocation?.address ||
-    '3 Senpara Parbata Lane, Mirpur 10, Dhaka';
+    (isBn ? 'পিকআপ পয়েন্টের দিকে' : 'En route to pickup');
 
   return (
     <div
@@ -459,117 +482,30 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
       {/* Real Google Map Container */}
       <div ref={mapContainerRef} className="w-full h-full" />
 
-      {/* Elegant Fallback Schematic Route while Google Maps is initializing or offline */}
+      {/* Shimmer loading overlay while Google Maps initializes with real API data */}
       {!mapLoaded && (
-        <div className="absolute inset-0 bg-slate-50 flex items-center justify-center pointer-events-none">
-          <svg className="w-full h-full" viewBox="0 0 900 680" fill="none">
-            <rect width="900" height="680" fill="#f8fafc" />
-
-            {/* Grid Highways */}
-            <path d="M-100 140 Q 400 180 1000 140" stroke="#e2e8f0" strokeWidth="18" />
-            <path d="M-100 360 Q 450 320 1000 390" stroke="#e2e8f0" strokeWidth="22" />
-            <path d="M-100 580 Q 450 540 1000 600" stroke="#e2e8f0" strokeWidth="16" />
-            <path d="M220 -80 Q 250 360 210 760" stroke="#e2e8f0" strokeWidth="20" />
-            <path d="M720 -80 Q 690 360 740 760" stroke="#e2e8f0" strokeWidth="20" />
-
-            {/* Glowing Route Polyline */}
-            <path
-              d="M 280 580 Q 380 440 450 340 T 580 200 T 680 110"
-              stroke="rgba(16, 185, 129, 0.25)"
-              strokeWidth="28"
-              strokeLinecap="round"
-            />
-            <path
-              d="M 280 580 Q 380 440 450 340 T 580 200 T 680 110"
-              stroke="#10b981"
-              strokeWidth="7"
-              strokeLinecap="round"
-            />
-
-            {/* Pickup Point A */}
-            <g transform="translate(280, 580)">
-              <circle r="12" fill="#059669" />
-              <circle r="4" fill="#ffffff" />
-              <text x="24" y="5" fill="#0f172a" fontSize="12" fontWeight="bold">
-                {pickupLocation?.address ? pickupLocation.address.slice(0, 26) : 'Pickup Point (A)'}
-              </text>
-            </g>
-
-            {/* Dropoff Point B */}
-            <g transform="translate(680, 110)">
-              <circle r="20" fill="rgba(239, 68, 68, 0.3)" />
-              <circle r="11" fill="#ef4444" />
-              <circle r="4" fill="#ffffff" />
-              <text x="-160" y="5" fill="#0f172a" fontSize="13" fontWeight="bold">
-                {dropoffLocation?.address ? dropoffLocation.address.slice(0, 30) : 'Dropoff Point (B)'}
-              </text>
-            </g>
-
-            {/* Live Vehicle Pin on route (Car or Motorcycle matching user image) */}
-            <g transform={isCompleted ? 'translate(680, 110)' : 'translate(510, 260)'}>
-              <circle r="34" fill="rgba(34, 197, 94, 0.25)">
-                <animate attributeName="r" values="26;42;26" dur="2s" repeatCount="indefinite" />
-              </circle>
-
-              {/* Top-Down Vehicle Vector */}
-              <g transform="translate(-24, -32)">
-                {isMotorcycle ? (
-                  /* Top-Down Motorcycle */
-                  <g>
-                    <rect x="21" y="4" width="6" height="14" rx="3" fill="#0f172a"/>
-                    <path d="M20 13 C20 9.5, 28 9.5, 28 13 L27 18 L21 18 Z" fill="#ef4444"/>
-                    <circle cx="24" cy="9.5" r="2.5" fill="#fbbf24"/>
-                    <rect x="8" y="17" width="32" height="3.5" rx="1.75" fill="#334155"/>
-                    <rect x="7" y="16" width="5" height="5.5" rx="1.5" fill="#0f172a"/>
-                    <rect x="36" y="16" width="5" height="5.5" rx="1.5" fill="#0f172a"/>
-                    <circle cx="6" cy="15" r="2" fill="#94a3b8"/>
-                    <circle cx="42" cy="15" r="2" fill="#94a3b8"/>
-                    <rect x="15" y="42" width="3.5" height="11" rx="1.5" fill="#64748b"/>
-                    <rect x="29.5" y="42" width="3.5" height="11" rx="1.5" fill="#64748b"/>
-                    <rect x="21" y="46" width="6" height="15" rx="3" fill="#0f172a"/>
-                    <path d="M19 19 C16 23, 16 31, 18 34 C19 35, 29 35, 30 34 C32 31, 32 23, 29 19 Z" fill="#22c55e" stroke="#15803d" strokeWidth="1.5"/>
-                    <circle cx="24" cy="23" r="2" fill="#e2e8f0"/>
-                    <path d="M13 24 C14 21, 20 19, 24 19 C28 19, 34 21, 35 24 C36 29, 34 35, 31 37 C29 38, 19 38, 17 37 C14 35, 12 29, 13 24 Z" fill="#1e293b"/>
-                    <circle cx="24" cy="27" r="7" fill="#ef4444" stroke="#991b1b" strokeWidth="1"/>
-                    <path d="M19 25 C19 22, 29 22, 29 25 C29 27, 19 27, 19 25 Z" fill="#0f172a"/>
-                    <rect x="20" y="36" width="8" height="11" rx="2.5" fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="1"/>
-                    <circle cx="24" cy="41.5" r="5" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5"/>
-                    <polygon points="18,36.5 21,39.5 19,40.5" fill="#3b82f6"/>
-                    <rect x="21.5" y="48" width="5" height="3" rx="1.5" fill="#ef4444"/>
-                  </g>
-                ) : (
-                  /* Top-Down Car (Matching User Image) */
-                  <g>
-                    <rect x="4" y="11" width="6" height="14" rx="2.5" fill="#0f172a"/>
-                    <rect x="38" y="11" width="6" height="14" rx="2.5" fill="#0f172a"/>
-                    <rect x="4" y="39" width="6" height="14" rx="2.5" fill="#0f172a"/>
-                    <rect x="38" y="39" width="6" height="14" rx="2.5" fill="#0f172a"/>
-                    <path d="M12 7 C12 5, 36 5, 36 7 C40 9, 41 21, 41 34 C41 47, 40 57, 36 59 C36 61, 12 61, 12 59 C8 57, 7 47, 7 34 C7 21, 8 9, 12 7 Z" fill="#22c55e" stroke="#15803d" strokeWidth="1.5"/>
-                    <path d="M10 13 C10 7, 14 4.5, 24 4.5 C34 4.5, 38 7, 38 13 C38 17.5, 36 21, 35 22 C33 22, 15 22, 13 22 C12 21, 10 17.5, 10 13 Z" fill="#ef4444"/>
-                    <circle cx="13.5" cy="5" r="2.2" fill="#fbbf24"/>
-                    <circle cx="34.5" cy="5" r="2.2" fill="#fbbf24"/>
-                    <path d="M13 20 C13 15, 35 15, 35 20 C35 22, 13 22, 13 20 Z" fill="#0f172a"/>
-                    <rect x="13" y="21" width="22" height="23" rx="3.5" fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="1"/>
-                    <circle cx="24" cy="32.5" r="6" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5"/>
-                    <polygon points="17,25 21,29 18,30" fill="#3b82f6"/>
-                    <path d="M13 44 C13 48, 35 48, 35 44 C35 43, 13 43, 13 44 Z" fill="#0f172a"/>
-                    <rect x="11.5" y="58" width="5" height="2.5" rx="1" fill="#ef4444"/>
-                    <rect x="31.5" y="58" width="5" height="2.5" rx="1" fill="#ef4444"/>
-                  </g>
-                )}
-              </g>
-
-              {/* Speed badge removed — speed data is not reliably available from the GPS API */}
-            </g>
-          </svg>
-
-          {/* Loading Indicator */}
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-xs border border-slate-200/90 px-4 py-2 rounded-2xl shadow-md text-xs font-bold text-slate-700 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span>{isBn ? 'স্যাটেলাইট জিপিএস ম্যাপ লোড হচ্ছে...' : 'Initializing Google Maps Live GPS...'}</span>
+        <div className="absolute inset-0 bg-slate-50 flex flex-col items-center justify-center text-center p-6 z-10 pointer-events-none">
+          <div className="relative flex items-center justify-center mb-4">
+            <div className="w-20 h-20 rounded-full bg-emerald-100 animate-ping absolute" />
+            <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center relative">
+              <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white shadow-md">
+                <Navigation className="w-5 h-5 text-white animate-pulse" />
+              </div>
+            </div>
           </div>
+          <p className="text-sm font-extrabold text-slate-800 font-heading mb-1">
+            {isBn ? 'লাইভ গুগল ম্যাপ প্রস্তুত হচ্ছে...' : 'Loading Live Route & GPS...'}
+          </p>
+          <p className="text-xs text-slate-500 max-w-xs truncate">
+            {pickupLocation?.address || (isBn ? 'রুট ও চালকের অবস্থান সংযুক্ত হচ্ছে' : 'Connecting route and driver coordinates')}
+          </p>
+          <div className="absolute inset-0 shimmer-effect opacity-30 pointer-events-none" />
         </div>
       )}
+
+      {/* Real Controls and Telemetry Overlay (Only visible when map is initialized) */}
+      {mapLoaded && (
+        <>
 
       {/* Floating Map Controls (Top Right) */}
       <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
@@ -712,6 +648,8 @@ export const TrackingGoogleMap: React.FC<TrackingGoogleMapProps> = ({
           )}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

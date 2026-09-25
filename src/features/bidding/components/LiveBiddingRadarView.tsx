@@ -2264,6 +2264,12 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
               fill
               className="object-cover"
               sizes="48px"
+              unoptimized
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                target.onerror = null;
+                target.src = '/images/avatar-placeholder.png';
+              }}
             />
           </div>
 
