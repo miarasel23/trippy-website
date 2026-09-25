@@ -12,31 +12,30 @@ export { API_BASE_URL };
 export const ENDPOINTS = {
   SEND_OTP: AppUrls.backend.sendOtpCustomer,
   VERIFY_OTP: AppUrls.backend.verifyOtpCustomer,
-  PROXY_SEND_OTP: AppUrls.proxy.sendOtp,
-  PROXY_VERIFY_OTP: AppUrls.proxy.verifyOtp,
 };
 
 /**
  * Send OTP for Login or Signup
- * Calls Next.js API proxy to prevent browser Mixed-Content / CORS issues
- * and guarantees FormData formatting to the backend.
+ * Calls direct backend API using URLSearchParams (form-urlencoded).
  */
 export async function sendOtpApi(
   payload: SendOtpPayload
 ): Promise<AuthResponse<SendOtpSuccessData>> {
-  const response = await fetch(AppUrls.proxy.sendOtp, {
+  const formParams = new URLSearchParams({
+    platform: payload.platform || 'web',
+    language_code: payload.language_code || 'en',
+    action_when: payload.action_when || 'admin_login',
+    phone_number: payload.phone_number,
+    country_code: payload.country_code || 'BD',
+  });
 
+  const response = await fetch(AppUrls.backend.sendOtpCustomer, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
     },
-    body: JSON.stringify({
-      platform: payload.platform || 'web',
-      language_code: payload.language_code || 'en',
-      action_when: payload.action_when || 'admin_login',
-      phone_number: payload.phone_number,
-      country_code: payload.country_code || 'BD',
-    }),
+    body: formParams.toString(),
   });
 
   const data = await response.json();
@@ -54,19 +53,22 @@ export async function sendOtpApi(
 export async function verifyOtpApi(
   payload: VerifyOtpPayload
 ): Promise<AuthResponse<LoginSuccessData>> {
-  const response = await fetch(ENDPOINTS.PROXY_VERIFY_OTP, {
+  const formParams = new URLSearchParams({
+    platform: payload.platform || 'web',
+    language_code: payload.language_code || 'en',
+    action_when: payload.action_when || 'admin_login',
+    phone_number: payload.phone_number,
+    country_code: payload.country_code || 'BD',
+    otp: payload.otp,
+  });
+
+  const response = await fetch(AppUrls.backend.verifyOtpCustomer, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
     },
-    body: JSON.stringify({
-      platform: payload.platform || 'web',
-      language_code: payload.language_code || 'en',
-      action_when: payload.action_when || 'admin_login',
-      phone_number: payload.phone_number,
-      country_code: payload.country_code || 'BD',
-      otp: payload.otp,
-    }),
+    body: formParams.toString(),
   });
 
   const data = await response.json();

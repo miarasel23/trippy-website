@@ -121,7 +121,7 @@ export const HeroBookingWidget: React.FC = () => {
     const fetchRentalInfo = async () => {
       try {
         const res = await fetch(
-          `${AppUrls.proxy.rentalInfo}?platform=web&language_code=bn&action_when=admin_login`
+          `${AppUrls.backend.rentalInfo}?platform=web&language_code=bn&action_when=admin_login`
         );
         if (!res.ok) return;
         const json = await res.json();

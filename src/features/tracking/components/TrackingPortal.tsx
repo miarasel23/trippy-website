@@ -52,92 +52,48 @@ import { TrackingGoogleMap } from '@/features/tracking/components/TrackingGoogle
 import { formatTripServiceType } from '@/shared/utils/serviceFormat';
 import { clearAllTripRelatedStorage, markTripReviewed, isTripReviewed } from '@/shared/utils/tripStorage';
 
-// Sample default trip structure matching the live backend API response provided by the user
+// Default trip fallback structure when active trip is loading or not yet cached
 const DEFAULT_API_TRIP: RentalTrip = {
-  id: 365,
-  uuid: '6cc58e5d-c79f-4fc8-9229-25c73453cdab',
-  accepted_bid_uuid: '1859220f-57ba-45e4-8211-f74c3365a6d7',
+  id: 0,
+  uuid: '',
+  accepted_bid_uuid: '',
   accepted_driver: {
-    rent_bid_uuid: '1859220f-57ba-45e4-8211-f74c3365a6d7',
-    bid_amount: 650.0,
-    total_amount: 747.0,
-    insurance_charge_amount: 12.0,
-    customer_discount_amount: 0.0,
-    driver_uuid: 'fcfa9476-27c5-4f67-8c30-59940d4b2fff',
-    name: 'Md Rasel Mia',
-    email: 'rasel2379@gmail.com',
-    profile_picture:
-      '221d2c34b01c14e07f5aea686bca3fe503211153376d113ac833f73725045b1e3ae335c02d76d3e3bf2975e26d8ab5783da6.jpg',
+    rent_bid_uuid: '',
+    bid_amount: 0,
+    total_amount: 0,
+    insurance_charge_amount: 0,
+    customer_discount_amount: 0,
+    driver_uuid: '',
+    name: 'Driver',
+    email: '',
+    profile_picture: '',
     country_code: 'BD',
     is_active: 'ACTIVE',
-    phone: '01997709990',
-    bid_status: 'COMPLETED',
+    phone: '',
+    bid_status: 'ACCEPTED',
     has_bid: true,
-    review_status: true,
-    total_completed_trips: 9,
+    review_status: false,
+    total_completed_trips: 0,
     average_rating: 5.0,
-    rating_list: [
-      {
-        uuid: '64af3d42-2699-4de6-978b-24ad0f25143b',
-        rating: 5,
-        comments: 'Great music',
-        customer_uuid: '3810b347-ab60-4004-891d-81060cf4135c',
-        customer_name: 'Md Rasel Mia',
-        customer_photo:
-          '64d979a7549e78f37bf689f7f3e042e13dc8a73cf3b62e79b96b2cbe362681dd6932b5fe8ffaefcfce76c7c8b6e4c41895f7.jpg',
-        created_at: '2026-08-31T03:49:47',
-      },
-      {
-        uuid: '27567144-fdaa-4d4c-89d0-916a12e21c0a',
-        rating: 5,
-        comments: 'Professional',
-        customer_uuid: '3810b347-ab60-4004-891d-81060cf4135c',
-        customer_name: 'Md Rasel Mia',
-        customer_photo:
-          '64d979a7549e78f37bf689f7f3e042e13dc8a73cf3b62e79b96b2cbe362681dd6932b5fe8ffaefcfce76c7c8b6e4c41895f7.jpg',
-        created_at: '2026-09-08T07:31:52',
-      },
-    ],
-    car_photos: [
-      'cd190f8cc82aefefb0f4a5e3abc226d8723f076130934577430a9b6b204842ccbd015fc14f76180775ab390ea236719cac32.jpg',
-      '582c9f173394ae3239c5688126bcb548e9303e1efd9808cbb1d5fa905e20c62927ce05b6ee1d071b171bbedce16b61b947b0.jpg',
-      '00a4523b3d9a36ddbdc531eabb9af594ccaf1c5ddf299314bce254096ed50626f10f4dd7338ee40413e7b37a3cfc8c0be31f.jpg',
-      '401e2c1eb5e2e140c02dd39f29668947def5097ca3184d123788ea7563456877140e7db6be419e8b30dd51418bcc7a2df604.jpg',
-      '09b24daa27d5f75ce6395a67188b46d58f5a8c924bcac6816ca6b623e33f80d57462918dfb350bcdb9945732018d88cd9e9d.jpg',
-    ],
-    car_reg_number: 'Dhaka-Metro-cha-54-1400',
+    rating_list: [],
+    car_photos: [],
+    car_reg_number: '',
   },
   total_bids: 0,
-  seen_driver_count: 1,
-  service_name: 'RIDE_SHARE',
+  seen_driver_count: 0,
+  service_name: '',
   payment_method: 'CASH',
-  start_datetime: '2026-09-12T18:55:43+06:00',
-  trip_status: 'COMPLETED',
-  note: '🧳 Have luggage',
-  offer_amount: 760.0,
-  total_amount: 747.0,
-  given_review: true,
-  created_at: '2026-09-12T19:56:50+06:00',
-  car_category: {
-    uuid: 'ab252ff5-534f-49c5-9497-c3748d44fd6c',
-    car_type: 'HIACE',
-    set_capacity: 11,
-    car_avatar:
-      'eb168fc0ee7c716469f72e9dd05c8720dca80328c1a84e38f0fe31bbf37f62253351825ab7157d989c98544a0530c2297b7e.png',
-  },
-  pickup_locations: [
-    {
-      uuid: '2b809f83-681d-4bb8-a2be-779dcb64c440',
-      address: 'Senpara Porbota, Mirpur 10., Dhaka, Bangladesh',
-    },
-  ],
-  dropoff_locations: [
-    {
-      uuid: '2c81229b-2fc4-46e9-b539-448b73c85fd3',
-      address: 'Gulshan 2, Dhaka, Bangladesh',
-    },
-  ],
+  start_datetime: '',
+  trip_status: 'ACCEPTED',
+  pickup_locations: [],
+  dropoff_locations: [],
   drivers: [],
+  car_category: {
+    uuid: '',
+    car_type: '',
+    set_capacity: 4,
+    car_avatar: '',
+  },
 };
 
 export const TrackingPortal: React.FC = () => {
@@ -163,9 +119,26 @@ export const TrackingPortal: React.FC = () => {
   const effectiveTripUuid =
     tripUuidParam || contextActiveTrip?.uuid || '';
 
+  const [isMounted, setIsMounted] = useState<boolean>(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const [trip, setTrip] = useState<RentalTrip | null>(
     contextActiveTrip || null
   );
+
+  // Sync trip state whenever contextActiveTrip updates from client storage
+  useEffect(() => {
+    if (contextActiveTrip) {
+      setTrip((prev) => {
+        if (!prev || prev.uuid !== contextActiveTrip.uuid || prev.trip_status !== contextActiveTrip.trip_status) {
+          return contextActiveTrip;
+        }
+        return prev;
+      });
+    }
+  }, [contextActiveTrip]);
   const [speed, setSpeed] = useState<number>(45);
   const [etaMinutes, setEtaMinutes] = useState<number>(12);
   const [copied, setCopied] = useState<boolean>(false);
@@ -747,17 +720,20 @@ export const TrackingPortal: React.FC = () => {
               <Badge variant="primary">
                 {isBn ? 'লাইভ রাইড ট্র্যাকিং' : 'Live Ride Tracking'}
               </Badge>
-              <span className={`text-xs font-extrabold px-3 py-0.5 rounded-full border shadow-2xs ${serviceInfo.badgeColor}`}>
+              <span
+                suppressHydrationWarning
+                className={`text-xs font-extrabold px-3 py-0.5 rounded-full border shadow-2xs ${serviceInfo.badgeColor}`}
+              >
                 {serviceInfo.name}
               </span>
-              <span className="text-xs font-mono font-bold text-slate-500">
+              <span className="text-xs font-mono font-bold text-slate-500" suppressHydrationWarning>
                 {displayTripId}
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading" suppressHydrationWarning>
               {banner.title}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5" suppressHydrationWarning>
               {banner.desc}
             </p>
           </div>
@@ -957,6 +933,10 @@ export const TrackingPortal: React.FC = () => {
                       fill
                       className="object-cover"
                       sizes="56px"
+                      unoptimized
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/images/car-placeholder.png';
+                      }}
                     />
                   </div>
                   <div className="min-w-0">
@@ -1105,12 +1085,12 @@ export const TrackingPortal: React.FC = () => {
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">
                         {isBn ? 'সার্ভিস ধরন' : 'SERVICE TYPE'}
                       </span>
-                      <span className="text-xs font-black text-slate-900 truncate block">
+                      <span suppressHydrationWarning className="text-xs font-black text-slate-900 truncate block">
                         {serviceInfo.name}
                       </span>
                     </div>
                   </div>
-                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${serviceInfo.badgeColor}`}>
+                  <span suppressHydrationWarning className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${serviceInfo.badgeColor}`}>
                     {serviceInfo.isHourly ? (serviceInfo.hoursText || 'Hourly') : serviceInfo.name}
                   </span>
                 </div>
@@ -1187,6 +1167,10 @@ export const TrackingPortal: React.FC = () => {
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-300"
                           sizes="120px"
+                          unoptimized
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/images/car-placeholder.png';
+                          }}
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors flex items-center justify-center">
                           <div className="w-7 h-7 rounded-full bg-white/90 text-slate-900 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
@@ -1450,6 +1434,10 @@ export const TrackingPortal: React.FC = () => {
                 fill
                 className="object-cover"
                 sizes="64px"
+                unoptimized
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/images/car-placeholder.png';
+                }}
               />
             </div>
 
@@ -1512,6 +1500,10 @@ export const TrackingPortal: React.FC = () => {
                     fill
                     className="object-cover"
                     sizes="40px"
+                    unoptimized
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/images/car-placeholder.png';
+                    }}
                   />
                 </div>
                 <div>

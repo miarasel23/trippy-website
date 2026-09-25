@@ -14,6 +14,7 @@ import { CarPhotoGalleryModal } from './CarPhotoGalleryModal';
 import { RaiseOfferModal } from './RaiseOfferModal';
 import { TripReviewModal } from './TripReviewModal';
 import { clearAllTripRelatedStorage, markTripReviewed, isTripReviewed } from '@/shared/utils/tripStorage';
+import { useTripSocket } from '@/features/trips/hooks/useTripSocket';
 import { useLanguage } from '@/context/LanguageContext';
 import { useActiveTrip, hasTripDataChanged } from '@/features/trips/context/ActiveTripContext';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -743,13 +744,189 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     // from the original trip creation time, unaffected by offer updates.
   };
 
-  // ── 2. Poll Driver Bids via /v1/rental-trip/rental-bid-trip-single_for_customer Every 5s until completed or cancelled ──
+  // ── 1. Universal Processor for Live Trip Updates (Socket.IO + Polling) ──
+  const isTerminalRef = useRef<boolean>(false);
+
+  const processTripUpdate = useCallback(
+    (trip: RentalTrip) => {
+      if (!trip || isTerminalRef.current) return;
+
+      const effectiveTrip =
+        currentTripUuidRef.current ||
+        currentTripUuid ||
+        tripUuid ||
+        activeTrip?.uuid ||
+        '';
+
+      if (trip.uuid && trip.uuid !== currentTripUuidRef.current) {
+        setCurrentTripUuid(trip.uuid);
+        currentTripUuidRef.current = trip.uuid;
+        if (onTripUuidUpdated) {
+          onTripUuidUpdated(trip.uuid);
+        }
+      }
+
+      const freshCreated =
+        trip.created_at ||
+        (trip as any).createdAt ||
+        (trip as any).creation_date ||
+        (trip as any).created_date ||
+        (trip as any).rental_trip?.created_at ||
+        tripCreatedAt ||
+        getPersistedCreatedAt(trip.uuid) ||
+        getPersistedCreatedAt(effectiveTrip);
+
+      if (freshCreated) {
+        if (!trip.created_at) {
+          trip.created_at = freshCreated;
+        }
+        // Write-once to Redux: updates will not overwrite once set
+        const uuidForTimer = trip.uuid || effectiveTrip;
+        if (uuidForTimer) {
+          dispatch(setTripCreatedAtOnce({ tripUuid: uuidForTimer, createdAt: freshCreated }));
+        }
+        // Only update local React state if not already set (Redux is authoritative)
+        if (!tripCreatedAt) {
+          setTripCreatedAt(freshCreated);
+        }
+      }
+
+      const polledService =
+        trip.service_name ||
+        (trip as any).service_type ||
+        (trip as any).servive_type ||
+        trip.car_service?.service_name;
+      if (polledService && polledService !== internalServiceName) {
+        setInternalServiceName(polledService);
+      }
+
+      const polledHours =
+        trip.hours_booked ||
+        (trip as any).hours ||
+        (trip as any).rental_duration;
+      if (polledHours && polledHours !== internalHoursBooked) {
+        setInternalHoursBooked(polledHours);
+      }
+
+      if (trip.offer_amount && trip.offer_amount !== proposedFare) {
+        setProposedFare(trip.offer_amount);
+      }
+
+      if (trip.drivers && Array.isArray(trip.drivers) && hasDriverBidsChanged(bidsRef.current, trip.drivers)) {
+        setBids(trip.drivers);
+      }
+
+      if (trip.seen_drivers && Array.isArray(trip.seen_drivers) && hasSeenDriversChanged(seenDriversRef.current, trip.seen_drivers)) {
+        setSeenDrivers(trip.seen_drivers);
+      }
+
+      const polledSeenCount =
+        typeof trip.seen_driver_count === 'number'
+          ? trip.seen_driver_count
+          : (trip.seen_drivers?.length ?? 0);
+      if (seenDriverCountRef.current !== polledSeenCount) {
+        setSeenDriverCount(polledSeenCount);
+      }
+
+      // Handle trip completion or cancellation (until completed and cancelled)
+      const status = (trip.trip_status || '').toUpperCase();
+      const isReviewDone = isTripReviewed(trip, effectiveTrip);
+
+      if (
+        status === 'COMPLETED' ||
+        status === 'TRIP_COMPLETED' ||
+        status === 'FINISHED'
+      ) {
+        isTerminalRef.current = true;
+        clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
+
+        // If already reviewed, do NOT open review modal! Terminate and exit radar cleanly.
+        if (isReviewDone) {
+          clearActiveTrip();
+          onCancelTrip();
+          return;
+        }
+
+        // Otherwise, open review modal for unreviewed completed trip
+        setCompletedTripForReview(trip);
+        setIsTripCompletedReviewOpen(true);
+        return;
+      }
+
+      if (
+        status === 'CANCELLED' ||
+        status === 'CANCELED' ||
+        status === 'TRIP_CANCELLED'
+      ) {
+        isTerminalRef.current = true;
+        clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
+        alert(isBn ? 'ট্রিপটি বাতিল করা হয়েছে।' : 'Trip has been cancelled.');
+        onCancelTrip();
+        return;
+      }
+
+      if (status === 'ACCEPTED' || status === 'ON_THE_WAY' || status === 'STARTED') {
+        isTerminalRef.current = true;
+        clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
+        onCancelTrip();
+        const driverId =
+          trip.accepted_driver?.driver_uuid ||
+          (trip as any).driver_uuid ||
+          (trip.drivers && trip.drivers[0]?.driver_uuid) ||
+          '';
+        router.push(`/tracking?trip_uuid=${effectiveTrip}&driver_uuid=${driverId}`);
+        return;
+      }
+
+      // Sync with active trip global context only for active requested trips
+      setActiveTripManually(trip);
+    },
+    [
+      currentTripUuid,
+      tripUuid,
+      activeTrip?.uuid,
+      onTripUuidUpdated,
+      tripCreatedAt,
+      dispatch,
+      internalServiceName,
+      internalHoursBooked,
+      proposedFare,
+      clearActiveTrip,
+      onCancelTrip,
+      isBn,
+      router,
+      setActiveTripManually,
+    ]
+  );
+
+  // ── 2. Real-time Driver Bids via Socket.IO (rental_bid_trip_single_for_customer & trip_updated) ──
+  const effectiveActiveTripUuid =
+    currentTripUuid ||
+    tripUuid ||
+    activeTrip?.uuid ||
+    '';
+
+  const effectiveActiveCustomerUuid =
+    customerUuid ||
+    activeTrip?.customer_uuid ||
+    (activeTrip as any)?.customerUuid ||
+    user?.uuid ||
+    getActiveCustomerUuid();
+
+  const { isConnected: isSocketConnected } = useTripSocket({
+    tripUuid: effectiveActiveTripUuid,
+    customerUuid: effectiveActiveCustomerUuid,
+    onTripUpdate: processTripUpdate,
+    enabled: Boolean(effectiveActiveTripUuid) && !isTerminalRef.current,
+  });
+
+  // ── 3. Resilient Fallback Polling via /v1/rental-trip/rental-bid-trip-single_for_customer ──
+  // Operates quietly in background (12s if Socket.IO is connected, 5s for RideShare if disconnected)
   useEffect(() => {
     let isMounted = true;
-    let isTerminal = false;
 
     const pollBids = async () => {
-      if (!isMounted || isTerminal) return;
+      if (!isMounted || isTerminalRef.current) return;
 
       const effectiveCustomer =
         customerUuid ||
@@ -778,138 +955,15 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           token || undefined
         );
 
-        if (!isMounted || isTerminal) return;
+        if (!isMounted || isTerminalRef.current) return;
 
         if (singleRes.status && singleRes.data) {
-          const trip = singleRes.data;
-
-          if (trip.uuid && trip.uuid !== currentTripUuidRef.current) {
-            setCurrentTripUuid(trip.uuid);
-            currentTripUuidRef.current = trip.uuid;
-            if (onTripUuidUpdated) {
-              onTripUuidUpdated(trip.uuid);
-            }
-          }
-
-          const freshCreated =
-            trip.created_at ||
-            (trip as any).createdAt ||
-            (trip as any).creation_date ||
-            (trip as any).created_date ||
-            (trip as any).rental_trip?.created_at ||
-            tripCreatedAt ||
-            getPersistedCreatedAt(trip.uuid) ||
-            getPersistedCreatedAt(effectiveTrip);
-
-          if (freshCreated) {
-            if (!trip.created_at) {
-              trip.created_at = freshCreated;
-            }
-            // Write-once to Redux: polling will not overwrite once set
-            const uuidForTimer = trip.uuid || effectiveTrip;
-            if (uuidForTimer) {
-              dispatch(setTripCreatedAtOnce({ tripUuid: uuidForTimer, createdAt: freshCreated }));
-            }
-            // Only update local React state if not already set (Redux is authoritative)
-            if (!tripCreatedAt) {
-              setTripCreatedAt(freshCreated);
-            }
-          }
-          const polledService =
-            trip.service_name ||
-            (trip as any).service_type ||
-            (trip as any).servive_type ||
-            trip.car_service?.service_name;
-          if (polledService && polledService !== internalServiceName) {
-            setInternalServiceName(polledService);
-          }
-          const polledHours =
-            trip.hours_booked ||
-            (trip as any).hours ||
-            (trip as any).rental_duration;
-          if (polledHours && polledHours !== internalHoursBooked) {
-            setInternalHoursBooked(polledHours);
-          }
-          if (trip.offer_amount && trip.offer_amount !== proposedFare) {
-            setProposedFare(trip.offer_amount);
-          }
-          if (trip.drivers && Array.isArray(trip.drivers) && hasDriverBidsChanged(bidsRef.current, trip.drivers)) {
-            setBids(trip.drivers);
-          }
-          if (trip.seen_drivers && Array.isArray(trip.seen_drivers) && hasSeenDriversChanged(seenDriversRef.current, trip.seen_drivers)) {
-            setSeenDrivers(trip.seen_drivers);
-          }
-          const polledSeenCount =
-            typeof trip.seen_driver_count === 'number'
-              ? trip.seen_driver_count
-              : (trip.seen_drivers?.length ?? 0);
-          if (seenDriverCountRef.current !== polledSeenCount) {
-            setSeenDriverCount(polledSeenCount);
-          }
-
-          // Handle trip completion or cancellation (until completed and cancelled)
-          const status = (trip.trip_status || '').toUpperCase();
-          const isReviewDone = isTripReviewed(trip, effectiveTrip);
-
-          if (
-            status === 'COMPLETED' ||
-            status === 'TRIP_COMPLETED' ||
-            status === 'FINISHED'
-          ) {
-            isTerminal = true;
-            clearInterval(interval);
-
-            // Clean all trip-related storage immediately
-            clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
-
-            // If already reviewed, do NOT open review modal! Terminate and exit radar cleanly.
-            if (isReviewDone) {
-              clearActiveTrip();
-              onCancelTrip();
-              return;
-            }
-
-            // Otherwise, open review modal for unreviewed completed trip
-            setCompletedTripForReview(trip);
-            setIsTripCompletedReviewOpen(true);
-            return;
-          }
-
-          if (
-            status === 'CANCELLED' ||
-            status === 'CANCELED' ||
-            status === 'TRIP_CANCELLED'
-          ) {
-            isTerminal = true;
-            clearInterval(interval);
-            clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
-            alert(isBn ? 'ট্রিপটি বাতিল করা হয়েছে।' : 'Trip has been cancelled.');
-            onCancelTrip();
-            return;
-          }
-
-          if (status === 'ACCEPTED' || status === 'ON_THE_WAY' || status === 'STARTED') {
-            isTerminal = true;
-            clearInterval(interval);
-            clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
-            onCancelTrip();
-            const driverId =
-              trip.accepted_driver?.driver_uuid ||
-              (trip as any).driver_uuid ||
-              (trip.drivers && trip.drivers[0]?.driver_uuid) ||
-              '';
-            router.push(`/tracking?trip_uuid=${effectiveTrip}&driver_uuid=${driverId}`);
-            return;
-          }
-
-          // Sync with active trip global context only for active requested trips
-          setActiveTripManually(trip);
-
+          processTripUpdate(singleRes.data);
           return;
         }
       }
 
-      // Fallback: fetchBids list every 10 seconds if single endpoint had temporary hiccup
+      // Fallback: fetchBids list if single endpoint had temporary hiccup
       const trips: RentalTrip[] = await customerTripService.fetchBids(
         effectiveCustomer,
         language,
@@ -917,66 +971,27 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         token || undefined
       );
 
-      if (!isMounted || isTerminal) return;
+      if (!isMounted || isTerminalRef.current) return;
 
       if (trips && trips.length > 0) {
         const currentTrip = trips.find((t) => t.uuid === effectiveTrip) || trips[0];
-        if (currentTrip) {
-          const fallbackCreated =
-            currentTrip.created_at ||
-            (currentTrip as any).createdAt ||
-            (currentTrip as any).creation_date ||
-            (currentTrip as any).created_date ||
-            (currentTrip as any).rental_trip?.created_at;
-
-          if (fallbackCreated) {
-            const uuid = currentTrip.uuid;
-            if (uuid) {
-              dispatch(setTripCreatedAtOnce({ tripUuid: uuid, createdAt: fallbackCreated }));
-            }
-            if (!tripCreatedAt) {
-              setTripCreatedAt(fallbackCreated);
-            }
-          }
-          const polledFallbackService =
-            currentTrip.service_name ||
-            (currentTrip as any).service_type ||
-            (currentTrip as any).servive_type ||
-            currentTrip.car_service?.service_name;
-          if (polledFallbackService && polledFallbackService !== internalServiceName) {
-            setInternalServiceName(polledFallbackService);
-          }
-          const polledFallbackHours =
-            currentTrip.hours_booked ||
-            (currentTrip as any).hours ||
-            (currentTrip as any).rental_duration;
-          if (polledFallbackHours && polledFallbackHours !== internalHoursBooked) {
-            setInternalHoursBooked(polledFallbackHours);
-          }
-          if (currentTrip.offer_amount && currentTrip.offer_amount !== proposedFare) {
-            setProposedFare(currentTrip.offer_amount);
-          }
-          if (currentTrip.drivers && Array.isArray(currentTrip.drivers) && hasDriverBidsChanged(bidsRef.current, currentTrip.drivers)) {
-            setBids(currentTrip.drivers);
-          }
-          if (currentTrip.seen_drivers && Array.isArray(currentTrip.seen_drivers) && hasSeenDriversChanged(seenDriversRef.current, currentTrip.seen_drivers)) {
-            setSeenDrivers(currentTrip.seen_drivers);
-          }
-          const fallbackSeenCount =
-            typeof currentTrip.seen_driver_count === 'number'
-              ? currentTrip.seen_driver_count
-              : (currentTrip.seen_drivers?.length ?? 0);
-          if (seenDriverCountRef.current !== fallbackSeenCount) {
-            setSeenDriverCount(fallbackSeenCount);
-          }
-          setActiveTripManually(currentTrip);
+        if (currentTrip && isMounted && !isTerminalRef.current) {
+          processTripUpdate(currentTrip);
         }
       }
     };
 
+    // When Socket.IO is established and connected, real-time events handle all updates.
+    // Absolutely NO repeated polling when socket is active.
+    if (isSocketConnected) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    // Only if Socket.IO is NOT connected, use fallback polling
     pollBids();
-    // Dynamic polling interval: 5s for RIDE_SHARE, 30s for other services
-    const pollIntervalMs = isRideShare ? 5000 : 30000;
+    const pollIntervalMs = isRideShare ? 5000 : 15000;
     const interval = setInterval(pollBids, pollIntervalMs);
 
     return () => {
@@ -991,12 +1006,11 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     activeTrip?.customer_uuid,
     user?.uuid,
     token,
-    router,
-    isBn,
-    onCancelTrip,
-    setActiveTripManually,
+    processTripUpdate,
     isRideShare,
+    isSocketConnected,
   ]);
+
 
   // ── 3. Action Handlers ───────────────────────────────────────────────────
   // Open Photo Gallery for a Driver's Car
@@ -1091,6 +1105,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       bidToAccept.rent_bid_uuid ||
       bidToAccept.rentBidUuid ||
       bidToAccept.uuid ||
+      bidToAccept.bid_uuid ||
+      (bidToAccept as any).bidUuid ||
       bidToAccept.driver_uuid ||
       bidToAccept.driverUuid ||
       '';
@@ -1101,10 +1117,11 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
     try {
       const res = await customerTripService.acceptBid(
-        customerUuid,
+        effectiveActiveCustomerUuid,
         bidUuid,
         activeCurrentUuid,
-        language
+        language,
+        token || undefined
       );
 
       if (res.status) {
@@ -1174,9 +1191,20 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
         {/* Title and Subtitle */}
         <div className="text-center">
-          <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight font-heading">
-            {isBn ? 'আপনার রাইড খোঁজা হচ্ছে' : 'Finding your ride'}
-          </h1>
+          <div className="flex items-center justify-center gap-1.5">
+            <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight font-heading">
+              {isBn ? 'আপনার রাইড খোঁজা হচ্ছে' : 'Finding your ride'}
+            </h1>
+            {isSocketConnected && (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs"
+                title={isBn ? 'রিয়েল-টাইম সকেট সংযোগ সক্রিয়' : 'Real-time WebSocket active'}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live
+              </span>
+            )}
+          </div>
           <p className="text-xs font-semibold text-slate-600 capitalize tracking-wide">
             {getFormattedServiceName()}
           </p>

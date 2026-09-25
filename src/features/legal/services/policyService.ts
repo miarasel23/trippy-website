@@ -108,29 +108,22 @@ export async function fetchPolicyAndSupport(language: string = 'bn'): Promise<{
     country_code,
   });
 
-  const urlsToTry = [
-    `${AppUrls.proxy.privacyPolicyTermsCondition}?${queryParams.toString()}`,
-    `${AppUrls.backend.privacyPolicyTermsCondition}?${queryParams.toString()}`,
-  ];
-
+  const url = `${AppUrls.backend.privacyPolicyTermsCondition}?${queryParams.toString()}`;
   let rawData: PolicyResponseData | null = null;
 
-  for (const url of urlsToTry) {
-    try {
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.status && json.data) {
-          rawData = json.data;
-          break;
-        }
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.status && json.data) {
+        rawData = json.data;
       }
-    } catch {
-      // Fall through to next URL
     }
+  } catch {
+    // Backend fetch failed
   }
 
   const helpItem = rawData?.HELP_AND_SUPPORT?.[0];

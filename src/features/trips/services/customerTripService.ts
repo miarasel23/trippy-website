@@ -117,6 +117,43 @@ export function clearTripDataFromLocalStorage(): void {
   } catch {}
 }
 
+/**
+ * Normalizes raw API or Socket.IO trip payload into a standardized RentalTrip.
+ * Handles single objects, array responses, nested structures, and field aliases.
+ */
+export function normalizeRentalTrip(rawData: any): RentalTrip | null {
+  if (!rawData) return null;
+
+  let rawItem: any = null;
+  if (Array.isArray(rawData)) {
+    rawItem = rawData[0] || null;
+  } else if (typeof rawData === 'object') {
+    if (rawData.data) {
+      return normalizeRentalTrip(rawData.data);
+    }
+    rawItem = rawData;
+  }
+
+  if (!rawItem) return null;
+
+  const nested = rawItem.rental_trip || rawItem.trip || {};
+  return {
+    ...nested,
+    ...rawItem,
+    drivers: rawItem.drivers || nested.drivers || [],
+    seen_drivers: rawItem.seen_drivers || nested.seen_drivers || [],
+    created_at:
+      rawItem.created_at ||
+      nested.created_at ||
+      rawItem.createdAt ||
+      nested.createdAt ||
+      rawItem.creation_date ||
+      nested.creation_date ||
+      rawItem.created_date ||
+      nested.created_date,
+  };
+}
+
 export const customerTripService = {
   /**
    * Search locations using Google Places backend endpoint
@@ -128,17 +165,18 @@ export const customerTripService = {
     if (!query || query.trim().length < 2) return [];
 
     try {
-      const res = await fetch(AppUrls.proxy.searchLocation, {
+      const formParams = new URLSearchParams({
+        platform: 'web',
+        language_code: languageCode,
+        action_when: 'search_locations',
+        search_location: query.trim(),
+      });
+      const res = await fetch(AppUrls.backend.searchLocation, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({
-          platform: 'web',
-          language_code: languageCode,
-          action_when: 'search_locations',
-          search_location: query.trim(),
-        }),
+        body: formParams.toString(),
       });
 
       if (!res.ok) return [];
@@ -157,7 +195,7 @@ export const customerTripService = {
   ): Promise<Record<string, ServiceCategory> | null> {
     try {
       const res = await fetch(
-        `${AppUrls.proxy.rentalInfo}?platform=web&language_code=${languageCode}&action_when=admin_login`
+        `${AppUrls.backend.rentalInfo}?platform=web&language_code=${languageCode}&action_when=admin_login`
       );
       if (!res.ok) return null;
       const json: RentalInfoResponse = await res.json();
@@ -177,26 +215,44 @@ export const customerTripService = {
     const authToken = token || getStoredAuthToken();
     try {
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       };
       if (authToken) {
-        headers.Authorization = `Bearer ${authToken}`;
+        headers.Authorization = authToken.startsWith('Bearer ')
+          ? authToken
+          : `Bearer ${authToken}`;
       }
 
-      const res = await fetch(AppUrls.proxy.tripPriceDetails, {
+      const formParams = new URLSearchParams({
+        platform: 'web',
+        language_code: request.language_code || 'bn',
+        action_when: 'trip_details_customer_admin',
+        servive_type: request.servive_type,
+        country_code: request.country_code || 'BD',
+        start_datetime: request.start_datetime,
+      });
+      if (request.pickup_location_uuid) {
+        if (Array.isArray(request.pickup_location_uuid)) {
+          request.pickup_location_uuid.forEach((u) => formParams.append('pickup_location_uuid', u));
+        } else {
+          formParams.append('pickup_location_uuid', request.pickup_location_uuid);
+        }
+      }
+      if (request.dropoff_location_uuid) {
+        if (Array.isArray(request.dropoff_location_uuid)) {
+          request.dropoff_location_uuid.forEach((u) => formParams.append('dropoff_location_uuid', u));
+        } else {
+          formParams.append('dropoff_location_uuid', request.dropoff_location_uuid);
+        }
+      }
+      if (request.end_datetime) {
+        formParams.append('end_datetime', request.end_datetime);
+      }
+
+      const res = await fetch(AppUrls.backend.tripPriceDetailsCustomer, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          platform: 'web',
-          language_code: request.language_code || 'bn',
-          action_when: 'trip_details_customer_admin',
-          servive_type: request.servive_type,
-          country_code: request.country_code || 'BD',
-          pickup_location_uuid: request.pickup_location_uuid,
-          dropoff_location_uuid: request.dropoff_location_uuid,
-          start_datetime: request.start_datetime,
-          ...(request.end_datetime ? { end_datetime: request.end_datetime } : {}),
-        }),
+        body: formParams.toString(),
       });
 
       return await res.json();
@@ -214,20 +270,40 @@ export const customerTripService = {
   ): Promise<{ status: boolean; message: string; data?: any }> {
     const authToken = token || getStoredAuthToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
     };
     if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`;
+      headers.Authorization = authToken.startsWith('Bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
     }
 
-    const res = await fetch(AppUrls.proxy.createRentalTrip, {
+    const formParams = new URLSearchParams({
+      platform: 'web',
+      action_when: 'create_rental_trip',
+      service_name: payload.service_name,
+      customer_uuid: payload.customer_uuid,
+      price_set_uuid: payload.price_set_uuid,
+      payment_method: payload.payment_method || 'CASH',
+      start_datetime: payload.start_datetime,
+      country_code: payload.country_code || 'BD',
+      offer_ammount: String(payload.offer_ammount ?? (payload as any).offer_amount ?? ''),
+      language_code: payload.language_code || 'bn',
+    });
+    if (payload.end_datetime) formParams.append('end_datetime', payload.end_datetime);
+    if (payload.hours_booked) formParams.append('hours_booked', String(payload.hours_booked));
+    if (payload.note) formParams.append('note', payload.note);
+    if (payload.pickup_location_uuid) {
+      payload.pickup_location_uuid.forEach((u) => formParams.append('pickup_location_uuid', u));
+    }
+    if (payload.dropoff_location_uuid) {
+      payload.dropoff_location_uuid.forEach((u) => formParams.append('dropoff_location_uuid', u));
+    }
+
+    const res = await fetch(AppUrls.backend.createRentalTrip, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        ...payload,
-        platform: 'web',
-        action_when: 'create_rental_trip',
-      }),
+      body: formParams.toString(),
     });
 
     return await res.json();
@@ -251,10 +327,7 @@ export const customerTripService = {
     try {
       const query = `platform=web&language_code=${languageCode}&customer_uuid=${customerUuid}&trip_status=${tripStatus}&action_when=rental_bid_trip_list_for_customer`;
       const directUrl = `${AppUrls.backend.rentalBidTripListForCustomer}?${query}`;
-      let res = await fetch(directUrl, { headers }).catch(() => null);
-      if (!res || !res.ok) {
-        res = await fetch(`${AppUrls.proxy.rentalBids}?${query}`, { headers }).catch(() => null);
-      }
+      const res = await fetch(directUrl, { headers }).catch(() => null);
       if (!res || !res.ok) return [];
       const json = await res.json().catch(() => null);
       if (json && json.status && Array.isArray(json.data)) {
@@ -316,12 +389,8 @@ export const customerTripService = {
         trip_status: tripStatus,
       });
 
-      // Use direct backend URL so Next.js dev server proxy does not log repeated polling in terminal/console
       const directUrl = `${AppUrls.backend.rentalBidTripSingleForCustomer}?${query.toString()}`;
-      let res = await fetch(directUrl, { headers }).catch(() => null);
-      if (!res || !res.ok) {
-        res = await fetch(`${AppUrls.proxy.rentalBidTripSingle}?${query.toString()}`, { headers }).catch(() => null);
-      }
+      const res = await fetch(directUrl, { headers }).catch(() => null);
       if (!res || !res.ok) {
         return { status: false, data: null, message: res ? `HTTP ${res.status}` : 'Request failed' };
       }
@@ -330,35 +399,7 @@ export const customerTripService = {
         return { status: false, data: null, message: 'Invalid response' };
       }
 
-      let trip: RentalTrip | null = null;
-      if (json.status && json.data) {
-        let rawItem: any = null;
-        if (Array.isArray(json.data)) {
-          rawItem = json.data[0] || null;
-        } else if (typeof json.data === 'object') {
-          rawItem = json.data;
-        }
-
-        if (rawItem) {
-          const nested = rawItem.rental_trip || rawItem.trip || {};
-          trip = {
-            ...nested,
-            ...rawItem,
-            drivers: rawItem.drivers || nested.drivers || [],
-            seen_drivers: rawItem.seen_drivers || nested.seen_drivers || [],
-            created_at:
-              rawItem.created_at ||
-              nested.created_at ||
-              rawItem.createdAt ||
-              nested.createdAt ||
-              rawItem.creation_date ||
-              nested.creation_date ||
-              rawItem.created_date ||
-              nested.created_date,
-          };
-        }
-      }
-
+      const trip = json.status && json.data ? normalizeRentalTrip(json.data) : null;
       return { status: Boolean(json.status), data: trip, message: json.message };
     } catch {
       return { status: false, data: null, message: 'Request failed' };
@@ -379,28 +420,47 @@ export const customerTripService = {
     const authToken = token || getStoredAuthToken();
     const targetCustomerUuid = customerUuid || getActiveCustomerUuid();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
     };
     if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`;
+      headers.Authorization = authToken.startsWith('Bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
     }
 
-    const res = await fetch(AppUrls.proxy.acceptTrip, {
+    const formParams = new URLSearchParams({
+      platform: 'web',
+      language_code: languageCode || 'bn',
+      action_when: 'accept_trip_for_customer',
+      bid_uuid: bidUuid,
+      rent_bid_uuid: bidUuid,
+    });
+    if (targetCustomerUuid) {
+      formParams.append('customer_uuid', targetCustomerUuid);
+    }
+    if (tripUuid) {
+      formParams.append('trip_uuid', tripUuid);
+      formParams.append('rental_trip_uuid', tripUuid);
+    }
+
+    // Call direct backend base URL (http://3.209.161.158/api/...) - no proxy
+    const directUrl = AppUrls.backend.acceptTripForCustomer;
+    const res = await fetch(directUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        platform: 'web',
-        customer_uuid: targetCustomerUuid,
-        bid_uuid: bidUuid,
-        rent_bid_uuid: bidUuid,
-        trip_uuid: tripUuid,
-        rental_trip_uuid: tripUuid,
-        language_code: languageCode,
-        action_when: 'accept_trip_for_customer',
-      }),
-    });
+      body: formParams.toString(),
+    }).catch(() => null);
 
-    return await res.json();
+    if (!res) {
+      return { status: false, message: 'Network request failed' };
+    }
+
+    try {
+      return await res.json();
+    } catch {
+      return { status: res.ok, message: `Server responded with HTTP ${res.status}` };
+    }
   },
 
   /**
@@ -414,28 +474,34 @@ export const customerTripService = {
   ): Promise<{ status: boolean; message: string }> {
     const authToken = token || getStoredAuthToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
     };
     if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`;
+      headers.Authorization = authToken.startsWith('Bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
     }
 
-    const res = await fetch(
-      AppUrls.proxy.cancelTrip,
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          platform: 'web',
-          trip_uuid: tripUuid,
-          rental_trip_uuid: tripUuid,
-          comment,
-          language_code: languageCode,
-          action_when: 'cancel_trip_driver_or_customer_admin',
-        }),
-      }
-    );
+    const formParams = new URLSearchParams({
+      platform: 'web',
+      trip_uuid: tripUuid,
+      rental_trip_uuid: tripUuid,
+      comment,
+      language_code: languageCode,
+      action_when: 'cancel_trip_driver_or_customer_admin',
+    });
 
+    const directUrl = AppUrls.backend.cancelTripDriverOrCustomerAdmin;
+    const res = await fetch(directUrl, {
+      method: 'POST',
+      headers,
+      body: formParams.toString(),
+    }).catch(() => null);
+
+    if (!res) {
+      return { status: false, message: 'Request failed' };
+    }
     return await res.json();
   },
 
@@ -455,29 +521,32 @@ export const customerTripService = {
 
     const authToken = token || getStoredAuthToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
     };
     if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`;
+      headers.Authorization = authToken.startsWith('Bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
     }
 
     const targetCustomerUuid = customerUuid || getActiveCustomerUuid();
     const numAmount = typeof offerAmount === 'string' ? parseFloat(offerAmount) || 0 : offerAmount;
 
     try {
-      const res = await fetch(AppUrls.proxy.updateTripOfferAmount, {
+      const formParams = new URLSearchParams({
+        platform: 'web',
+        language_code: languageCode,
+        action_when: 'update_trip_offer_amount',
+        trip_uuid: tripUuid,
+        customer_uuid: targetCustomerUuid,
+        offer_ammount: String(numAmount),
+      });
+
+      const res = await fetch(AppUrls.backend.updateTripOfferAmount, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          platform: 'web',
-          language_code: languageCode,
-          action_when: 'update_trip_offer_amount',
-          trip_uuid: tripUuid,
-          rental_trip_uuid: tripUuid,
-          offer_ammount: numAmount,
-          offer_amount: numAmount,
-          customer_uuid: targetCustomerUuid,
-        }),
+        body: formParams.toString(),
       });
 
       return await res.json();
@@ -498,24 +567,29 @@ export const customerTripService = {
   ): Promise<{ status: boolean; message: string; data?: any }> {
     const authToken = token || getStoredAuthToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
     };
     if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`;
+      headers.Authorization = authToken.startsWith('Bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
     }
 
     try {
-      const res = await fetch(AppUrls.proxy.cancelRentBid, {
+      const formParams = new URLSearchParams({
+        platform: 'web',
+        language_code: languageCode,
+        action_when: 'cancel_rent_bid_driver_or_customer_admin',
+        bid_uuid: bidUuid,
+        rent_bid_uuid: bidUuid,
+        comment: comment || 'cancel_rent_bid_driver_or_customer_admin',
+      });
+
+      const res = await fetch(AppUrls.backend.cancelRentBidDriverOrCustomerAdmin, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          platform: 'web',
-          language_code: languageCode,
-          action_when: 'cancel_rent_bid_driver_or_customer_admin',
-          bid_uuid: bidUuid,
-          rent_bid_uuid: bidUuid,
-          comment: comment || 'cancel_rent_bid_driver_or_customer_admin',
-        }),
+        body: formParams.toString(),
       });
 
       return await res.json();
@@ -540,30 +614,36 @@ export const customerTripService = {
   }): Promise<{ status: boolean; message: string; data?: any }> {
     const authToken = params.token || getStoredAuthToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
     };
     if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`;
+      headers.Authorization = authToken.startsWith('Bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
     }
 
     const targetCustomerUuid = params.customerUuid || getActiveCustomerUuid();
 
     try {
-      const res = await fetch(AppUrls.proxy.giveReview, {
+      const formParams = new URLSearchParams({
+        platform: 'web',
+        action_when: 'give_review',
+        language_code: params.languageCode || 'bn',
+        customer_uuid: targetCustomerUuid,
+        trip_uuid: params.tripUuid,
+        driver_uuid: params.driverUuid,
+        rating: String(params.rating),
+        given_by: params.given_by || 'CUSTOMER',
+      });
+      if (params.comments) {
+        formParams.append('comments', params.comments);
+      }
+
+      const res = await fetch(AppUrls.backend.rentalTripGiveReview, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          platform: 'web',
-          action_when: 'give_review',
-          language_code: params.languageCode || 'bn',
-          customer_uuid: targetCustomerUuid,
-          trip_uuid: params.tripUuid,
-          rental_trip_uuid: params.tripUuid,
-          driver_uuid: params.driverUuid,
-          rating: params.rating,
-          comments: params.comments || '',
-          given_by: 'CUSTOMER',
-        }),
+        body: formParams.toString(),
       });
 
       return await res.json();
@@ -602,30 +682,13 @@ export const customerTripService = {
         driver_uuid: driverUuid,
       });
 
-      // Try direct backend endpoint first to avoid Next.js dev server terminal proxy logging
-      let res = await fetch(AppUrls.backend.customerDriverTrackGet, {
+      const res = await fetch(AppUrls.backend.customerDriverTrackGet, {
         method: 'POST',
         headers,
         body: body.toString(),
-      }).catch(() => null);
+      });
 
-      if (!res || !res.ok) {
-        res = await fetch(AppUrls.proxy.driverLocation, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(authToken ? { Authorization: headers.Authorization } : {}),
-          },
-          body: JSON.stringify({
-            platform: 'web',
-            language_code: languageCode,
-            action_when: 'track_location_get',
-            driver_uuid: driverUuid,
-          }),
-        }).catch(() => null);
-      }
-
-      if (!res || !res.ok) return [];
+      if (!res.ok) return [];
       const json: DriverTrackingResponse = await res.json().catch(() => null);
       return json && json.status && Array.isArray(json.data) ? json.data : [];
     } catch {
@@ -652,7 +715,7 @@ export const customerTripService = {
         headers.Authorization = `Bearer ${authToken}`;
       }
 
-      const res = await fetch(AppUrls.proxy.liveChatConversation, {
+      const res = await fetch(AppUrls.backend.liveChatConversation, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -722,7 +785,7 @@ export const customerTripService = {
         });
       }
 
-      const res = await fetch(AppUrls.proxy.liveChatSend, {
+      const res = await fetch(AppUrls.backend.liveChatSend, {
         method: 'POST',
         headers,
         body,

@@ -16,6 +16,7 @@ import {
 import { useLanguage } from '@/context/LanguageContext';
 import { useAppSelector } from '@/store/hooks';
 import { clearAllTripRelatedStorage, isTripReviewed } from '@/shared/utils/tripStorage';
+import { subscribeToRentalBidTripSingle } from '@/features/trips/services/tripSocketService';
 
 interface ActiveTripContextType {
   activeTrip: RentalTrip | null;
@@ -297,7 +298,32 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [customerUuid, language, token]);
 
-  // Initial load + interval polling every 10 seconds (10000ms)
+  // ── Real-time Socket.IO Sync for Active Trip ──────────────────────────
+  useEffect(() => {
+    if (!activeTrip?.uuid || typeof window === 'undefined') return;
+
+    const unsubscribe = subscribeToRentalBidTripSingle({
+      tripUuid: activeTrip.uuid,
+      customerUuid: customerUuid || undefined,
+      onTripUpdate: (updatedTrip) => {
+        if (hasTripDataChanged(activeTripRef.current, updatedTrip)) {
+          setActiveTrip(updatedTrip);
+          const count =
+            updatedTrip.drivers?.length ??
+            updatedTrip.total_bids ??
+            (updatedTrip as any).bid_summary?.total_bids ??
+            0;
+          setBidsCount(count);
+        }
+      },
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [activeTrip?.uuid, customerUuid]);
+
+  // Initial load + gentle fallback check (60s if active trip is handled by Socket.IO, 25s if idle)
   useEffect(() => {
     let isMounted = true;
 
@@ -312,12 +338,13 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
 
     check();
 
-    // Call API every 10 seconds
+    // Gentle polling interval: when an active trip is ongoing, Socket.IO provides real-time updates
+    const intervalMs = activeTripRef.current ? 60000 : 25000;
     const interval = setInterval(() => {
       if (isMounted) {
         refreshActiveTrip();
       }
-    }, 10000);
+    }, intervalMs);
 
     return () => {
       isMounted = false;
