@@ -73,6 +73,11 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
   const isHourly = serviceType === 'HOURLY';
   const isRideShare = serviceType === 'RIDE_SHARE';
 
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Minimum allowed start time: now for RIDE_SHARE, or now + 2h20m for all scheduled services
   const minLeadMs = isRideShare ? 0 : (2 * 3600 + 20 * 60) * 1000; // 2 hours 20 minutes
   const minAllowedDate = new Date(Date.now() + minLeadMs);
@@ -148,11 +153,11 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
     { key: 'tomorrow_morning', label: '🌅 Tomorrow Morning (9:00 AM)', labelBn: '🌅 কাল সকালে (৯:০০ AM)' },
   ];
 
-  // Helper: check if selected start time is in the past or less than 2h20m for scheduled rides
+  // Helper: check if selected start time is in the past or less than 2h20m for scheduled rides (guarded by mounted)
   const nowTs = Date.now();
   const startTs = startDatetime ? new Date(startDatetime.replace(' ', 'T')).getTime() : 0;
-  const isPastTime = !isRideShare && startTs > 0 && startTs < (nowTs - 60 * 1000);
-  const isStartTimeTooEarly = !isRideShare && startTs > 0 && startTs < (nowTs + minLeadMs - 60 * 1000);
+  const isPastTime = mounted && !isRideShare && startTs > 0 && startTs < (nowTs - 60 * 1000);
+  const isStartTimeTooEarly = mounted && !isRideShare && startTs > 0 && startTs < (nowTs + minLeadMs - 60 * 1000);
 
   const startDisplay = formatDisplayLabel(startDatetime);
   const endDisplay   = formatDisplayLabel(endDatetime);
@@ -223,6 +228,7 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
           </div>
           <input
             type="datetime-local"
+            suppressHydrationWarning
             min={apiToInputValue(formatDateTimeToApi(minAllowedDate))}
             value={apiToInputValue(startDatetime)}
             onChange={(e) => {
@@ -256,7 +262,7 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
             className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none cursor-pointer"
           />
           {startDisplay && (
-            <p className="text-[10px] text-emerald-700 font-bold mt-1.5 flex items-center gap-1">
+            <p suppressHydrationWarning className="text-[10px] text-emerald-700 font-bold mt-1.5 flex items-center gap-1">
               <Clock className="w-2.5 h-2.5" />
               {startDisplay}
             </p>
@@ -277,6 +283,7 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
             </div>
             <input
               type="datetime-local"
+              suppressHydrationWarning
               min={apiToInputValue(formatDateTimeToApi(minEndDate))}
               value={apiToInputValue(endDatetime)}
               onChange={(e) => {
@@ -299,7 +306,7 @@ export const TripDateTimeSchedule: React.FC<TripDateTimeScheduleProps> = ({
               className="w-full bg-transparent text-xs sm:text-sm font-bold text-amber-950 focus:outline-none cursor-pointer"
             />
             {endDisplay && (
-              <p className="text-[10px] text-amber-800 font-bold mt-1.5 flex items-center gap-1">
+              <p suppressHydrationWarning className="text-[10px] text-amber-800 font-bold mt-1.5 flex items-center gap-1">
                 <Clock className="w-2.5 h-2.5" />
                 {endDisplay}
               </p>

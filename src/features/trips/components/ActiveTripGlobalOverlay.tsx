@@ -19,6 +19,12 @@ import {
 
 export const ActiveTripGlobalOverlay: React.FC = () => {
   const pathname = usePathname();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const {
     activeTrip,
     bidsCount,
@@ -32,6 +38,8 @@ export const ActiveTripGlobalOverlay: React.FC = () => {
   } = useActiveTrip();
   const { language } = useLanguage();
   const isBn = language === 'bn';
+
+  if (!mounted) return null;
 
   // Check if activeTrip status is strictly a pending REQUESTED bidding trip
   const rawStatus = (activeTrip?.trip_status || '').toUpperCase();

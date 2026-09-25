@@ -81,8 +81,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable} ${hindSiliguri.variable}`}>
-      <body className="bg-white text-slate-900 font-body min-h-screen flex flex-col antialiased">
+    <html lang="en" className={`${outfit.variable} ${inter.variable} ${jetbrainsMono.variable} ${hindSiliguri.variable}`} suppressHydrationWarning>
+      <body className="bg-white text-slate-900 font-body min-h-screen flex flex-col antialiased" suppressHydrationWarning>
         <ConsoleFilter />
         <LanguageProvider>
           <ReduxProvider>

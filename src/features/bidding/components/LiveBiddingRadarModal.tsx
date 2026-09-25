@@ -8,6 +8,11 @@ import Link from 'next/link';
 import { useLanguage } from '@/context/LanguageContext';
 
 export const LiveBiddingRadarModal: React.FC = () => {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const {
     activeTrip,
     isRadarModalOpen,
@@ -18,6 +23,8 @@ export const LiveBiddingRadarModal: React.FC = () => {
   } = useActiveTrip();
   const { language } = useLanguage();
   const isBn = language === 'bn';
+
+  if (!mounted) return null;
 
   const rawStatus = (activeTrip?.trip_status || '').toUpperCase();
   const isAcceptedOrActive =

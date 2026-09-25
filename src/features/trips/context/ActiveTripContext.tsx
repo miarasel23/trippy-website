@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from 'react';
 import { RentalTrip } from '@/features/trips/types/customerApi';
 import {
@@ -130,18 +131,28 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   const { language } = useLanguage();
   const { user, token } = useAppSelector((state) => state.auth);
 
-  const [activeTrip, setActiveTrip] = useState<RentalTrip | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const cached =
-        sessionStorage.getItem('trippy_active_trip_cache') ||
-        localStorage.getItem('trippy_active_trip_cache');
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return null;
-  });
+  const isInitialMount = useRef<boolean>(true);
+  const [activeTrip, setActiveTrip] = useState<RentalTrip | null>(null);
+  const [bidsCount, setBidsCount] = useState<number>(0);
 
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      // On initial client mount, safely restore cached active trip from storage
+      try {
+        const cached =
+          sessionStorage.getItem('trippy_active_trip_cache') ||
+          localStorage.getItem('trippy_active_trip_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setActiveTrip(parsed);
+          setBidsCount(parsed?.drivers?.length ?? parsed?.total_bids ?? 0);
+        }
+      } catch {}
+      return;
+    }
+
+    // Subsequent updates: persist or purge based on activeTrip state
     if (activeTrip) {
       try {
         const json = JSON.stringify(activeTrip);
@@ -164,20 +175,6 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
       } catch {}
     }
   }, [activeTrip]);
-
-  const [bidsCount, setBidsCount] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0;
-    try {
-      const cached =
-        sessionStorage.getItem('trippy_active_trip_cache') ||
-        localStorage.getItem('trippy_active_trip_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return parsed?.drivers?.length ?? parsed?.total_bids ?? 0;
-      }
-    } catch {}
-    return 0;
-  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isOverlayVisible, setIsOverlayVisible] = useState<boolean>(true);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);

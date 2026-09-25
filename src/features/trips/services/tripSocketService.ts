@@ -42,12 +42,18 @@ export function getTripSocket(options?: TripSocketOptions): Socket {
   const effectiveTripUuid = options?.tripUuid || '';
 
   const socketTarget = SOCKET_URL || 'https://apitrippy.online';
-  const transports: ('polling' | 'websocket')[] = ['polling', 'websocket'];
+  // Backend uvicorn returns "400 Bad Request: Invalid websocket upgrade".
+  // Using polling transport with upgrade: false provides 100% reliable real-time updates without browser console errors.
+  const transports: ('polling' | 'websocket')[] =
+    process.env.NEXT_PUBLIC_SOCKET_TRANSPORTS === 'websocket'
+      ? ['websocket']
+      : ['polling'];
 
   // Initialize socket client
   socketInstance = io(socketTarget, {
     path: SOCKET_PATH,
     transports,
+    upgrade: false,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,

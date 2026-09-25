@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ServiceCategory,
   LocationSearchResult,
@@ -64,16 +64,9 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     index: number;
   } | null>({ type: 'pickup', index: 0 });
 
-  // 3. Date and Time schedule state (Bangladesh Time format)
-  const [startDatetime, setStartDatetime] = useState<string>(() => {
-    const isRide = selectedService === 'RIDE_SHARE';
-    const initDate = isRide ? new Date() : new Date(Date.now() + (2 * 3600 + 20 * 60) * 1000); // +2h 20m
-    return formatDateTimeToApi(initDate);
-  });
-  const [endDatetime, setEndDatetime] = useState<string>(() => {
-    const later = new Date(Date.now() + 10 * 3600 * 1000);
-    return formatDateTimeToApi(later);
-  });
+  // 3. Date and Time schedule state (Bangladesh Time format - safely populated on client mount)
+  const [startDatetime, setStartDatetime] = useState<string>('');
+  const [endDatetime, setEndDatetime] = useState<string>('');
   const [hoursBooked, setHoursBooked] = useState<string>('4');
 
   // 4. Vehicle & Fare state
@@ -90,6 +83,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
   } = useActiveTrip();
   const [hasDismissedRadar, setHasDismissedRadar] = useState(false);
 
+  const isInitialBookingMount = useRef<boolean>(true);
   const [activeTrip, setActiveTrip] = useState<{
     uuid: string;
     customerUuid: string;
@@ -101,41 +95,44 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     hoursBooked?: string;
     note?: string;
     createdAt?: string;
-  } | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const cached =
-        sessionStorage.getItem('trippy_booking_active_trip') ||
-        localStorage.getItem('trippy_booking_active_trip');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        // If trip is already completed, finished, cancelled, or reviewed, purge and do not restore
-        const st = (parsed?.trip_status || '').toUpperCase();
-        if (
-          !parsed?.uuid ||
-          st === 'COMPLETED' ||
-          st === 'FINISHED' ||
-          st === 'TRIP_COMPLETED' ||
-          st === 'CANCELLED' ||
-          st === 'CANCELED' ||
-          isTripReviewed(parsed, parsed?.uuid)
-        ) {
-          clearAllTripRelatedStorage(parsed?.uuid);
-          return null;
-        }
-        if (parsed?.uuid && !parsed.createdAt) {
-          parsed.createdAt =
-            localStorage.getItem(`trippy_trip_created_${parsed.uuid}`) ||
-            sessionStorage.getItem(`trippy_trip_created_${parsed.uuid}`) ||
-            undefined;
-        }
-        return parsed;
-      }
-    } catch {}
-    return null;
-  });
+  } | null>(null);
 
   useEffect(() => {
+    if (isInitialBookingMount.current) {
+      isInitialBookingMount.current = false;
+      // On initial client mount, safely check storage to resume active booking if exists
+      try {
+        const cached =
+          sessionStorage.getItem('trippy_booking_active_trip') ||
+          localStorage.getItem('trippy_booking_active_trip');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const st = (parsed?.trip_status || '').toUpperCase();
+          if (
+            !parsed?.uuid ||
+            st === 'COMPLETED' ||
+            st === 'FINISHED' ||
+            st === 'TRIP_COMPLETED' ||
+            st === 'CANCELLED' ||
+            st === 'CANCELED' ||
+            isTripReviewed(parsed, parsed?.uuid)
+          ) {
+            clearAllTripRelatedStorage(parsed?.uuid);
+            return;
+          }
+          if (parsed?.uuid && !parsed.createdAt) {
+            parsed.createdAt =
+              localStorage.getItem(`trippy_trip_created_${parsed.uuid}`) ||
+              sessionStorage.getItem(`trippy_trip_created_${parsed.uuid}`) ||
+              undefined;
+          }
+          setActiveTrip(parsed);
+        }
+      } catch {}
+      return;
+    }
+
+    // Subsequent updates: persist or clear storage
     if (activeTrip) {
       try {
         const json = JSON.stringify(activeTrip);
