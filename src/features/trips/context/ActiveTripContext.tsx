@@ -17,7 +17,10 @@ import {
 import { useLanguage } from '@/context/LanguageContext';
 import { useAppSelector } from '@/store/hooks';
 import { clearAllTripRelatedStorage, isTripReviewed } from '@/shared/utils/tripStorage';
-import { subscribeToRentalBidTripSingle } from '@/features/trips/services/tripSocketService';
+import {
+  subscribeToRentalBidTripSingle,
+  isTripSocketConnected,
+} from '@/features/trips/services/tripSocketService';
 
 interface ActiveTripContextType {
   activeTrip: RentalTrip | null;
@@ -243,7 +246,7 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
 
-      // If activeTrip exists but wasn't in REQUESTED list, check single trip endpoint
+      // If activeTrip exists but wasn't in REQUESTED list, check single trip endpoint with ALL status
       if (!nextTrip && activeTripRef.current?.uuid) {
         const singleRes = await customerTripService.fetchSingleTripBids(
           customerUuid,
@@ -351,13 +354,12 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
 
     check();
 
-    // Gentle polling interval: when an active trip is ongoing, Socket.IO provides real-time updates
-    const intervalMs = activeTripRef.current ? 60000 : 25000;
+    // Background sync: periodic check ensures external status updates or DB changes are captured
     const interval = setInterval(() => {
       if (isMounted) {
         refreshActiveTrip();
       }
-    }, intervalMs);
+    }, 15000);
 
     return () => {
       isMounted = false;

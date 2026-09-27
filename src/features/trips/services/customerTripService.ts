@@ -134,9 +134,37 @@ export function normalizeRentalTrip(rawData: any): RentalTrip | null {
   if (!rawItem) return null;
 
   const nested = rawItem.rental_trip || rawItem.trip || {};
+  const resolvedUuid =
+    rawItem.uuid ||
+    rawItem.trip_uuid ||
+    rawItem.rental_trip_uuid ||
+    nested.uuid ||
+    nested.trip_uuid ||
+    nested.rental_trip_uuid ||
+    '';
+
+  const resolvedStatus =
+    rawItem.trip_status ||
+    rawItem.status ||
+    rawItem.ride_status ||
+    nested.trip_status ||
+    nested.status ||
+    nested.ride_status ||
+    '';
+
+  const resolvedCustomerUuid =
+    rawItem.customer_uuid ||
+    rawItem.customerUuid ||
+    nested.customer_uuid ||
+    nested.customerUuid ||
+    '';
+
   return {
     ...nested,
     ...rawItem,
+    uuid: resolvedUuid,
+    trip_status: resolvedStatus,
+    customer_uuid: resolvedCustomerUuid,
     drivers: rawItem.drivers || nested.drivers || [],
     seen_drivers: rawItem.seen_drivers || nested.seen_drivers || [],
     created_at:

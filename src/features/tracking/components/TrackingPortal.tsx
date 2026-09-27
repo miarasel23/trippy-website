@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useTripSocket } from '@/features/trips/hooks/useTripSocket';
 import { Badge } from '@/shared/components/ui/Badge';
 import {
   Phone,
@@ -327,11 +328,70 @@ export const TrackingPortal: React.FC = () => {
   // Dynamic polling interval: 5s for Ride Share, 30s for other services
   const pollIntervalMs = isRideShare ? 5000 : 30000;
 
-  // ── 1. Real-time Trip Polling from Backend API (5s for Ride Share, 30s for Others) ──
+  // ── Centralized Trip State & Lifecycle Transition Handler ──
+  const processTripState = useCallback(
+    (currentTrip: RentalTrip) => {
+      setTrip(currentTrip);
+
+      const status = (currentTrip.trip_status || '').toUpperCase();
+
+      // If trip is strictly in REQUESTED bidding state, redirect back to trips/bidding radar
+      if (status === 'REQUESTED') {
+        router.push(`/trips?trip_uuid=${effectiveTripUuid}`);
+        return;
+      }
+
+      const isDone =
+        status === 'COMPLETED' ||
+        status === 'FINISHED' ||
+        status === 'TRIP_COMPLETED' ||
+        status === 'CANCELLED' ||
+        status === 'CANCELED' ||
+        status === 'TRIP_CANCELLED';
+
+      if (isDone) {
+        clearAllTripRelatedStorage(effectiveTripUuid);
+      } else {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('trippy_has_active_ride', 'true');
+          } catch {}
+        }
+      }
+
+      // Check if review has been given
+      const isReviewed = isTripReviewed(currentTrip, effectiveTripUuid);
+
+      if (isDone && !isReviewed && !hasReviewed) {
+        setIsReviewModalOpen(true);
+      }
+    },
+    [effectiveTripUuid, hasReviewed, router]
+  );
+
+  // ── 1. Real-time Trip Updates via Socket.IO (0ms Instant Latency) ──
+  const handleTripSocketUpdate = useCallback(
+    (currentTrip: RentalTrip) => {
+      processTripState(currentTrip);
+      setIsLoading(false);
+    },
+    [processTripState]
+  );
+
+  const { isConnected: isSocketConnected } = useTripSocket({
+    tripUuid: effectiveTripUuid,
+    customerUuid: effectiveCustomerUuid,
+    onTripUpdate: handleTripSocketUpdate,
+    enabled: Boolean(effectiveTripUuid),
+  });
+
+  // ── 2. Trip HTTP Fetching: Initial mount + Disconnection fallback only ──
+  // Per requirement: DO NOT poll HTTP API repeatedly while Socket.IO connection is active.
+  // Only call API once on initial load, or as fallback when connection drops.
   useEffect(() => {
     let isMounted = true;
 
-    const pollTripStatus = async () => {
+    const fetchTripData = async () => {
       if (!effectiveTripUuid || !effectiveCustomerUuid) {
         setIsLoading(false);
         return;
@@ -349,44 +409,10 @@ export const TrackingPortal: React.FC = () => {
         if (!isMounted) return;
 
         if (res.status && res.data) {
-          const currentTrip = res.data;
-          setTrip(currentTrip);
-
-          const status = (currentTrip.trip_status || '').toUpperCase();
-
-          // If trip is strictly in REQUESTED bidding state, redirect back to trips/bidding radar
-          if (status === 'REQUESTED') {
-            router.push(`/trips?trip_uuid=${effectiveTripUuid}`);
-            return;
-          }
-
-          const isDone =
-            status === 'COMPLETED' ||
-            status === 'FINISHED' ||
-            status === 'TRIP_COMPLETED' ||
-            status === 'CANCELLED' ||
-            status === 'CANCELED' ||
-            status === 'TRIP_CANCELLED';
-
-          if (isDone) {
-            clearAllTripRelatedStorage(effectiveTripUuid);
-          } else {
-            if (typeof window !== 'undefined') {
-              try {
-                localStorage.setItem('trippy_has_active_ride', 'true');
-              } catch {}
-            }
-          }
-
-          // Check if review has been given
-          const isReviewed = isTripReviewed(currentTrip, effectiveTripUuid);
-
-          if (isDone && !isReviewed && !hasReviewed) {
-            setIsReviewModalOpen(true);
-          }
+          processTripState(res.data);
         }
       } catch (err) {
-        console.error('Failed to poll trip status in tracking:', err);
+        console.error('Failed to fetch trip in tracking:', err);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -394,14 +420,34 @@ export const TrackingPortal: React.FC = () => {
       }
     };
 
-    pollTripStatus();
-    const interval = setInterval(pollTripStatus, pollIntervalMs);
+    // Always fetch latest state on mount (catches any updates that arrived before socket connected)
+    fetchTripData();
+
+    // Dual-layer resilience:
+    // 1. Socket.IO delivers instant zero-latency updates (handled by useTripSocket above)
+    // 2. HTTP polling is a safety net — catches status changes when backend doesn't emit socket events
+    //    or when polling was faster than socket delivery
+    // When socket is connected: sync every 8s (ride share) / 12s (other) — lightweight guard
+    // When socket is down: sync at 5s / 10s — more aggressive fallback
+    const syncIntervalMs = isSocketConnected
+      ? (isRideShare ? 8000 : 12000)
+      : (isRideShare ? 5000 : 10000);
+
+    const interval = setInterval(fetchTripData, syncIntervalMs);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [effectiveTripUuid, effectiveCustomerUuid, language, token, hasReviewed, pollIntervalMs]);
+  }, [
+    effectiveTripUuid,
+    effectiveCustomerUuid,
+    language,
+    token,
+    isRideShare,
+    isSocketConnected,
+    processTripState,
+  ]);
 
   // Gentle ETA update when driver is en route
   useEffect(() => {

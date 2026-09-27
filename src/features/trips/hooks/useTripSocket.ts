@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { RentalTrip } from '@/features/trips/types/customerApi';
-import { subscribeToRentalBidTripSingle } from '@/features/trips/services/tripSocketService';
+import {
+  subscribeToRentalBidTripSingle,
+  isTripSocketConnected,
+} from '@/features/trips/services/tripSocketService';
 
 export interface UseTripSocketParams {
   tripUuid?: string | null;
@@ -19,7 +22,10 @@ export function useTripSocket({
   onTripUpdate,
   enabled = true,
 }: UseTripSocketParams) {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return isTripSocketConnected();
+  });
   const onTripUpdateRef = useRef(onTripUpdate);
   onTripUpdateRef.current = onTripUpdate;
 

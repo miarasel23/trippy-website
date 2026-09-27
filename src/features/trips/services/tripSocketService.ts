@@ -13,6 +13,13 @@ export interface TripSocketOptions {
 }
 
 /**
+ * Checks if the singleton Socket.IO instance is currently connected.
+ */
+export function isTripSocketConnected(): boolean {
+  return Boolean(socketInstance && socketInstance.connected);
+}
+
+/**
  * Returns or initializes the singleton Socket.IO client instance.
  * Automatically configured with fallback transports (polling + websocket upgrade).
  */
@@ -56,9 +63,9 @@ export function getTripSocket(options?: TripSocketOptions): Socket {
     upgrade: false,
     reconnection: true,
     reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    timeout: 20000,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 3000,
+    timeout: 15000,
     autoConnect: true,
     auth: {
       user_uuid: effectiveUserUuid,
@@ -121,45 +128,127 @@ export function getTripSocket(options?: TripSocketOptions): Socket {
     const trip = normalizeRentalTrip(rawPayload);
     if (!trip || !trip.uuid) return;
 
-    // Deduplicate event bursts (e.g. backend emitting to both trip and user rooms simultaneously)
-    const signature = `${trip.uuid}_${trip.trip_status}_${trip.drivers?.length ?? 0}_${trip.offer_amount}_${trip.seen_driver_count ?? trip.seen_drivers?.length ?? 0}`;
+    // Deduplicate rapid duplicate emits while preserving legitimate state/bid changes
+    const driverSummary = Array.isArray(trip.drivers)
+      ? trip.drivers
+          .map(
+            (d: any) =>
+              `${d.driver_uuid || d.uuid || ''}:${d.bid_amount || d.counter_bid || ''}:${d.bid_status || d.status || ''}:${d.is_accepted ?? ''}`
+          )
+          .join('|')
+      : '';
+    const signature = `${trip.uuid}_${trip.trip_status}_${trip.offer_amount}_${driverSummary}_${trip.seen_driver_count ?? trip.seen_drivers?.length ?? 0}`;
     const now = Date.now();
-    if (signature === lastEventSignature && now - lastEventTimestamp < 350) {
+    if (signature === lastEventSignature && now - lastEventTimestamp < 200) {
       return;
     }
     lastEventSignature = signature;
     lastEventTimestamp = now;
 
-    const listeners = activeTripSubscriptions.get(trip.uuid);
-    if (listeners && listeners.size > 0) {
-      listeners.forEach((callback) => {
-        try {
-          callback(trip);
-        } catch (err) {
-          console.error('[Socket.IO] Error in trip subscription listener:', err);
-        }
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Socket.IO] Real-time Trip Update received for ${trip.uuid}:`, {
+        status: trip.trip_status,
+        driversCount: trip.drivers?.length ?? 0,
+        fare: trip.offer_amount,
       });
     }
+
+    const tripUuidNorm = trip.uuid ? trip.uuid.trim().toLowerCase() : '';
+    activeTripSubscriptions.forEach((listeners, subTripUuid) => {
+      const subNorm = subTripUuid ? subTripUuid.trim().toLowerCase() : '';
+      if (
+        subNorm === tripUuidNorm ||
+        subTripUuid === '*' ||
+        !subTripUuid ||
+        !tripUuidNorm || // If server event didn't include UUID, but client is subscribed to active trip
+        activeTripSubscriptions.size === 1 // Only 1 active trip in current browser session
+      ) {
+        listeners.forEach((callback) => {
+          try {
+            callback(trip);
+          } catch (err) {
+            console.error('[Socket.IO] Error in trip subscription listener:', err);
+          }
+        });
+      }
+    });
   };
 
-  // Listen to both the specific route event and general trip update event
+  // Primary event listeners
   socketInstance.on(SocketEvents.RENTAL_BID_TRIP_SINGLE, handleTripIncomingData);
   socketInstance.on(SocketEvents.TRIP_UPDATED, handleTripIncomingData);
+
+  // Common backend event name aliases
+  socketInstance.on('rental-bid-trip-single_for_customer', handleTripIncomingData);
+  socketInstance.on('rental_bid_trip_single', handleTripIncomingData);
+  socketInstance.on('rental-bid-trip-single', handleTripIncomingData);
+  socketInstance.on('trip_update', handleTripIncomingData);
+  socketInstance.on('trip_status', handleTripIncomingData);
+  socketInstance.on('trip_status_changed', handleTripIncomingData);
+  socketInstance.on('driver_bid', handleTripIncomingData);
+  socketInstance.on('driver_bids', handleTripIncomingData);
+  socketInstance.on('driver_accepted', handleTripIncomingData);
+  socketInstance.on('bid_accepted', handleTripIncomingData);
+  socketInstance.on('status_update', handleTripIncomingData);
+  socketInstance.on('trip_cancelled', handleTripIncomingData);
+  socketInstance.on('trip_completed', handleTripIncomingData);
+
+  // Wildcard handler via Socket.IO v4 onAny: catches ANY server event carrying trip data
+  socketInstance.onAny((eventName: string, ...args: any[]) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Socket.IO onAny] Received event: "${eventName}"`, args);
+    }
+    for (const payload of args) {
+      if (!payload || typeof payload !== 'object') continue;
+      const tripCandidate = payload.data || payload.trip || payload.rental_trip || payload;
+      if (
+        tripCandidate &&
+        typeof tripCandidate === 'object' &&
+        (tripCandidate.uuid ||
+          tripCandidate.rental_trip_uuid ||
+          tripCandidate.trip_uuid ||
+          tripCandidate.trip_status ||
+          tripCandidate.status ||
+          tripCandidate.ride_status)
+      ) {
+        handleTripIncomingData(payload);
+        break;
+      }
+    }
+  });
 
   return socketInstance;
 }
 
 /**
- * Emits 'join_trip' event to join the room 'trip_<tripUuid>'
+ * Emits room join events to join the trip room.
+ * Handles both connected and pending connection states.
  */
 export function joinTripRoom(tripUuid: string): void {
   if (!tripUuid || typeof window === 'undefined') return;
-  const socket = getTripSocket({ tripUuid });
-  if (socket && socket.connected) {
-    socket.emit(SocketEvents.JOIN_TRIP, { trip_uuid: tripUuid.trim() });
+  const cleanTripUuid = tripUuid.trim();
+  const socket = getTripSocket({ tripUuid: cleanTripUuid });
+  if (!socket) return;
+
+  const emitJoin = () => {
+    socket.emit(SocketEvents.JOIN_TRIP, {
+      trip_uuid: cleanTripUuid,
+      room: `trip_${cleanTripUuid}`,
+      room_name: `trip_${cleanTripUuid}`,
+    });
+    socket.emit('join_room', { room: `trip_${cleanTripUuid}`, trip_uuid: cleanTripUuid });
+    socket.emit('join_room', { room: cleanTripUuid, trip_uuid: cleanTripUuid });
+    socket.emit('join', `trip_${cleanTripUuid}`);
+    socket.emit('join', cleanTripUuid);
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[Socket.IO] Joined trip room: ${tripUuid}`);
+      console.log(`[Socket.IO] Joined trip room: ${cleanTripUuid}`);
     }
+  };
+
+  if (socket.connected) {
+    emitJoin();
+  } else {
+    socket.once('connect', emitJoin);
   }
 }
 
@@ -168,25 +257,49 @@ export function joinTripRoom(tripUuid: string): void {
  */
 export function leaveTripRoom(tripUuid: string): void {
   if (!tripUuid || typeof window === 'undefined') return;
+  const cleanTripUuid = tripUuid.trim();
   if (socketInstance && socketInstance.connected) {
-    socketInstance.emit(SocketEvents.LEAVE_TRIP, { trip_uuid: tripUuid.trim() });
+    socketInstance.emit(SocketEvents.LEAVE_TRIP, { trip_uuid: cleanTripUuid });
+    socketInstance.emit('leave_room', { room: `trip_${cleanTripUuid}` });
+    socketInstance.emit('leave_room', { room: cleanTripUuid });
+    socketInstance.emit('leave', `trip_${cleanTripUuid}`);
+    socketInstance.emit('leave', cleanTripUuid);
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[Socket.IO] Left trip room: ${tripUuid}`);
+      console.log(`[Socket.IO] Left trip room: ${cleanTripUuid}`);
     }
   }
 }
 
 /**
- * Emits 'join_user' to receive user-targeted events
+ * Emits room join events to receive user-targeted events.
+ * Handles both connected and pending connection states.
  */
 export function joinUserRoom(userUuid: string): void {
   if (!userUuid || typeof window === 'undefined') return;
-  const socket = getTripSocket({ userUuid });
-  if (socket && socket.connected) {
-    socket.emit(SocketEvents.JOIN_USER, { user_uuid: userUuid.trim() });
+  const cleanUserUuid = userUuid.trim();
+  const socket = getTripSocket({ userUuid: cleanUserUuid });
+  if (!socket) return;
+
+  const emitUserJoin = () => {
+    socket.emit(SocketEvents.JOIN_USER, {
+      user_uuid: cleanUserUuid,
+      customer_uuid: cleanUserUuid,
+      room: `user_${cleanUserUuid}`,
+    });
+    socket.emit('join_room', { room: `user_${cleanUserUuid}` });
+    socket.emit('join_room', { room: `customer_${cleanUserUuid}` });
+    socket.emit('join_room', { room: cleanUserUuid });
+    socket.emit('join', `user_${cleanUserUuid}`);
+    socket.emit('join', `customer_${cleanUserUuid}`);
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[Socket.IO] Joined user room: ${userUuid}`);
+      console.log(`[Socket.IO] Joined user room: ${cleanUserUuid}`);
     }
+  };
+
+  if (socket.connected) {
+    emitUserJoin();
+  } else {
+    socket.once('connect', emitUserJoin);
   }
 }
 
@@ -195,8 +308,13 @@ export function joinUserRoom(userUuid: string): void {
  */
 export function leaveUserRoom(userUuid: string): void {
   if (!userUuid || typeof window === 'undefined') return;
+  const cleanUserUuid = userUuid.trim();
   if (socketInstance && socketInstance.connected) {
-    socketInstance.emit(SocketEvents.LEAVE_USER, { user_uuid: userUuid.trim() });
+    socketInstance.emit(SocketEvents.LEAVE_USER, { user_uuid: cleanUserUuid });
+    socketInstance.emit('leave_room', { room: `user_${cleanUserUuid}` });
+    socketInstance.emit('leave_room', { room: `customer_${cleanUserUuid}` });
+    socketInstance.emit('leave', `user_${cleanUserUuid}`);
+    socketInstance.emit('leave', `customer_${cleanUserUuid}`);
   }
 }
 
@@ -257,6 +375,7 @@ export function subscribeToRentalBidTripSingle(params: {
 
 export const tripSocketService = {
   getSocket: getTripSocket,
+  isConnected: isTripSocketConnected,
   joinTripRoom,
   leaveTripRoom,
   joinUserRoom,

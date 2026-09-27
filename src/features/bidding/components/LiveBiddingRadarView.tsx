@@ -920,8 +920,11 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     enabled: Boolean(effectiveActiveTripUuid) && !isTerminalRef.current,
   });
 
+  const hasFetchedInitialRef = useRef(false);
+
   // ── 3. Resilient Fallback Polling via /v1/rental-trip/rental-bid-trip-single_for_customer ──
-  // Operates quietly in background (12s if Socket.IO is connected, 5s for RideShare if disconnected)
+  // Per requirement: DO NOT poll HTTP API repeatedly while Socket.IO is connected.
+  // Real-time Socket.IO handles all updates. Fallback polling only runs if socket drops.
   useEffect(() => {
     let isMounted = true;
 
@@ -981,17 +984,14 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       }
     };
 
-    // When Socket.IO is established and connected, real-time events handle all updates.
-    // Absolutely NO repeated polling when socket is active.
-    if (isSocketConnected) {
-      return () => {
-        isMounted = false;
-      };
+    // Always ensure latest state is loaded on mount
+    if (!hasFetchedInitialRef.current) {
+      hasFetchedInitialRef.current = true;
+      pollBids();
     }
 
-    // Only if Socket.IO is NOT connected, use fallback polling
-    pollBids();
-    const pollIntervalMs = isRideShare ? 5000 : 15000;
+    // Periodic sync: ensures status updates from backend (even direct DB changes) are never missed
+    const pollIntervalMs = isSocketConnected ? 12000 : (isRideShare ? 5000 : 10000);
     const interval = setInterval(pollBids, pollIntervalMs);
 
     return () => {
