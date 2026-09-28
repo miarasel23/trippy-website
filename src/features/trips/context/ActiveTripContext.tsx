@@ -19,6 +19,7 @@ import { useAppSelector } from '@/store/hooks';
 import { clearAllTripRelatedStorage, isTripReviewed } from '@/shared/utils/tripStorage';
 import {
   subscribeToRentalBidTripSingle,
+  subscribeToRentalBidTripList,
   isTripSocketConnected,
 } from '@/features/trips/services/tripSocketService';
 
@@ -331,6 +332,30 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [activeTrip?.uuid, customerUuid]);
 
+  // ── Real-time Socket.IO Sync for Trip List (Ensures global socket connection) ──
+  useEffect(() => {
+    if (!customerUuid || typeof window === 'undefined') return;
+
+    const unsubscribe = subscribeToRentalBidTripList({
+      customerUuid,
+      onTripListUpdate: (trips) => {
+        // If there is no active trip but a new one arrives in REQUESTED status
+        if (!activeTripRef.current) {
+          const newRequested = trips.find(t => (t.trip_status || '').toUpperCase() === 'REQUESTED');
+          if (newRequested) {
+            setActiveTrip(newRequested);
+            setIsOverlayVisible(true);
+            setIsMinimized(false);
+          }
+        }
+      },
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [customerUuid]);
+
   // Initial load + gentle fallback check (60s if active trip is handled by Socket.IO, 25s if idle)
   useEffect(() => {
     let isMounted = true;
@@ -355,9 +380,16 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
     check();
 
     // Background sync: periodic check ensures external status updates or DB changes are captured
+    // If Socket.IO is perfectly connected, skip the API call!
     const interval = setInterval(() => {
       if (isMounted) {
-        refreshActiveTrip();
+        const connected = isTripSocketConnected();
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[ActiveTripContext] Interval check. Socket Connected: ${connected}`);
+        }
+        if (!connected) {
+          refreshActiveTrip();
+        }
       }
     }, 15000);
 

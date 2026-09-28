@@ -6,6 +6,14 @@ import { normalizeRentalTrip, getActiveCustomerUuid } from '@/features/trips/ser
 let socketInstance: Socket | null = null;
 const activeTripSubscriptions = new Map<string, Set<(trip: RentalTrip) => void>>();
 const statusListeners = new Set<(connected: boolean) => void>();
+const failureListeners = new Set<(failed: boolean) => void>();
+
+// Tracks how many consecutive WebSocket errors have occurred.
+// After MAX_CONNECT_ERRORS, we give up on Socket.IO and let
+// components fall back to direct HTTP API calls.
+let connectErrorCount = 0;
+const MAX_CONNECT_ERRORS = 3;
+let socketFailed = false;
 
 export interface TripSocketOptions {
   userUuid?: string;
@@ -13,19 +21,46 @@ export interface TripSocketOptions {
 }
 
 /**
- * Checks if the singleton Socket.IO instance is currently connected.
+ * Checks if the singleton Socket.IO instance is currently connected via WebSocket.
  */
 export function isTripSocketConnected(): boolean {
   return Boolean(socketInstance && socketInstance.connected);
 }
 
 /**
- * Returns or initializes the singleton Socket.IO client instance.
- * Automatically configured with fallback transports (polling + websocket upgrade).
+ * Returns true if the WebSocket connection has permanently failed (after MAX_CONNECT_ERRORS).
+ * Components should use this to switch to direct HTTP API polling as fallback.
  */
-export function getTripSocket(options?: TripSocketOptions): Socket {
+export function isTripSocketFailed(): boolean {
+  return socketFailed;
+}
+
+/**
+ * Registers a listener that fires when the socket permanently fails.
+ * Returns a cleanup function to remove the listener.
+ */
+export function onSocketFailure(fn: (failed: boolean) => void): () => void {
+  failureListeners.add(fn);
+  // Immediately notify if already failed
+  if (socketFailed) fn(true);
+  return () => failureListeners.delete(fn);
+}
+
+/**
+ * Returns or initializes the singleton Socket.IO client instance.
+ * Uses WebSocket transport only — no Socket.IO internal HTTP polling ever.
+ * If WebSocket fails after MAX_CONNECT_ERRORS attempts, marks the socket as
+ * permanently failed so components can fall back to direct HTTP API calls.
+ */
+export function getTripSocket(options?: TripSocketOptions): Socket | null {
   if (typeof window === 'undefined') {
-    return null as unknown as Socket;
+    return null;
+  }
+
+  // If WebSocket has permanently failed, do not attempt to reconnect.
+  // Components should be reading isTripSocketFailed() and calling the HTTP API directly.
+  if (socketFailed) {
+    return null;
   }
 
   if (socketInstance && (socketInstance.connected || socketInstance.active)) {
@@ -49,23 +84,20 @@ export function getTripSocket(options?: TripSocketOptions): Socket {
   const effectiveTripUuid = options?.tripUuid || '';
 
   const socketTarget = SOCKET_URL || 'https://apitrippy.online';
-  // Backend uvicorn returns "400 Bad Request: Invalid websocket upgrade".
-  // Using polling transport with upgrade: false provides 100% reliable real-time updates without browser console errors.
-  const transports: ('polling' | 'websocket')[] =
-    process.env.NEXT_PUBLIC_SOCKET_TRANSPORTS === 'websocket'
-      ? ['websocket']
-      : ['polling'];
 
-  // Initialize socket client
+  // WebSocket ONLY — no Socket.IO internal polling transport.
+  // If WebSocket succeeds → real-time updates at 0ms latency.
+  // If WebSocket fails (after MAX_CONNECT_ERRORS) → socket is marked failed,
+  // and components fall back to direct HTTP API calls. No polling via Socket.IO ever.
   socketInstance = io(socketTarget, {
     path: SOCKET_PATH,
-    transports,
+    transports: ['websocket'],
     upgrade: false,
     reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 500,
+    reconnectionAttempts: MAX_CONNECT_ERRORS,
+    reconnectionDelay: 1000,
     reconnectionDelayMax: 3000,
-    timeout: 15000,
+    timeout: 10000,
     autoConnect: true,
     auth: {
       user_uuid: effectiveUserUuid,
@@ -75,13 +107,17 @@ export function getTripSocket(options?: TripSocketOptions): Socket {
 
   // Attach global lifecycle handlers
   socketInstance.on('connect', () => {
+    // WebSocket connected — reset failure tracking
+    connectErrorCount = 0;
+    socketFailed = false;
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[Socket.IO] Connected successfully (sid: ${socketInstance?.id})`);
+      console.log(`[Socket.IO] ✅ WebSocket connected (sid: ${socketInstance?.id})`);
     }
     statusListeners.forEach((fn) => {
-      try {
-        fn(true);
-      } catch {}
+      try { fn(true); } catch {}
+    });
+    failureListeners.forEach((fn) => {
+      try { fn(false); } catch {}
     });
 
     // Re-join any active trip rooms on reconnect
@@ -103,21 +139,36 @@ export function getTripSocket(options?: TripSocketOptions): Socket {
       console.log(`[Socket.IO] Disconnected (reason: ${reason})`);
     }
     statusListeners.forEach((fn) => {
-      try {
-        fn(false);
-      } catch {}
+      try { fn(false); } catch {}
     });
   });
 
   socketInstance.on('connect_error', (error) => {
+    connectErrorCount += 1;
     if (process.env.NODE_ENV !== 'production') {
-      console.warn(`[Socket.IO] Connection error:`, error.message);
+      console.warn(`[Socket.IO] WebSocket error (${connectErrorCount}/${MAX_CONNECT_ERRORS}):`, error.message);
     }
     statusListeners.forEach((fn) => {
-      try {
-        fn(false);
-      } catch {}
+      try { fn(false); } catch {}
     });
+
+    // After MAX_CONNECT_ERRORS consecutive failures, give up on WebSocket.
+    // Mark as permanently failed so components switch to direct HTTP API polling.
+    if (connectErrorCount >= MAX_CONNECT_ERRORS) {
+      socketFailed = true;
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[Socket.IO] ❌ WebSocket permanently unavailable after ${MAX_CONNECT_ERRORS} attempts. Falling back to HTTP API polling.`);
+      }
+      // Stop all reconnection attempts — we do NOT want Socket.IO internal polling
+      if (socketInstance) {
+        socketInstance.disconnect();
+        socketInstance = null;
+      }
+      // Notify all failure listeners so components can switch to HTTP API
+      failureListeners.forEach((fn) => {
+        try { fn(true); } catch {}
+      });
+    }
   });
 
   let lastEventSignature = '';
@@ -344,6 +395,14 @@ export function subscribeToRentalBidTripSingle(params: {
     onStatusChange(Boolean(socket?.connected));
   }
 
+  if (!socket) {
+    return () => {
+      if (onStatusChange) {
+        statusListeners.delete(onStatusChange);
+      }
+    };
+  }
+
   // Register trip subscriber
   if (!activeTripSubscriptions.has(cleanTripUuid)) {
     activeTripSubscriptions.set(cleanTripUuid, new Set());
@@ -373,14 +432,100 @@ export function subscribeToRentalBidTripSingle(params: {
   };
 }
 
+
+/**
+ * Subscribes to real-time full active trip list updates for a customer.
+ */
+export function subscribeToRentalBidTripList(params: {
+  customerUuid: string;
+  onTripListUpdate: (trips: RentalTrip[]) => void;
+  onStatusChange?: (connected: boolean) => void;
+}): () => void {
+  const { customerUuid, onTripListUpdate, onStatusChange } = params;
+  if (!customerUuid || typeof window === 'undefined') {
+    return () => {};
+  }
+  const cleanCustomerUuid = customerUuid.trim();
+  const socket = getTripSocket({ userUuid: cleanCustomerUuid });
+  
+  if (onStatusChange) {
+    statusListeners.add(onStatusChange);
+    onStatusChange(Boolean(socket?.connected));
+  }
+
+  if (!socket) {
+    return () => {
+      if (onStatusChange) {
+        statusListeners.delete(onStatusChange);
+      }
+    };
+  }
+
+  const handler = (rawPayload: any) => {
+    let payload = rawPayload;
+    if (rawPayload && rawPayload.data) {
+        payload = rawPayload.data;
+    }
+    if (Array.isArray(payload)) {
+        const normalized = payload.map(normalizeRentalTrip).filter(Boolean) as RentalTrip[];
+        onTripListUpdate(normalized);
+    }
+  };
+
+  socket.on('rental_bid_trip_list_for_customer', handler);
+  socket.on('rental-bid-trip-list_for_customer', handler);
+
+  joinUserRoom(cleanCustomerUuid);
+
+  return () => {
+    if (onStatusChange) {
+      statusListeners.delete(onStatusChange);
+    }
+    socket.off('rental_bid_trip_list_for_customer', handler);
+    socket.off('rental-bid-trip-list_for_customer', handler);
+    // leaveUserRoom(cleanCustomerUuid); // Let other listeners keep the room if needed
+  };
+}
+
+/**
+ * Subscribes to real-time driver tracking location updates.
+ */
+export function subscribeToDriverTrack(params: {
+  tripUuid?: string;
+  customerUuid?: string;
+  onTrackUpdate: (trackData: any) => void;
+}): () => void {
+  const { tripUuid, customerUuid, onTrackUpdate } = params;
+  const socket = getTripSocket({ tripUuid, userUuid: customerUuid });
+  // If socket is null (WebSocket failed), return a no-op cleanup
+  if (!socket) return () => {};
+
+  const handler = (rawPayload: any) => {
+    onTrackUpdate(rawPayload);
+  };
+
+  socket.on('customer_driver_track_update', handler);
+
+  if (tripUuid) joinTripRoom(tripUuid);
+  if (customerUuid) joinUserRoom(customerUuid);
+
+  return () => {
+    socket.off('customer_driver_track_update', handler);
+  };
+}
+
 export const tripSocketService = {
   getSocket: getTripSocket,
   isConnected: isTripSocketConnected,
+  isFailed: isTripSocketFailed,
+  onFailure: onSocketFailure,
   joinTripRoom,
   leaveTripRoom,
   joinUserRoom,
   leaveUserRoom,
   subscribeToRentalBidTripSingle,
+  subscribeToRentalBidTripList,
+  subscribeToDriverTrack,
 };
 
 export default tripSocketService;

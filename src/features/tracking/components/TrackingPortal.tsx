@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useTripSocket } from '@/features/trips/hooks/useTripSocket';
+import { useTripSocket, useDriverTrackSocket } from '@/features/trips/hooks/useTripSocket';
 import { Badge } from '@/shared/components/ui/Badge';
 import {
   Phone,
@@ -378,16 +378,30 @@ export const TrackingPortal: React.FC = () => {
     [processTripState]
   );
 
-  const { isConnected: isSocketConnected } = useTripSocket({
+  const { isConnected: isSocketConnected, socketFailed: isSocketFailed } = useTripSocket({
     tripUuid: effectiveTripUuid,
     customerUuid: effectiveCustomerUuid,
     onTripUpdate: handleTripSocketUpdate,
     enabled: Boolean(effectiveTripUuid),
   });
 
-  // ── 2. Trip HTTP Fetching: Initial mount + Disconnection fallback only ──
-  // Per requirement: DO NOT poll HTTP API repeatedly while Socket.IO connection is active.
-  // Only call API once on initial load, or as fallback when connection drops.
+  // ── 2. Trip Data: One initial HTTP fetch, then Socket.IO owns all updates ──
+  //
+  // Strategy:
+  //   • Always do ONE initial fetch on mount to hydrate UI (regardless of socket state).
+  //   • If Socket.IO is connected → stop there. Socket pushes all future updates instantly.
+  //   • If Socket.IO is disconnected → start periodic HTTP polling as fallback.
+  //   • If socket reconnects mid-session → the polling effect re-runs and stops the interval.
+  //
+  // This ref ensures the one-time initial fetch only fires once per trip,
+  // even when isSocketConnected state changes and the effect re-runs.
+  const hasFetchedInitialRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    // Reset guard whenever the trip changes
+    hasFetchedInitialRef.current = false;
+  }, [effectiveTripUuid, effectiveCustomerUuid]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -412,7 +426,7 @@ export const TrackingPortal: React.FC = () => {
           processTripState(res.data);
         }
       } catch (err) {
-        console.error('Failed to fetch trip in tracking:', err);
+        console.error('[TripFetch] Failed to fetch trip data:', err);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -420,19 +434,21 @@ export const TrackingPortal: React.FC = () => {
       }
     };
 
-    // Always fetch latest state on mount (catches any updates that arrived before socket connected)
-    fetchTripData();
+    // ── Initial fetch (runs exactly once per trip, on first mount) ──
+    if (!hasFetchedInitialRef.current) {
+      hasFetchedInitialRef.current = true;
+      fetchTripData();
+    }
 
-    // Dual-layer resilience:
-    // 1. Socket.IO delivers instant zero-latency updates (handled by useTripSocket above)
-    // 2. HTTP polling is a safety net — catches status changes when backend doesn't emit socket events
-    //    or when polling was faster than socket delivery
-    // When socket is connected: sync every 8s (ride share) / 12s (other) — lightweight guard
-    // When socket is down: sync at 5s / 10s — more aggressive fallback
-    const syncIntervalMs = isSocketConnected
-      ? (isRideShare ? 8000 : 12000)
-      : (isRideShare ? 5000 : 10000);
+    // ── WebSocket connected: Socket.IO owns all updates. No polling needed. ──
+    if (isSocketConnected) {
+      return () => {
+        isMounted = false;
+      };
+    }
 
+    // ── WebSocket unavailable (failed or temporarily disconnected): HTTP API polling fallback ──
+    const syncIntervalMs = isRideShare ? 5000 : 10000;
     const interval = setInterval(fetchTripData, syncIntervalMs);
 
     return () => {
@@ -446,6 +462,7 @@ export const TrackingPortal: React.FC = () => {
     token,
     isRideShare,
     isSocketConnected,
+    isSocketFailed,
     processTripState,
   ]);
 
@@ -605,13 +622,61 @@ export const TrackingPortal: React.FC = () => {
     };
   }, [isCompleted]);
 
-  // ── 2.b Live Driver Location Polling (/v1/customer-driver-track/get) ──────────
+
+  // ── Live Driver GPS Location Updates via Socket.IO ──
+  useDriverTrackSocket({
+    tripUuid: effectiveTripUuid,
+    customerUuid: effectiveCustomerUuid,
+    enabled: Boolean(effectiveTripUuid || effectiveCustomerUuid),
+    onTrackUpdate: (newTrack) => {
+      setDriverTrackingRecords((prev) => {
+        // Simple deduplication logic
+        const exists = prev.find(p => p.uuid === newTrack.uuid);
+        if (exists) return prev;
+        const newArray = [newTrack, ...prev].slice(0, 100);
+        return newArray;
+      });
+      if (newTrack?.geolocation?.latitude && newTrack?.geolocation?.longitude) {
+        const lat =
+          typeof newTrack.geolocation.latitude === 'string'
+            ? parseFloat(newTrack.geolocation.latitude)
+            : Number(newTrack.geolocation.latitude);
+        const lng =
+          typeof newTrack.geolocation.longitude === 'string'
+            ? parseFloat(newTrack.geolocation.longitude)
+            : Number(newTrack.geolocation.longitude);
+
+        if (!isNaN(lat) && !isNaN(lng)) {
+          setLatestDriverLocation({
+            latitude: lat,
+            longitude: lng,
+            address: newTrack.geolocation.address || 'Driver Location',
+            updated_at: newTrack.created_at || new Date().toISOString(),
+          });
+        }
+      }
+    },
+  });
+
+  // ── 2.b Live Driver GPS Location: Socket.IO first, HTTP polling fallback ──
+  //
+  // Strategy:
+  //   • Socket connected → useDriverTrackSocket (above) delivers GPS updates in real-time.
+  //     Do ONE initial HTTP fetch to hydrate the map, then let socket own all updates.
+  //   • Socket disconnected → periodic HTTP polling every 10s as fallback.
+  //
+  const hasFetchedDriverLocationRef = useRef<boolean>(false);
+
   useEffect(() => {
-    // Only poll live driver GPS tracking when there is an active running trip!
+    hasFetchedDriverLocationRef.current = false;
+  }, [effectiveDriverUuid]);
+
+  useEffect(() => {
+    // Only track live GPS when there is an active running trip
     if (!effectiveDriverUuid || !isActiveTrip) return;
     let isMounted = true;
 
-    const pollDriverLocation = async () => {
+    const fetchDriverLocation = async () => {
       try {
         const records = await customerTripService.fetchDriverLocation(
           effectiveDriverUuid,
@@ -638,8 +703,7 @@ export const TrackingPortal: React.FC = () => {
               setLatestDriverLocation({
                 latitude: lat,
                 longitude: lng,
-                address:
-                  latest.geolocation.address || '',
+                address: latest.geolocation.address || '',
                 updated_at: latest.created_at || latest.updated_at,
               });
             }
@@ -648,14 +712,27 @@ export const TrackingPortal: React.FC = () => {
       } catch {}
     };
 
-    pollDriverLocation();
-    const interval = setInterval(pollDriverLocation, 10000); // 10s polling interval
+    // ── Initial fetch: hydrate map with last known driver position ──
+    if (!hasFetchedDriverLocationRef.current) {
+      hasFetchedDriverLocationRef.current = true;
+      fetchDriverLocation();
+    }
+
+    // ── WebSocket connected: useDriverTrackSocket handles GPS in real-time. No polling. ──
+    if (isSocketConnected) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    // ── WebSocket unavailable: poll HTTP API every 10s as fallback ──
+    const interval = setInterval(fetchDriverLocation, 10000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [effectiveDriverUuid, language, token, isActiveTrip]);
+  }, [effectiveDriverUuid, language, token, isActiveTrip, isSocketConnected, isSocketFailed]);
 
   // Car photos list from driver info (Strictly use real photos; do not fall back to fake demo photos if driver has none)
   const noPhotosParam = searchParams.get('no_photos') === 'true';

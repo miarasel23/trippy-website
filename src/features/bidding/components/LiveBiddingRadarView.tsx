@@ -14,7 +14,7 @@ import { CarPhotoGalleryModal } from './CarPhotoGalleryModal';
 import { RaiseOfferModal } from './RaiseOfferModal';
 import { TripReviewModal } from './TripReviewModal';
 import { clearAllTripRelatedStorage, markTripReviewed, isTripReviewed } from '@/shared/utils/tripStorage';
-import { useTripSocket } from '@/features/trips/hooks/useTripSocket';
+import { useTripSocket, useTripListSocket } from '@/features/trips/hooks/useTripSocket';
 import { useLanguage } from '@/context/LanguageContext';
 import { useActiveTrip, hasTripDataChanged } from '@/features/trips/context/ActiveTripContext';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
@@ -913,7 +913,21 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     user?.uuid ||
     getActiveCustomerUuid();
 
-  const { isConnected: isSocketConnected } = useTripSocket({
+
+  // ── Live Trip List Updates via Socket.IO ──
+  useTripListSocket({
+    customerUuid: customerUuid,
+    enabled: Boolean(customerUuid),
+    onTripListUpdate: (updatedTrips) => {
+      // Find current active trip
+      const currentActive = updatedTrips.find(t => t.uuid === activeTrip?.uuid) || updatedTrips.find(t => t.trip_status === 'REQUESTED') || updatedTrips[0];
+      if (currentActive) {
+        processTripUpdate(currentActive);
+      }
+    },
+  });
+
+  const { isConnected: isSocketConnected, socketFailed: isSocketFailed } = useTripSocket({
     tripUuid: effectiveActiveTripUuid,
     customerUuid: effectiveActiveCustomerUuid,
     onTripUpdate: processTripUpdate,
@@ -990,8 +1004,15 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       pollBids();
     }
 
-    // Periodic sync: ensures status updates from backend (even direct DB changes) are never missed
-    const pollIntervalMs = isSocketConnected ? 12000 : (isRideShare ? 5000 : 10000);
+    // If WebSocket is connected: Socket.IO pushes all updates. Zero HTTP polling.
+    if (isSocketConnected) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    // WebSocket unavailable (failed or disconnected): fall back to HTTP API polling
+    const pollIntervalMs = isRideShare ? 5000 : 10000;
     const interval = setInterval(pollBids, pollIntervalMs);
 
     return () => {
@@ -1009,6 +1030,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     processTripUpdate,
     isRideShare,
     isSocketConnected,
+    isSocketFailed,
   ]);
 
 
