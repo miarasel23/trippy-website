@@ -476,8 +476,23 @@ export const TrackingPortal: React.FC = () => {
       }
     };
 
-    fetchTripData();
+    // Fetch initial trip state on mount if not already loaded in memory
+    if (!trip || trip.uuid !== effectiveTripUuid || !isSocketConnected) {
+      fetchTripData();
+    } else {
+      setIsLoading(false);
+    }
 
+    // Zero-polling strategy: When WebSocket is actively connected, all trip
+    // updates arrive instantly via Socket.IO with 0ms latency.
+    // Skip background interval polling completely.
+    if (isSocketConnected) {
+      return () => {
+        isEffectActive = false;
+      };
+    }
+
+    // Resilient fallback: Polling interval only runs if WebSocket is disconnected or failed
     const syncIntervalMs = isRideShare ? 5000 : 10000;
     const interval = setInterval(fetchTripData, syncIntervalMs);
 
@@ -491,6 +506,8 @@ export const TrackingPortal: React.FC = () => {
     language,
     token,
     isRideShare,
+    isSocketConnected,
+    trip,
     processTripState,
   ]);
 
@@ -753,16 +770,36 @@ export const TrackingPortal: React.FC = () => {
       } catch {}
     };
 
-    fetchDriverLocation();
+    // Fetch initial location once on mount only if not already loaded and not yet received via socket
+    if (!latestDriverLocation && driverTrackingRecords.length === 0) {
+      fetchDriverLocation();
+    }
 
-    // Fallback sync every 10s ensures driver's position stays updated even if socket blips
+    // Zero-polling strategy: When WebSocket is actively connected, live driver
+    // GPS coordinates are pushed in real time via useDriverTrackSocket.
+    // Skip background interval polling completely.
+    if (isSocketConnected) {
+      return () => {
+        isEffectActive = false;
+      };
+    }
+
+    // Fallback sync every 10s ensures driver's position stays updated ONLY if WebSocket is disconnected
     const interval = setInterval(fetchDriverLocation, 10000);
 
     return () => {
       isEffectActive = false;
       clearInterval(interval);
     };
-  }, [effectiveDriverUuid, language, token, isActiveTrip]);
+  }, [
+    effectiveDriverUuid,
+    language,
+    token,
+    isActiveTrip,
+    isSocketConnected,
+    latestDriverLocation,
+    driverTrackingRecords.length,
+  ]);
 
   // Car photos list from driver info (Strictly use real photos; do not fall back to fake demo photos if driver has none)
   const noPhotosParam = searchParams.get('no_photos') === 'true';
