@@ -269,6 +269,21 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
             !isTripReviewed(sTrip, sTrip.uuid)
           ) {
             nextTrip = sTrip;
+          } else {
+            nextTrip = null;
+          }
+        } else if (!singleRes.status && activeTripRef.current) {
+          // Network or transient hiccup — preserve existing in-progress active trip
+          const currentStatus = (activeTripRef.current.trip_status || '').toUpperCase();
+          if (
+            currentStatus === 'REQUESTED' ||
+            currentStatus === 'ACCEPTED' ||
+            currentStatus === 'ON_THE_WAY' ||
+            currentStatus === 'STARTED' ||
+            currentStatus === 'IN_PROGRESS' ||
+            currentStatus === 'INPROGRESS'
+          ) {
+            nextTrip = activeTripRef.current;
           }
         }
       }

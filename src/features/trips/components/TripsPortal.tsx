@@ -60,6 +60,27 @@ const TripsContent: React.FC = () => {
 
   const [specificTrip, setSpecificTrip] = useState<RentalTrip | null>(null);
   const [isLoadingSpecific, setIsLoadingSpecific] = useState<boolean>(false);
+  const [customerTrips, setCustomerTrips] = useState<RentalTrip[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState<boolean>(false);
+  const [selectedReviewTrip, setSelectedReviewTrip] = useState<RentalTrip | null>(null);
+
+  const currentTrip = specificTrip || contextActiveTrip;
+  const rawStatus = (currentTrip?.trip_status || '').toUpperCase();
+  const isTripRequested = Boolean(currentTrip && rawStatus === 'REQUESTED');
+  const isTripCompleted = Boolean(
+    currentTrip &&
+    (rawStatus === 'COMPLETED' || rawStatus === 'FINISHED' || rawStatus === 'TRIP_COMPLETED')
+  );
+  const isTripActive = Boolean(
+    currentTrip &&
+    (rawStatus === 'ACCEPTED' ||
+     rawStatus === 'ON_THE_WAY' ||
+     rawStatus === 'STARTED' ||
+     rawStatus === 'IN_PROGRESS' ||
+     rawStatus === 'INPROGRESS' ||
+     rawStatus === 'RIDE_STARTED' ||
+     rawStatus === 'FIRST_COMPLETED')
+  );
 
   // If a specific trip_uuid was passed in query, try fetching it via single trip bids endpoint
   useEffect(() => {
@@ -86,7 +107,33 @@ const TripsContent: React.FC = () => {
     }
   }, [tripUuidParam, effectiveCustomerUuid, language, contextActiveTrip, token]);
 
-  const currentTrip = specificTrip || contextActiveTrip;
+  // Auto redirect active trips (ACCEPTED, ON_THE_WAY, STARTED) to live tracking
+  useEffect(() => {
+    if (isTripActive && currentTrip?.uuid) {
+      const driverId =
+        currentTrip.accepted_driver?.driver_uuid ||
+        currentTrip.drivers?.[0]?.driver_uuid ||
+        '';
+      router.push(`/tracking?trip_uuid=${currentTrip.uuid}${driverId ? `&driver_uuid=${driverId}` : ''}`);
+    }
+  }, [isTripActive, currentTrip?.uuid, currentTrip?.accepted_driver?.driver_uuid, currentTrip?.drivers, router]);
+
+  // Fetch all customer trips if user has no single active/requested trip showing
+  useEffect(() => {
+    if (isAuthenticated && !isTripRequested && !isTripActive && !isTripCompleted) {
+      setIsLoadingList(true);
+      customerTripService
+        .fetchBids(effectiveCustomerUuid, language, 'ALL', token || undefined)
+        .then((trips) => {
+          if (Array.isArray(trips)) {
+            setCustomerTrips(trips);
+          }
+        })
+        .finally(() => {
+          setIsLoadingList(false);
+        });
+    }
+  }, [isAuthenticated, effectiveCustomerUuid, language, token, isTripRequested, isTripActive, isTripCompleted]);
 
   if (isLoadingSpecific) {
     return (
@@ -148,34 +195,7 @@ const TripsContent: React.FC = () => {
     );
   }
 
-  // ── 1. If an active requested trip is found: Show Live Bidding Radar ────────
-  const rawStatus = (currentTrip?.trip_status || '').toUpperCase();
-  const isTripRequested = Boolean(currentTrip && rawStatus === 'REQUESTED');
-  const isTripCompleted = Boolean(
-    currentTrip &&
-    (rawStatus === 'COMPLETED' || rawStatus === 'FINISHED' || rawStatus === 'TRIP_COMPLETED')
-  );
-  const isTripActive = Boolean(
-    currentTrip &&
-    (rawStatus === 'ACCEPTED' ||
-     rawStatus === 'ON_THE_WAY' ||
-     rawStatus === 'STARTED' ||
-     rawStatus === 'IN_PROGRESS' ||
-     rawStatus === 'INPROGRESS' ||
-     rawStatus === 'RIDE_STARTED' ||
-     rawStatus === 'FIRST_COMPLETED')
-  );
 
-  // Auto redirect active trips (ACCEPTED, ON_THE_WAY, STARTED) to live tracking
-  useEffect(() => {
-    if (isTripActive && currentTrip?.uuid) {
-      const driverId =
-        currentTrip.accepted_driver?.driver_uuid ||
-        currentTrip.drivers?.[0]?.driver_uuid ||
-        '';
-      router.push(`/tracking?trip_uuid=${currentTrip.uuid}${driverId ? `&driver_uuid=${driverId}` : ''}`);
-    }
-  }, [isTripActive, currentTrip?.uuid, currentTrip?.accepted_driver?.driver_uuid, currentTrip?.drivers, router]);
 
   if (isTripRequested && currentTrip) {
     const pickupAddress =
@@ -285,26 +305,7 @@ const TripsContent: React.FC = () => {
   }
 
 
-  // ── 2. All Trips List View with Review Status Check & Total Amount ───────
-  const [customerTrips, setCustomerTrips] = useState<RentalTrip[]>([]);
-  const [isLoadingList, setIsLoadingList] = useState<boolean>(false);
-  const [selectedReviewTrip, setSelectedReviewTrip] = useState<RentalTrip | null>(null);
-
-  useEffect(() => {
-    if (!isTripRequested && !isTripActive && !isTripCompleted) {
-      setIsLoadingList(true);
-      customerTripService
-        .fetchBids(effectiveCustomerUuid, language, 'ALL', token || undefined)
-        .then((trips) => {
-          if (Array.isArray(trips)) {
-            setCustomerTrips(trips);
-          }
-        })
-        .finally(() => {
-          setIsLoadingList(false);
-        });
-    }
-  }, [effectiveCustomerUuid, language, token, isTripRequested, isTripActive, isTripCompleted]);
+  // ── 3. All Trips List View with Review Status Check & Total Amount ───────
 
   if (isLoadingList) {
     return (

@@ -144,20 +144,29 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
         }
       } catch {}
     } else {
-      clearAllTripRelatedStorage();
+      try {
+        sessionStorage.removeItem('trippy_booking_active_trip');
+        localStorage.removeItem('trippy_booking_active_trip');
+      } catch {}
     }
   }, [activeTrip]);
 
   // Auto-resume live bidding radar if an active REQUESTED trip exists on server
   useEffect(() => {
-    // If no active REQUESTED trip exists globally, dismiss radar and clear booking active trip
-    if (
-      !globalActiveTrip ||
-      globalActiveTrip.trip_status !== 'REQUESTED' ||
-      globalActiveTrip.accepted_bid_uuid ||
-      globalActiveTrip.accepted_driver ||
-      isTripReviewed(globalActiveTrip, globalActiveTrip?.uuid)
-    ) {
+    // Only clear if the global trip has definitively finished, been cancelled, or accepted a driver
+    const isGlobalTerminal =
+      globalActiveTrip &&
+      (globalActiveTrip.trip_status === 'COMPLETED' ||
+        globalActiveTrip.trip_status === 'TRIP_COMPLETED' ||
+        globalActiveTrip.trip_status === 'FINISHED' ||
+        globalActiveTrip.trip_status === 'CANCELLED' ||
+        globalActiveTrip.trip_status === 'CANCELED' ||
+        globalActiveTrip.trip_status === 'TRIP_CANCELLED' ||
+        Boolean(globalActiveTrip.accepted_bid_uuid) ||
+        Boolean(globalActiveTrip.accepted_driver) ||
+        isTripReviewed(globalActiveTrip, globalActiveTrip?.uuid));
+
+    if (isGlobalTerminal) {
       if (activeTrip) {
         clearAllTripRelatedStorage(activeTrip?.uuid);
         setActiveTrip(null);
@@ -167,32 +176,33 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
 
     if (
       globalActiveTrip &&
-      globalActiveTrip.trip_status === 'REQUESTED' &&
+      (globalActiveTrip.trip_status || '').toUpperCase() === 'REQUESTED' &&
       !hasDismissedRadar
     ) {
-      const pAddress =
-        globalActiveTrip.pickup_locations
-          ?.map((p) => p.address)
-          .filter(Boolean)
-          .join(' → ') || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point');
-      const dAddress =
-        globalActiveTrip.dropoff_locations?.[0]?.address ||
-        (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
+      if (!activeTrip || activeTrip.uuid !== globalActiveTrip.uuid) {
+        const pAddress =
+          globalActiveTrip.pickup_locations
+            ?.map((p) => p.address)
+            .filter(Boolean)
+            .join(' → ') || (isBn ? 'পিকআপ পয়েন্ট' : 'Pickup Point');
+        const dAddress =
+          globalActiveTrip.dropoff_locations?.[0]?.address ||
+          (isBn ? 'ড্রপঅফ পয়েন্ট' : 'Dropoff Point');
 
-      const resolvedCreatedAt =
-        globalActiveTrip.created_at ||
-        (globalActiveTrip as any).createdAt ||
-        (globalActiveTrip as any).creation_date ||
-        (globalActiveTrip as any).created_date ||
-        (typeof window !== 'undefined' && globalActiveTrip.uuid
-          ? localStorage.getItem(`trippy_trip_created_${globalActiveTrip.uuid}`) ||
-            sessionStorage.getItem(`trippy_trip_created_${globalActiveTrip.uuid}`)
-          : undefined);
+        const resolvedCreatedAt =
+          globalActiveTrip.created_at ||
+          (globalActiveTrip as any).createdAt ||
+          (globalActiveTrip as any).creation_date ||
+          (globalActiveTrip as any).created_date ||
+          (typeof window !== 'undefined' && globalActiveTrip.uuid
+            ? localStorage.getItem(`trippy_trip_created_${globalActiveTrip.uuid}`) ||
+              sessionStorage.getItem(`trippy_trip_created_${globalActiveTrip.uuid}`)
+            : undefined);
 
-      if (!activeTrip) {
         setActiveTrip({
           uuid: globalActiveTrip.uuid || '',
           customerUuid:
+            globalActiveTrip.customer_uuid ||
             user?.uuid ||
             localStorage.getItem('trippy_customer_uuid') ||
             getActiveCustomerUuid(),
@@ -214,11 +224,9 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
           note: globalActiveTrip.note || undefined,
           createdAt: resolvedCreatedAt,
         });
-      } else if (resolvedCreatedAt && activeTrip.createdAt !== resolvedCreatedAt) {
-        setActiveTrip((prev) => (prev ? { ...prev, createdAt: resolvedCreatedAt } : null));
       }
     }
-  }, [globalActiveTrip, activeTrip, hasDismissedRadar, user, isBn]);
+  }, [globalActiveTrip, hasDismissedRadar, activeTrip?.uuid, user, isBn]);
 
   // Fetch real-time services from /rental-info
   useEffect(() => {
