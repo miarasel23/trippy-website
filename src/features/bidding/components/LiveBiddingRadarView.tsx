@@ -548,7 +548,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     setTopProgressPct(pct);
     setIsTimerExpired(remaining <= 0);
     setHasPromptedExpired(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Decrement second by second smoothly: 01:00:00 -> 00:59:59 -> 00:59:58...
@@ -736,7 +736,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
           // Fallback: no created_at available, reset timer from now
           restartCountdown();
         }
-      } catch {}
+      } catch { }
     }
 
     setIsUpdatingBottomOffer(false);
@@ -907,7 +907,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('trippy_has_active_ride', 'true');
-          } catch {}
+          } catch { }
         }
         setActiveTripManuallyRef.current(trip);
         const targetTripUuid = trip.uuid || effectiveTrip;
@@ -1192,7 +1192,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('trippy_has_active_ride', 'true');
-          } catch {}
+          } catch { }
         }
         dismissOverlay();
         const driverId = bidToAccept.driver_uuid || bidToAccept.driverUuid || '';
@@ -1777,7 +1777,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                   created_at: new Date().toISOString(),
                 } as any);
               }
-            } catch {}
+            } catch { }
           }
         }}
         onKeepTrying={(newTripUuid) => {
@@ -1867,11 +1867,10 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
                 type="button"
                 disabled={Boolean(isAccepting)}
                 onClick={handleConfirmAcceptBid}
-                className={`relative overflow-hidden py-2.5 px-4 rounded-xl font-bold text-xs border shadow-sm transition-all select-none ${
-                  isAccepting
+                className={`relative overflow-hidden py-2.5 px-4 rounded-xl font-bold text-xs border shadow-sm transition-all select-none ${isAccepting
                     ? 'bg-slate-900 border-slate-800 text-white cursor-wait opacity-95'
                     : 'bg-black hover:bg-slate-900 border-black text-white active:scale-98 cursor-pointer'
-                }`}
+                  }`}
               >
                 {/* Background Progress Fill (expands while accepting) */}
                 {isAccepting && (
@@ -2212,13 +2211,13 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
   const totalDurRef = useRef<number>(totalDurationSecondsRaw);
   const hasExpiredRef = useRef(false);
 
-  // Effective bid date: tripCreatedAt (from Redux, write-once) takes priority
+  // Effective bid date: bid's own created_at takes priority; fall back to tripCreatedAt
   const effectiveBidDate =
-    tripCreatedAt ||
     bid.created_at ||
     (bid as any).createdAt ||
     (bid as any).creation_date ||
-    (bid as any).created_date;
+    (bid as any).created_date ||
+    tripCreatedAt;
 
   const initialBidTs = parseAsiaBangladeshTimestamp(effectiveBidDate);
 
@@ -2244,6 +2243,8 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
   // Smooth progress bar update every 1000ms (1s) — empty deps so it NEVER restarts on polling
   useEffect(() => {
     hasExpiredRef.current = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     const update = () => {
       const now = Date.now();
       const elapsedMs = Math.max(0, now - startTsRef.current);
@@ -2254,16 +2255,23 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
 
       if (elapsedMs >= totalMs && !hasExpiredRef.current) {
         hasExpiredRef.current = true;
-        clearInterval(interval);
-        // After progress bar ends, cancel bid and remove from UI
-        onDecline(bid, 'cancel_rent_bid_driver_or_customer_admin');
+        if (interval) {
+          clearInterval(interval);
+          interval = null;
+        }
       }
     };
 
     update();
-    const interval = setInterval(update, 1000);
+    if (!hasExpiredRef.current) {
+      interval = setInterval(update, 1000);
+    }
 
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
     // Empty deps: reads from refs, so safe to run once on mount only
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
