@@ -18,7 +18,7 @@ export const LiveRadarMap: React.FC = () => {
 
   return (
     <div className="hero-map-frame relative w-full h-full min-h-[520px] bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between">
-      
+
       {/* SVG Map Container */}
       <div className="map-svg-container absolute inset-0 w-full h-full pointer-events-none">
         <svg className="w-full h-full" viewBox="0 0 600 520" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -105,12 +105,12 @@ export const LiveRadarMap: React.FC = () => {
           </div>
           <div>
             <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-              Md Rasel Mia <span className="text-amber-500 text-[10px]">★ 4.9</span>
+              <span className="text-amber-500 text-[10px]"></span>
             </div>
-            <p className="text-[11px] text-slate-500">Hiace Microbus • 210 Trips</p>
+            <p className="text-[11px] text-slate-500"></p>
           </div>
           <div className="ml-2 px-2.5 py-1 rounded-lg bg-black text-white text-xs font-extrabold font-heading">
-            {t.common.currency} 1597
+            {t.common.currency}
           </div>
         </div>
       </div>
