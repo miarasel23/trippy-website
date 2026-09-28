@@ -31,6 +31,21 @@ export function getActiveCustomerUuid(): string {
     if (userStr) {
       const u = JSON.parse(userStr);
       if (u?.uuid) return u.uuid;
+      if (u?.customer_uuid) return u.customer_uuid;
+      if (u?.user_uuid) return u.user_uuid;
+      if (u?.id) return String(u.id);
+    }
+  } catch {}
+  try {
+    const tripCache =
+      sessionStorage.getItem('trippy_active_trip_cache') ||
+      localStorage.getItem('trippy_active_trip_cache') ||
+      sessionStorage.getItem('trippy_booking_active_trip') ||
+      localStorage.getItem('trippy_booking_active_trip');
+    if (tripCache) {
+      const t = JSON.parse(tripCache);
+      if (t?.customer_uuid) return t.customer_uuid;
+      if (t?.customerUuid) return t.customerUuid;
     }
   } catch {}
   return localStorage.getItem('trippy_customer_uuid') || '';
@@ -177,6 +192,35 @@ export function normalizeRentalTrip(rawData: any): RentalTrip | null {
       rawItem.created_date ||
       nested.created_date,
   };
+}
+
+/**
+ * Validates that a trip object contains actual, populated trip data
+ * and is not an empty/hollow placeholder object.
+ */
+export function isValidTripData(t: RentalTrip | null | undefined): boolean {
+  if (!t || typeof t !== 'object') return false;
+  if (!t.uuid || typeof t.uuid !== 'string' || t.uuid.trim().length === 0) return false;
+
+  const hasLocations = Boolean(
+    (Array.isArray(t.pickup_locations) && t.pickup_locations.length > 0 && t.pickup_locations[0]?.address) ||
+    (Array.isArray(t.dropoff_locations) && t.dropoff_locations.length > 0 && t.dropoff_locations[0]?.address) ||
+    (t as any).pickup_location?.address ||
+    (t as any).dropoff_location?.address ||
+    (t as any).pickup?.address ||
+    (t as any).dropoff?.address
+  );
+
+  const hasDriver = Boolean(
+    t.accepted_driver?.driver_uuid ||
+    t.accepted_driver?.name ||
+    (Array.isArray(t.drivers) && t.drivers.length > 0 && (t.drivers[0]?.name || t.drivers[0]?.driver_uuid))
+  );
+
+  const hasFare = Number(t.offer_amount || t.total_amount || 0) > 0;
+  const hasService = Boolean(t.service_name || (t as any).car_service || (t as any).car_category);
+
+  return hasLocations || hasDriver || hasFare || hasService;
 }
 
 export const customerTripService = {
@@ -390,32 +434,38 @@ export const customerTripService = {
    * Query params: platform=web&language_code=bn&action_when=rental_bid_trip_single_for_customer&customer_uuid=...&trip_uuid=...&trip_status=ALL
    */
   async fetchSingleTripBids(
-    customerUuid: string,
-    tripUuid: string,
+    customerUuid?: string,
+    tripUuid?: string,
     languageCode = 'bn',
     tripStatus = 'ALL',
     token?: string
   ): Promise<{ status: boolean; data?: RentalTrip | null; message?: string }> {
-    const authToken = token || getStoredAuthToken();
-    const targetCustomerUuid = customerUuid || getActiveCustomerUuid();
-    // Do not call single trip bids endpoint if unauthenticated or missing trip UUID
-    if (!authToken || !targetCustomerUuid || !tripUuid) {
-      return { status: false, data: null, message: 'Unauthenticated or missing parameters' };
+    if (!tripUuid || !tripUuid.trim()) {
+      return { status: false, data: null, message: 'Missing trip UUID' };
     }
+    const cleanTripUuid = tripUuid.trim();
+    const authToken = token || getStoredAuthToken();
+    const targetCustomerUuid = (customerUuid || getActiveCustomerUuid() || '').trim();
+
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      Authorization: authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`,
     };
+    if (authToken) {
+      headers.Authorization = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
+    }
 
     try {
-      const query = new URLSearchParams({
+      const queryParams: Record<string, string> = {
         platform: 'web',
-        language_code: languageCode,
+        language_code: languageCode || 'bn',
         action_when: 'rental_bid_trip_single_for_customer',
-        customer_uuid: targetCustomerUuid,
-        trip_uuid: tripUuid,
-        trip_status: tripStatus,
-      });
+        trip_uuid: cleanTripUuid,
+        trip_status: tripStatus || 'ALL',
+      };
+      if (targetCustomerUuid) {
+        queryParams.customer_uuid = targetCustomerUuid;
+      }
+      const query = new URLSearchParams(queryParams);
 
       const directUrl = `${AppUrls.backend.rentalBidTripSingleForCustomer}?${query.toString()}`;
       const res = await fetch(directUrl, { headers }).catch(() => null);
@@ -428,7 +478,8 @@ export const customerTripService = {
       }
 
       const trip = json.status && json.data ? normalizeRentalTrip(json.data) : null;
-      return { status: Boolean(json.status), data: trip, message: json.message };
+      const validTrip = isValidTripData(trip) ? trip : null;
+      return { status: Boolean(json.status && validTrip), data: validTrip, message: json.message };
     } catch {
       return { status: false, data: null, message: 'Request failed' };
     }

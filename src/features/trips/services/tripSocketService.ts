@@ -504,13 +504,21 @@ export function subscribeToDriverTrack(params: {
     onTrackUpdate(rawPayload);
   };
 
-  socket.on('customer_driver_track_update', handler);
+  const trackEvents = [
+    'customer_driver_track_update',
+    'customer-driver-track-update',
+    'driver_track_update',
+    'driver_location_update',
+    'driver_location',
+  ];
+
+  trackEvents.forEach((ev) => socket.on(ev, handler));
 
   if (tripUuid) joinTripRoom(tripUuid);
   if (customerUuid) joinUserRoom(customerUuid);
 
   return () => {
-    socket.off('customer_driver_track_update', handler);
+    trackEvents.forEach((ev) => socket.off(ev, handler));
   };
 }
 

@@ -41,6 +41,7 @@ import {
   customerTripService,
   getImageUrl,
   getActiveCustomerUuid,
+  isValidTripData,
 } from '@/features/trips/services/customerTripService';
 import {
   RentalTrip,
@@ -227,6 +228,7 @@ const TrackingEmptyState: React.FC<{ isBn: boolean }> = ({ isBn }) => {
   );
 };
 
+
 export const TrackingPortal: React.FC = () => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
@@ -245,31 +247,64 @@ export const TrackingPortal: React.FC = () => {
   const driverUuidParam = searchParams.get('driver_uuid');
   const customerUuidParam = searchParams.get('customer_uuid');
 
-  const effectiveCustomerUuid =
-    customerUuidParam || user?.uuid || getActiveCustomerUuid();
+  const cachedTripUuid =
+    typeof window !== 'undefined'
+      ? (() => {
+          try {
+            const c =
+              sessionStorage.getItem('trippy_active_trip_cache') ||
+              localStorage.getItem('trippy_active_trip_cache');
+            if (c) return JSON.parse(c)?.uuid || '';
+          } catch {}
+          return '';
+        })()
+      : '';
+
   const effectiveTripUuid =
-    tripUuidParam || contextActiveTrip?.uuid || '';
+    tripUuidParam || contextActiveTrip?.uuid || cachedTripUuid || '';
 
   const [isMounted, setIsMounted] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Component-lifetime mount tracking ref to guard async state updates without cancelling on effect re-runs
+  const isComponentMountedRef = useRef<boolean>(true);
   useEffect(() => {
+    isComponentMountedRef.current = true;
     setIsMounted(true);
+    return () => {
+      isComponentMountedRef.current = false;
+    };
   }, []);
 
-  const [trip, setTrip] = useState<RentalTrip | null>(
-    contextActiveTrip || null
-  );
-
-  // Sync trip state whenever contextActiveTrip updates from client storage
-  useEffect(() => {
-    if (contextActiveTrip) {
-      setTrip((prev) => {
-        if (!prev || prev.uuid !== contextActiveTrip.uuid || prev.trip_status !== contextActiveTrip.trip_status) {
-          return contextActiveTrip;
+  const [trip, setTrip] = useState<RentalTrip | null>(() => {
+    if (contextActiveTrip && isValidTripData(contextActiveTrip)) return contextActiveTrip;
+    if (typeof window !== 'undefined') {
+      try {
+        const cached =
+          sessionStorage.getItem('trippy_active_trip_cache') ||
+          localStorage.getItem('trippy_active_trip_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && isValidTripData(parsed) && (!tripUuidParam || parsed.uuid === tripUuidParam)) {
+            return parsed;
+          }
         }
-        return prev;
-      });
+      } catch {}
+    }
+    return null;
+  });
+
+  const effectiveCustomerUuid =
+    customerUuidParam ||
+    user?.uuid ||
+    trip?.customer_uuid ||
+    contextActiveTrip?.customer_uuid ||
+    getActiveCustomerUuid();
+
+  // Sync trip state whenever contextActiveTrip updates
+  useEffect(() => {
+    if (contextActiveTrip && isValidTripData(contextActiveTrip)) {
+      setTrip(contextActiveTrip);
       setIsLoading(false);
     }
   }, [contextActiveTrip]);
@@ -385,74 +420,69 @@ export const TrackingPortal: React.FC = () => {
     enabled: Boolean(effectiveTripUuid),
   });
 
-  // ── 2. Trip Data: One initial HTTP fetch, then Socket.IO owns all updates ──
+  // ── 2. Trip Data Fetching & Real-Time Synchronization ──
   //
   // Strategy:
-  //   • Always do ONE initial fetch on mount to hydrate UI (regardless of socket state).
-  //   • If Socket.IO is connected → stop there. Socket pushes all future updates instantly.
-  //   • If Socket.IO is disconnected → start periodic HTTP polling as fallback.
-  //   • If socket reconnects mid-session → the polling effect re-runs and stops the interval.
-  //
-  // This ref ensures the one-time initial fetch only fires once per trip,
-  // even when isSocketConnected state changes and the effect re-runs.
-  const hasFetchedInitialRef = useRef<boolean>(false);
-
+  //   • Fetch immediately on mount / URL parameter changes.
+  //   • Socket.IO handles instant updates with 0ms latency when active.
+  //   • A background polling interval (5s for Ride Share, 10s for other services)
+  //     runs as a resilient fallback safety net, ensuring backend DB updates
+  //     (e.g., status changes or direct writes) are never missed.
   useEffect(() => {
-    // Reset guard whenever the trip changes
-    hasFetchedInitialRef.current = false;
-  }, [effectiveTripUuid, effectiveCustomerUuid]);
+    if (!effectiveTripUuid) {
+      setIsLoading(false);
+      return;
+    }
 
-  useEffect(() => {
-    let isMounted = true;
+    let isEffectActive = true;
 
     const fetchTripData = async () => {
-      if (!effectiveTripUuid || !effectiveCustomerUuid) {
-        setIsLoading(false);
-        return;
-      }
-
       try {
+        const effectiveCustomer =
+          effectiveCustomerUuid ||
+          getActiveCustomerUuid() ||
+          trip?.customer_uuid ||
+          contextActiveTrip?.customer_uuid ||
+          '';
+
         const res = await customerTripService.fetchSingleTripBids(
-          effectiveCustomerUuid,
+          effectiveCustomer,
           effectiveTripUuid,
           language,
           'ALL',
           token || undefined
         );
 
-        if (!isMounted) return;
+        if (!isEffectActive || !isComponentMountedRef.current) return;
 
-        if (res.status && res.data) {
+        if (res.status && res.data && isValidTripData(res.data)) {
           processTripState(res.data);
+        } else {
+          // If backend returns no data or an empty trip list, clear hollow trip state
+          setTrip(null);
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.removeItem('trippy_active_trip_cache');
+              localStorage.removeItem('trippy_active_trip_cache');
+            } catch {}
+          }
         }
       } catch (err) {
-        console.error('[TripFetch] Failed to fetch trip data:', err);
+        console.error('[TrackingPortal] Failed to fetch trip data:', err);
       } finally {
-        if (isMounted) {
+        if (isEffectActive && isComponentMountedRef.current) {
           setIsLoading(false);
         }
       }
     };
 
-    // ── Initial fetch (runs exactly once per trip, on first mount) ──
-    if (!hasFetchedInitialRef.current) {
-      hasFetchedInitialRef.current = true;
-      fetchTripData();
-    }
+    fetchTripData();
 
-    // ── WebSocket connected: Socket.IO owns all updates. No polling needed. ──
-    if (isSocketConnected) {
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    // ── WebSocket unavailable (failed or temporarily disconnected): HTTP API polling fallback ──
     const syncIntervalMs = isRideShare ? 5000 : 10000;
     const interval = setInterval(fetchTripData, syncIntervalMs);
 
     return () => {
-      isMounted = false;
+      isEffectActive = false;
       clearInterval(interval);
     };
   }, [
@@ -461,8 +491,6 @@ export const TrackingPortal: React.FC = () => {
     language,
     token,
     isRideShare,
-    isSocketConnected,
-    isSocketFailed,
     processTripState,
   ]);
 
@@ -546,8 +574,26 @@ export const TrackingPortal: React.FC = () => {
   // ── 3. Step-by-Step Lifecycle Status Logic (Website Way) ───────────────────
   const statusParam = searchParams.get('status')?.toUpperCase();
   const tripStatusFromApi = (trip?.trip_status || '').toUpperCase();
-  // Default to IN_PROGRESS when we have an active trip uuid being tracked, unless explicitly COMPLETED
-  const rawStatus = (statusParam || tripStatusFromApi || (effectiveTripUuid ? 'IN_PROGRESS' : 'COMPLETED')).toUpperCase();
+
+  // LIVE API / SOCKET STATUS IS THE ABSOLUTE SOURCE OF TRUTH:
+  // Live trip status from DB / WebSocket takes immediate precedence.
+  // If the trip hasn't loaded yet, fall back to URL status param, or default to ACCEPTED.
+  const rawStatus = (
+    tripStatusFromApi ||
+    statusParam ||
+    (effectiveTripUuid ? 'ACCEPTED' : 'COMPLETED')
+  ).toUpperCase();
+
+  // Auto-sync URL if status in URL query differs from live database/socket status
+  useEffect(() => {
+    if (typeof window === 'undefined' || !tripStatusFromApi) return;
+    const currentUrl = new URL(window.location.href);
+    const currentStatusInUrl = currentUrl.searchParams.get('status');
+    if (currentStatusInUrl && currentStatusInUrl.toUpperCase() !== tripStatusFromApi) {
+      currentUrl.searchParams.set('status', tripStatusFromApi);
+      window.history.replaceState({}, '', currentUrl.toString());
+    }
+  }, [tripStatusFromApi]);
 
   // Completed or cancelled trip statuses
   const isCompleted =
@@ -556,7 +602,9 @@ export const TrackingPortal: React.FC = () => {
     rawStatus === 'TRIP_COMPLETED' ||
     rawStatus === 'CANCELLED' ||
     rawStatus === 'CANCELED' ||
-    rawStatus === 'TRIP_CANCELLED';
+    rawStatus === 'TRIP_CANCELLED' ||
+    rawStatus === 'DELETED' ||
+    rawStatus === 'NO_SHOW';
 
   const isFirstCompleted =
     rawStatus === 'FIRST_COMPLETED' || rawStatus === 'FIRSTCOMPLETED';
@@ -567,20 +615,26 @@ export const TrackingPortal: React.FC = () => {
     rawStatus === 'STARTED' ||
     isFirstCompleted;
 
-  // Strict status division as requested:
-  // 1. ACCEPTED: Driver accepted, tracking is shown but driver location in map is NOT shown
-  const isAccepted =
-    rawStatus === 'ACCEPTED' || rawStatus === 'ACCEPT' || rawStatus === 'CONFIRMED';
+  const isArrivedPickup =
+    rawStatus === 'ARRIVED_PICKUP_LOCATION' ||
+    rawStatus === 'PICKUP_ARRIVED' ||
+    rawStatus === 'ARRIVED';
 
-  // 2. IN_PROGRESS: Driver is moving/on the way/ride started - driver location in map IS shown!
+  // Strict status division:
+  // 1. ACCEPTED / BOOKED: Driver accepted, tracking is shown but driver location in map is NOT shown
+  const isAccepted =
+    rawStatus === 'ACCEPTED' ||
+    rawStatus === 'ACCEPT' ||
+    rawStatus === 'CONFIRMED' ||
+    rawStatus === 'BOOKED';
+
+  // 2. IN_PROGRESS: Driver is moving/on the way/arrived/ride started - driver location in map IS shown!
   const isInProgress =
     rawStatus === 'IN_PROGRESS' ||
     rawStatus === 'INPROGRESS' ||
-    rawStatus === 'STARTED' ||
-    rawStatus === 'RIDE_STARTED' ||
     rawStatus === 'ON_THE_WAY' ||
     rawStatus === 'ONTHEWAY' ||
-    rawStatus === 'PICKUP_ARRIVED' ||
+    isArrivedPickup ||
     isRideStarted;
 
   // Active trip remains visible and tracked until explicitly completed or cancelled
@@ -658,23 +712,10 @@ export const TrackingPortal: React.FC = () => {
     },
   });
 
-  // ── 2.b Live Driver GPS Location: Socket.IO first, HTTP polling fallback ──
-  //
-  // Strategy:
-  //   • Socket connected → useDriverTrackSocket (above) delivers GPS updates in real-time.
-  //     Do ONE initial HTTP fetch to hydrate the map, then let socket own all updates.
-  //   • Socket disconnected → periodic HTTP polling every 10s as fallback.
-  //
-  const hasFetchedDriverLocationRef = useRef<boolean>(false);
-
+  // ── 2.b Live Driver GPS Location: Real-time telemetry with HTTP fallback ──
   useEffect(() => {
-    hasFetchedDriverLocationRef.current = false;
-  }, [effectiveDriverUuid]);
-
-  useEffect(() => {
-    // Only track live GPS when there is an active running trip
     if (!effectiveDriverUuid || !isActiveTrip) return;
-    let isMounted = true;
+    let isEffectActive = true;
 
     const fetchDriverLocation = async () => {
       try {
@@ -684,7 +725,7 @@ export const TrackingPortal: React.FC = () => {
           token || undefined
         );
 
-        if (!isMounted) return;
+        if (!isEffectActive || !isComponentMountedRef.current) return;
 
         if (Array.isArray(records) && records.length > 0) {
           setDriverTrackingRecords(records);
@@ -712,27 +753,16 @@ export const TrackingPortal: React.FC = () => {
       } catch {}
     };
 
-    // ── Initial fetch: hydrate map with last known driver position ──
-    if (!hasFetchedDriverLocationRef.current) {
-      hasFetchedDriverLocationRef.current = true;
-      fetchDriverLocation();
-    }
+    fetchDriverLocation();
 
-    // ── WebSocket connected: useDriverTrackSocket handles GPS in real-time. No polling. ──
-    if (isSocketConnected) {
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    // ── WebSocket unavailable: poll HTTP API every 10s as fallback ──
+    // Fallback sync every 10s ensures driver's position stays updated even if socket blips
     const interval = setInterval(fetchDriverLocation, 10000);
 
     return () => {
-      isMounted = false;
+      isEffectActive = false;
       clearInterval(interval);
     };
-  }, [effectiveDriverUuid, language, token, isActiveTrip, isSocketConnected, isSocketFailed]);
+  }, [effectiveDriverUuid, language, token, isActiveTrip]);
 
   // Car photos list from driver info (Strictly use real photos; do not fall back to fake demo photos if driver has none)
   const noPhotosParam = searchParams.get('no_photos') === 'true';
@@ -796,9 +826,8 @@ export const TrackingPortal: React.FC = () => {
   // Calculate active step number for stepper
   const getStepIndex = () => {
     if (isCompleted) return 4;
-    if (isFirstCompleted) return 3;
-    if (isRideStarted) return 3;
-    if (isInProgress) return 2;
+    if (isFirstCompleted || isRideStarted) return 3;
+    if (isArrivedPickup || isInProgress) return 2;
     return 1;
   };
 
@@ -836,6 +865,17 @@ export const TrackingPortal: React.FC = () => {
         desc: isBn
           ? 'রাইডার ও চালকের অবস্থান দৃশ্যমান রয়েছে এবং লাইভ জিপিএস সক্রিয়।'
           : 'Rider and driver locations are visible with live GPS tracking active.',
+      };
+    }
+    if (isArrivedPickup) {
+      return {
+        badge: isBn ? 'চালক পৌঁছেছেন' : 'Driver Arrived',
+        title: isBn
+          ? 'চালক পিকআপ পয়েন্টে পৌঁছেছেন'
+          : 'Driver has arrived at pickup location',
+        desc: isBn
+          ? 'অনুগ্রহ করে গাড়ির কাছে যান এবং চালকের সাথে সাক্ষাৎ করুন।'
+          : 'Please proceed to the vehicle and meet your driver.',
       };
     }
     if (isInProgress) {
@@ -971,7 +1011,7 @@ export const TrackingPortal: React.FC = () => {
     return <TrackingSkeleton isBn={isBn} />;
   }
 
-  if (!trip && !isLoading) {
+  if ((!trip || !isValidTripData(trip)) && !isLoading) {
     return <TrackingEmptyState isBn={isBn} />;
   }
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Download,
   Menu,
@@ -31,6 +31,7 @@ import { getImageUrl } from '@/shared/config/appUrls';
 
 export const Header: React.FC = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -39,7 +40,7 @@ export const Header: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
   const dispatch = useAppDispatch();
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
-  const { activeTrip, bidsCount } = useActiveTrip();
+  const { activeTrip, bidsCount, clearActiveTrip, dismissOverlay } = useActiveTrip();
 
   // Prevent SSR/client hydration mismatch for client-only state
   // (activeTrip from storage, isAuthenticated from persisted Redux)
@@ -270,8 +271,11 @@ export const Header: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
+                          clearActiveTrip();
+                          dismissOverlay();
                           dispatch(logout());
                           setIsUserMenuOpen(false);
+                          router.push('/');
                         }}
                         className="w-full text-left px-2.5 py-2 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
                       >
@@ -393,8 +397,11 @@ export const Header: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        clearActiveTrip();
+                        dismissOverlay();
                         dispatch(logout());
                         setIsMobileMenuOpen(false);
+                        router.push('/');
                       }}
                       className="px-2.5 py-1.5 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1"
                       title={t.auth.logout}

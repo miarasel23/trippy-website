@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useActiveTrip } from '@/features/trips/context/ActiveTripContext';
@@ -74,6 +74,8 @@ const TripsContent: React.FC = () => {
   const isTripActive = Boolean(
     currentTrip &&
     (rawStatus === 'ACCEPTED' ||
+     rawStatus === 'BOOKED' ||
+     rawStatus === 'ARRIVED_PICKUP_LOCATION' ||
      rawStatus === 'ON_THE_WAY' ||
      rawStatus === 'STARTED' ||
      rawStatus === 'IN_PROGRESS' ||
@@ -82,10 +84,27 @@ const TripsContent: React.FC = () => {
      rawStatus === 'FIRST_COMPLETED')
   );
 
+  // When user is not authenticated or logs out, purge local trip states
+  useEffect(() => {
+    if (!isAuthenticated && !token) {
+      setSpecificTrip(null);
+      setCustomerTrips([]);
+      setIsLoadingSpecific(false);
+      setIsLoadingList(false);
+    }
+  }, [isAuthenticated, token]);
+
   // If a specific trip_uuid was passed in query, try fetching it via single trip bids endpoint
+  const fetchedTripParamRef = useRef<string | null>(null);
   useEffect(() => {
     if (tripUuidParam && (!contextActiveTrip || contextActiveTrip.uuid !== tripUuidParam)) {
-      setIsLoadingSpecific(true);
+      if (fetchedTripParamRef.current === tripUuidParam) return;
+      fetchedTripParamRef.current = tripUuidParam;
+
+      // Only show full loading spinner if there is no current trip displayed at all
+      if (!currentTrip) {
+        setIsLoadingSpecific(true);
+      }
       customerTripService
         .fetchSingleTripBids(effectiveCustomerUuid, tripUuidParam, language, 'ALL', token || undefined)
         .then((res) => {
@@ -105,11 +124,13 @@ const TripsContent: React.FC = () => {
           setIsLoadingSpecific(false);
         });
     }
-  }, [tripUuidParam, effectiveCustomerUuid, language, contextActiveTrip, token]);
+  }, [tripUuidParam, effectiveCustomerUuid, language, token]);
 
-  // Auto redirect active trips (ACCEPTED, ON_THE_WAY, STARTED) to live tracking
+  // Auto redirect active trips (ACCEPTED, ON_THE_WAY, STARTED) to live tracking (only once)
+  const hasRedirectedToTrackingRef = useRef<string | null>(null);
   useEffect(() => {
-    if (isTripActive && currentTrip?.uuid) {
+    if (isTripActive && currentTrip?.uuid && hasRedirectedToTrackingRef.current !== currentTrip.uuid) {
+      hasRedirectedToTrackingRef.current = currentTrip.uuid;
       const driverId =
         currentTrip.accepted_driver?.driver_uuid ||
         currentTrip.drivers?.[0]?.driver_uuid ||
@@ -120,7 +141,7 @@ const TripsContent: React.FC = () => {
 
   // Fetch all customer trips if user has no single active/requested trip showing
   useEffect(() => {
-    if (isAuthenticated && !isTripRequested && !isTripActive && !isTripCompleted) {
+    if (isAuthenticated && !tripUuidParam && !isTripRequested && !isTripActive && !isTripCompleted) {
       setIsLoadingList(true);
       customerTripService
         .fetchBids(effectiveCustomerUuid, language, 'ALL', token || undefined)
@@ -133,7 +154,7 @@ const TripsContent: React.FC = () => {
           setIsLoadingList(false);
         });
     }
-  }, [isAuthenticated, effectiveCustomerUuid, language, token, isTripRequested, isTripActive, isTripCompleted]);
+  }, [isAuthenticated, tripUuidParam, effectiveCustomerUuid, language, token, isTripRequested, isTripActive, isTripCompleted]);
 
   if (isLoadingSpecific) {
     return (

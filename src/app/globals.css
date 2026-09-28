@@ -615,11 +615,11 @@ body {
 @keyframes smoothBeaconPulse {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+    opacity: 0.92;
   }
   50% {
-    transform: scale(1.1);
-    box-shadow: 0 0 10px 2px rgba(16, 185, 129, 0.35);
+    transform: scale(1.08);
+    opacity: 1;
   }
 }
 
@@ -641,6 +641,7 @@ body {
 
 .animate-beacon-pulse {
   animation: smoothBeaconPulse 2.4s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 /* Floating Overlay Cards */

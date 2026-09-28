@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { AuthState, User, SendOtpPayload, VerifyOtpPayload } from '@/features/auth/types/auth';
 import { authApi } from '@/features/auth/services/authApi';
+import { clearAllSessionAndTripStorage } from '@/shared/utils/tripStorage';
 
 const TOKEN_KEY = 'trippy_auth_token';
 const USER_KEY = 'trippy_auth_user';
@@ -128,10 +129,15 @@ export const authSlice = createSlice({
       if (typeof window !== 'undefined') {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
+        localStorage.removeItem('tripyy_auth_token');
+        localStorage.removeItem('tripyy_auth_user');
         // Reset prompt timestamp on logout
         const now = Date.now();
         state.lastPromptTimestamp = now;
         localStorage.setItem(LAST_PROMPT_KEY, now.toString());
+
+        // Completely wipe all session storage and trip/booking caches
+        clearAllSessionAndTripStorage();
       }
     },
   },

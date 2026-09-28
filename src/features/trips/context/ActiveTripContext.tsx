@@ -67,6 +67,9 @@ export function hasTripDataChanged(
   if ((p.trip_status || '').toUpperCase() !== (n.trip_status || '').toUpperCase()) return true;
   if (Number(p.offer_amount || 0) !== Number(n.offer_amount || 0)) return true;
   if (p.accepted_bid_uuid !== n.accepted_bid_uuid) return true;
+  if (Boolean(p.accepted_driver) !== Boolean(n.accepted_driver)) return true;
+  if (p.accepted_driver?.driver_uuid !== n.accepted_driver?.driver_uuid) return true;
+  if (p.accepted_driver?.bid_status !== n.accepted_driver?.bid_status) return true;
   if (n.created_at && p.created_at !== n.created_at) return true;
   if ((n as any).createdAt && (p as any).createdAt !== (n as any).createdAt) return true;
   if ((n as any).creation_date && (p as any).creation_date !== (n as any).creation_date) return true;
@@ -139,25 +142,44 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
   const [activeTrip, setActiveTrip] = useState<RentalTrip | null>(null);
   const [bidsCount, setBidsCount] = useState<number>(0);
 
+  // Listen to auth state: when user logs out, purge activeTrip state & close all bidding functions/modals
   useEffect(() => {
+    const effectiveToken =
+      token || (typeof window !== 'undefined' ? localStorage.getItem('trippy_auth_token') : null);
+    if (!effectiveToken && !user) {
+      setActiveTrip(null);
+      setBidsCount(0);
+      setIsRadarModalOpen(false);
+      setIsOverlayVisible(false);
+      setIsRadarOnPage(false);
+      clearAllTripRelatedStorage();
+    }
+  }, [token, user]);
+
+  useEffect(() => {
+    const effectiveToken =
+      token || (typeof window !== 'undefined' ? localStorage.getItem('trippy_auth_token') : null);
+
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      // On initial client mount, safely restore cached active trip from storage
-      try {
-        const cached =
-          sessionStorage.getItem('trippy_active_trip_cache') ||
-          localStorage.getItem('trippy_active_trip_cache');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          setActiveTrip(parsed);
-          setBidsCount(parsed?.drivers?.length ?? parsed?.total_bids ?? 0);
-        }
-      } catch {}
+      // On initial client mount, only restore cached active trip if user is authenticated
+      if (effectiveToken) {
+        try {
+          const cached =
+            sessionStorage.getItem('trippy_active_trip_cache') ||
+            localStorage.getItem('trippy_active_trip_cache');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setActiveTrip(parsed);
+            setBidsCount(parsed?.drivers?.length ?? parsed?.total_bids ?? 0);
+          }
+        } catch {}
+      }
       return;
     }
 
-    // Subsequent updates: persist or purge based on activeTrip state
-    if (activeTrip) {
+    // Subsequent updates: persist when activeTrip state is updated
+    if (activeTrip && effectiveToken) {
       try {
         const json = JSON.stringify(activeTrip);
         sessionStorage.setItem('trippy_active_trip_cache', json);
@@ -172,13 +194,13 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
           sessionStorage.setItem(`trippy_trip_created_${activeTrip.uuid}`, cTime);
         }
       } catch {}
-    } else {
+    } else if (!activeTrip) {
       try {
         sessionStorage.removeItem('trippy_active_trip_cache');
         localStorage.removeItem('trippy_active_trip_cache');
       } catch {}
     }
-  }, [activeTrip]);
+  }, [activeTrip, token]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isOverlayVisible, setIsOverlayVisible] = useState<boolean>(true);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
@@ -247,11 +269,25 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
 
-      // If activeTrip exists but wasn't in REQUESTED list, check single trip endpoint with ALL status
-      if (!nextTrip && activeTripRef.current?.uuid) {
+      // If activeTrip wasn't in REQUESTED list, check single trip endpoint with ALL status
+      const targetSingleUuid =
+        activeTripRef.current?.uuid ||
+        (typeof window !== 'undefined'
+          ? (() => {
+              try {
+                const c =
+                  sessionStorage.getItem('trippy_active_trip_cache') ||
+                  localStorage.getItem('trippy_active_trip_cache');
+                if (c) return JSON.parse(c)?.uuid || '';
+              } catch {}
+              return '';
+            })()
+          : '');
+
+      if (!nextTrip && targetSingleUuid) {
         const singleRes = await customerTripService.fetchSingleTripBids(
           customerUuid,
-          activeTripRef.current.uuid,
+          targetSingleUuid,
           language,
           'ALL',
           effectiveToken
@@ -278,10 +314,14 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
           if (
             currentStatus === 'REQUESTED' ||
             currentStatus === 'ACCEPTED' ||
+            currentStatus === 'BOOKED' ||
+            currentStatus === 'ARRIVED_PICKUP_LOCATION' ||
             currentStatus === 'ON_THE_WAY' ||
             currentStatus === 'STARTED' ||
+            currentStatus === 'RIDE_STARTED' ||
             currentStatus === 'IN_PROGRESS' ||
-            currentStatus === 'INPROGRESS'
+            currentStatus === 'INPROGRESS' ||
+            currentStatus === 'FIRST_COMPLETED'
           ) {
             nextTrip = activeTripRef.current;
           }
@@ -436,6 +476,8 @@ export const ActiveTripProvider: React.FC<{ children: React.ReactNode }> = ({
     setActiveTrip(null);
     setBidsCount(0);
     setIsRadarModalOpen(false);
+    setIsOverlayVisible(false);
+    setIsRadarOnPage(false);
   }, []);
 
   const setActiveTripManually = useCallback((trip: RentalTrip | null) => {

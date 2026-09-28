@@ -22,6 +22,7 @@ import { GoogleRouteMap } from './GoogleRouteMap';
 import { useLanguage } from '@/context/LanguageContext';
 import { useActiveTrip } from '@/features/trips/context/ActiveTripContext';
 import { clearAllTripRelatedStorage, isTripReviewed } from '@/shared/utils/tripStorage';
+import { useRouter } from 'next/navigation';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Sparkles, MapPin, Zap, RefreshCw, PlusCircle } from 'lucide-react';
 
@@ -30,6 +31,7 @@ interface BookingPortalProps {
 }
 
 export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) => {
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const { isAuthenticated, user, token } = useAppSelector((state) => state.auth);
   const { language } = useLanguage();
@@ -97,10 +99,23 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     createdAt?: string;
   } | null>(null);
 
+  // When user logs out, immediately clear activeTrip and storage from booking page
+  useEffect(() => {
+    if (!isAuthenticated && !token) {
+      setActiveTrip(null);
+      setHasDismissedRadar(false);
+      try {
+        sessionStorage.removeItem('trippy_booking_active_trip');
+        localStorage.removeItem('trippy_booking_active_trip');
+      } catch {}
+    }
+  }, [isAuthenticated, token]);
+
   useEffect(() => {
     if (isInitialBookingMount.current) {
       isInitialBookingMount.current = false;
-      // On initial client mount, safely check storage to resume active booking if exists
+      // On initial client mount, safely check storage to resume active booking if user is logged in
+      if (!isAuthenticated && !token) return;
       try {
         const cached =
           sessionStorage.getItem('trippy_booking_active_trip') ||
@@ -153,17 +168,47 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
 
   // Auto-resume live bidding radar if an active REQUESTED trip exists on server
   useEffect(() => {
-    // Only clear if the global trip has definitively finished, been cancelled, or accepted a driver
+    // 1. If global active trip has transitioned to an accepted or in-progress ride, auto-redirect to live tracking
+    const status = (globalActiveTrip?.trip_status || '').toUpperCase();
+    const isTripActiveRide =
+      status === 'ACCEPTED' ||
+      status === 'BOOKED' ||
+      status === 'ARRIVED_PICKUP_LOCATION' ||
+      status === 'ON_THE_WAY' ||
+      status === 'STARTED' ||
+      status === 'RIDE_STARTED' ||
+      status === 'IN_PROGRESS' ||
+      status === 'INPROGRESS' ||
+      status === 'FIRST_COMPLETED' ||
+      (status !== 'REQUESTED' && (Boolean(globalActiveTrip?.accepted_bid_uuid) || Boolean(globalActiveTrip?.accepted_driver)));
+
+    if (isTripActiveRide && globalActiveTrip?.uuid && !isTripReviewed(globalActiveTrip, globalActiveTrip.uuid)) {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('trippy_has_active_ride', 'true');
+        } catch {}
+      }
+      if (activeTrip) {
+        setActiveTrip(null);
+      }
+      const driverId =
+        globalActiveTrip.accepted_driver?.driver_uuid ||
+        (globalActiveTrip as any).driver_uuid ||
+        globalActiveTrip.drivers?.[0]?.driver_uuid ||
+        '';
+      router.push(`/tracking?trip_uuid=${globalActiveTrip.uuid}${driverId ? `&driver_uuid=${driverId}` : ''}`);
+      return;
+    }
+
+    // 2. Only clear if the global trip has definitively finished, been cancelled, or reviewed
     const isGlobalTerminal =
       globalActiveTrip &&
-      (globalActiveTrip.trip_status === 'COMPLETED' ||
-        globalActiveTrip.trip_status === 'TRIP_COMPLETED' ||
-        globalActiveTrip.trip_status === 'FINISHED' ||
-        globalActiveTrip.trip_status === 'CANCELLED' ||
-        globalActiveTrip.trip_status === 'CANCELED' ||
-        globalActiveTrip.trip_status === 'TRIP_CANCELLED' ||
-        Boolean(globalActiveTrip.accepted_bid_uuid) ||
-        Boolean(globalActiveTrip.accepted_driver) ||
+      (status === 'COMPLETED' ||
+        status === 'TRIP_COMPLETED' ||
+        status === 'FINISHED' ||
+        status === 'CANCELLED' ||
+        status === 'CANCELED' ||
+        status === 'TRIP_CANCELLED' ||
         isTripReviewed(globalActiveTrip, globalActiveTrip?.uuid));
 
     if (isGlobalTerminal) {
@@ -226,7 +271,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
         });
       }
     }
-  }, [globalActiveTrip, hasDismissedRadar, activeTrip?.uuid, user, isBn]);
+  }, [globalActiveTrip, hasDismissedRadar, activeTrip?.uuid, user, isBn, router]);
 
   // Fetch real-time services from /rental-info
   useEffect(() => {
@@ -272,18 +317,7 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
     }
   }, [selectedService]);
 
-  // When activeTrip becomes active, automatically scroll to driver finding radar so user never has to scroll up
-  useEffect(() => {
-    if (activeTrip) {
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      requestAnimationFrame(() => {
-        const target = document.getElementById('booking-top') || document.getElementById('home-booking');
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      });
-    }
-  }, [activeTrip?.uuid]);
+
 
   const handleSelectCar = React.useCallback((car: CarInfo, baseFare: number) => {
     setSelectedCar(car);
@@ -545,15 +579,6 @@ export const BookingPortal: React.FC<BookingPortalProps> = ({ isHero = false }) 
       })
       .catch(() => {});
 
-    // Automatically scroll to driver finding radar view so user immediately sees next step without scrolling up
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      const target = document.getElementById('booking-top') || document.getElementById('home-booking');
-      if (target) {
-        target.scrollIntoView({ behavior: 'auto', block: 'start' });
-      }
-    });
   };
 
 

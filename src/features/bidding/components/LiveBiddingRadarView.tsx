@@ -574,7 +574,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     };
 
     check();
-    const interval = setInterval(check, 100);
+    const interval = setInterval(check, 1000);
     return () => clearInterval(interval);
     // Run once on mount — reads from refs, so no dependency needed
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -747,6 +747,33 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   // ── 1. Universal Processor for Live Trip Updates (Socket.IO + Polling) ──
   const isTerminalRef = useRef<boolean>(false);
 
+  const onTripUuidUpdatedRef = useRef(onTripUuidUpdated);
+  useEffect(() => { onTripUuidUpdatedRef.current = onTripUuidUpdated; }, [onTripUuidUpdated]);
+
+  const onCancelTripRef = useRef(onCancelTrip);
+  useEffect(() => { onCancelTripRef.current = onCancelTrip; }, [onCancelTrip]);
+
+  const setActiveTripManuallyRef = useRef(setActiveTripManually);
+  useEffect(() => { setActiveTripManuallyRef.current = setActiveTripManually; }, [setActiveTripManually]);
+
+  const clearActiveTripRef = useRef(clearActiveTrip);
+  useEffect(() => { clearActiveTripRef.current = clearActiveTrip; }, [clearActiveTrip]);
+
+  const activeTripRef = useRef(activeTrip);
+  useEffect(() => { activeTripRef.current = activeTrip; }, [activeTrip]);
+
+  const tripCreatedAtRef = useRef(tripCreatedAt);
+  useEffect(() => { tripCreatedAtRef.current = tripCreatedAt; }, [tripCreatedAt]);
+
+  const internalServiceNameRef = useRef(internalServiceName);
+  useEffect(() => { internalServiceNameRef.current = internalServiceName; }, [internalServiceName]);
+
+  const internalHoursBookedRef = useRef(internalHoursBooked);
+  useEffect(() => { internalHoursBookedRef.current = internalHoursBooked; }, [internalHoursBooked]);
+
+  const proposedFareRef = useRef(proposedFare);
+  useEffect(() => { proposedFareRef.current = proposedFare; }, [proposedFare]);
+
   const processTripUpdate = useCallback(
     (trip: RentalTrip) => {
       if (!trip || isTerminalRef.current) return;
@@ -755,14 +782,14 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         currentTripUuidRef.current ||
         currentTripUuid ||
         tripUuid ||
-        activeTrip?.uuid ||
+        activeTripRef.current?.uuid ||
         '';
 
       if (trip.uuid && trip.uuid !== currentTripUuidRef.current) {
         setCurrentTripUuid(trip.uuid);
         currentTripUuidRef.current = trip.uuid;
-        if (onTripUuidUpdated) {
-          onTripUuidUpdated(trip.uuid);
+        if (onTripUuidUpdatedRef.current) {
+          onTripUuidUpdatedRef.current(trip.uuid);
         }
       }
 
@@ -772,7 +799,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         (trip as any).creation_date ||
         (trip as any).created_date ||
         (trip as any).rental_trip?.created_at ||
-        tripCreatedAt ||
+        tripCreatedAtRef.current ||
         getPersistedCreatedAt(trip.uuid) ||
         getPersistedCreatedAt(effectiveTrip);
 
@@ -785,8 +812,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         if (uuidForTimer) {
           dispatch(setTripCreatedAtOnce({ tripUuid: uuidForTimer, createdAt: freshCreated }));
         }
-        // Only update local React state if not already set (Redux is authoritative)
-        if (!tripCreatedAt) {
+        if (!tripCreatedAtRef.current) {
           setTripCreatedAt(freshCreated);
         }
       }
@@ -796,7 +822,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         (trip as any).service_type ||
         (trip as any).servive_type ||
         trip.car_service?.service_name;
-      if (polledService && polledService !== internalServiceName) {
+      if (polledService && polledService !== internalServiceNameRef.current) {
         setInternalServiceName(polledService);
       }
 
@@ -804,11 +830,11 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         trip.hours_booked ||
         (trip as any).hours ||
         (trip as any).rental_duration;
-      if (polledHours && polledHours !== internalHoursBooked) {
+      if (polledHours && polledHours !== internalHoursBookedRef.current) {
         setInternalHoursBooked(polledHours);
       }
 
-      if (trip.offer_amount && trip.offer_amount !== proposedFare) {
+      if (trip.offer_amount && trip.offer_amount !== proposedFareRef.current) {
         setProposedFare(trip.offer_amount);
       }
 
@@ -842,8 +868,8 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
         // If already reviewed, do NOT open review modal! Terminate and exit radar cleanly.
         if (isReviewDone) {
-          clearActiveTrip();
-          onCancelTrip();
+          clearActiveTripRef.current();
+          onCancelTripRef.current();
           return;
         }
 
@@ -861,42 +887,45 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         isTerminalRef.current = true;
         clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
         alert(isBn ? 'ট্রিপটি বাতিল করা হয়েছে।' : 'Trip has been cancelled.');
-        onCancelTrip();
+        onCancelTripRef.current();
         return;
       }
 
-      if (status === 'ACCEPTED' || status === 'ON_THE_WAY' || status === 'STARTED') {
+      const isActiveRideStatus =
+        status === 'ACCEPTED' ||
+        status === 'BOOKED' ||
+        status === 'ARRIVED_PICKUP_LOCATION' ||
+        status === 'ON_THE_WAY' ||
+        status === 'STARTED' ||
+        status === 'RIDE_STARTED' ||
+        status === 'IN_PROGRESS' ||
+        status === 'INPROGRESS' ||
+        status === 'FIRST_COMPLETED';
+
+      if (isActiveRideStatus) {
         isTerminalRef.current = true;
-        clearAllTripRelatedStorage(trip.uuid || effectiveTrip);
-        onCancelTrip();
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('trippy_has_active_ride', 'true');
+          } catch {}
+        }
+        setActiveTripManuallyRef.current(trip);
+        const targetTripUuid = trip.uuid || effectiveTrip;
         const driverId =
           trip.accepted_driver?.driver_uuid ||
           (trip as any).driver_uuid ||
           (trip.drivers && trip.drivers[0]?.driver_uuid) ||
           '';
-        router.push(`/tracking?trip_uuid=${effectiveTrip}&driver_uuid=${driverId}`);
+        router.push(`/tracking?trip_uuid=${targetTripUuid}${driverId ? `&driver_uuid=${driverId}` : ''}`);
         return;
       }
 
-      // Sync with active trip global context only for active requested trips
-      setActiveTripManually(trip);
+      // Sync with active trip global context only for active requested trips if data actually changed
+      if (hasTripDataChanged(activeTripRef.current, trip)) {
+        setActiveTripManuallyRef.current(trip);
+      }
     },
-    [
-      currentTripUuid,
-      tripUuid,
-      activeTrip?.uuid,
-      onTripUuidUpdated,
-      tripCreatedAt,
-      dispatch,
-      internalServiceName,
-      internalHoursBooked,
-      proposedFare,
-      clearActiveTrip,
-      onCancelTrip,
-      isBn,
-      router,
-      setActiveTripManually,
-    ]
+    [dispatch, isBn, router, tripUuid]
   );
 
   // ── 2. Real-time Driver Bids via Socket.IO (rental_bid_trip_single_for_customer & trip_updated) ──
@@ -914,15 +943,20 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     getActiveCustomerUuid();
 
 
+  const processTripUpdateRef = useRef(processTripUpdate);
+  useEffect(() => {
+    processTripUpdateRef.current = processTripUpdate;
+  }, [processTripUpdate]);
+
   // ── Live Trip List Updates via Socket.IO ──
   useTripListSocket({
     customerUuid: customerUuid,
     enabled: Boolean(customerUuid),
     onTripListUpdate: (updatedTrips) => {
       // Find current active trip
-      const currentActive = updatedTrips.find(t => t.uuid === activeTrip?.uuid) || updatedTrips.find(t => t.trip_status === 'REQUESTED') || updatedTrips[0];
+      const currentActive = updatedTrips.find(t => t.uuid === activeTripRef.current?.uuid) || updatedTrips.find(t => t.trip_status === 'REQUESTED') || updatedTrips[0];
       if (currentActive) {
-        processTripUpdate(currentActive);
+        processTripUpdateRef.current(currentActive);
       }
     },
   });
@@ -930,7 +964,9 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
   const { isConnected: isSocketConnected, socketFailed: isSocketFailed } = useTripSocket({
     tripUuid: effectiveActiveTripUuid,
     customerUuid: effectiveActiveCustomerUuid,
-    onTripUpdate: processTripUpdate,
+    onTripUpdate: (trip) => {
+      processTripUpdateRef.current(trip);
+    },
     enabled: Boolean(effectiveActiveTripUuid) && !isTerminalRef.current,
   });
 
@@ -975,7 +1011,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
         if (!isMounted || isTerminalRef.current) return;
 
         if (singleRes.status && singleRes.data) {
-          processTripUpdate(singleRes.data);
+          processTripUpdateRef.current(singleRes.data);
           return;
         }
       }
@@ -993,7 +1029,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       if (trips && trips.length > 0) {
         const currentTrip = trips.find((t) => t.uuid === effectiveTrip) || trips[0];
         if (currentTrip && isMounted && !isTerminalRef.current) {
-          processTripUpdate(currentTrip);
+          processTripUpdateRef.current(currentTrip);
         }
       }
     };
@@ -1027,7 +1063,6 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
     activeTrip?.customer_uuid,
     user?.uuid,
     token,
-    processTripUpdate,
     isRideShare,
     isSocketConnected,
     isSocketFailed,
@@ -1135,7 +1170,14 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
 
     setIsAccepting(bidUuid);
 
-    const activeCurrentUuid = currentTripUuidRef.current || currentTripUuid || tripUuid;
+    const activeCurrentUuid =
+      currentTripUuidRef.current ||
+      currentTripUuid ||
+      tripUuid ||
+      activeTrip?.uuid ||
+      (bidToAccept as any)?.trip_uuid ||
+      (bidToAccept as any)?.rental_trip_uuid ||
+      '';
 
     try {
       const res = await customerTripService.acceptBid(
@@ -1147,7 +1189,6 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
       );
 
       if (res.status) {
-        clearAllTripRelatedStorage(activeCurrentUuid);
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('trippy_has_active_ride', 'true');
@@ -1333,7 +1374,7 @@ export const LiveBiddingRadarView: React.FC<LiveBiddingRadarViewProps> = ({
             style={{
               transform: `scaleX(${Math.min(1, Math.max(0, topProgressPct / 100))})`,
               transformOrigin: 'left',
-              transition: 'transform 200ms linear',
+              transition: 'transform 1000ms linear',
             }}
           />
         </div>
@@ -2163,9 +2204,9 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
     serviceName?.toLowerCase() === 'rideshare';
 
   // Accept button progress bar durations:
-  //   RIDE_SHARE  → 40 seconds
+  //   RIDE_SHARE  → 2 minutes (120 seconds)
   //   All others  → 40 minutes (2400 seconds)
-  const totalDurationSecondsRaw = isRideShare ? 40 : 40 * 60;
+  const totalDurationSecondsRaw = isRideShare ? 2 * 60 : 40 * 60;
 
   // Lock duration in a ref so service-type changes from polling don't reset the bar
   const totalDurRef = useRef<number>(totalDurationSecondsRaw);
@@ -2200,10 +2241,10 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
     return Math.min(1, Math.max(0, elapsedMs / totalMs));
   });
 
-  // Smooth progress bar update every 100ms — empty deps so it NEVER restarts on polling
+  // Smooth progress bar update every 1000ms (1s) — empty deps so it NEVER restarts on polling
   useEffect(() => {
     hasExpiredRef.current = false;
-    const interval = setInterval(() => {
+    const update = () => {
       const now = Date.now();
       const elapsedMs = Math.max(0, now - startTsRef.current);
       const totalMs = totalDurRef.current * 1000;
@@ -2217,7 +2258,10 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
         // After progress bar ends, cancel bid and remove from UI
         onDecline(bid, 'cancel_rent_bid_driver_or_customer_admin');
       }
-    }, 100);
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
 
     return () => clearInterval(interval);
     // Empty deps: reads from refs, so safe to run once on mount only
@@ -2389,7 +2433,7 @@ const DriverBidCardItem: React.FC<DriverBidCardItemProps> = ({
             style={{
               transform: `scaleX(${Math.min(1, Math.max(0, 1 - progressFraction))})`,
               transformOrigin: 'right',
-              transition: 'transform 200ms linear',
+              transition: 'transform 1000ms linear',
             }}
           />
 

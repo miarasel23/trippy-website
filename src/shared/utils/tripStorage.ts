@@ -16,6 +16,34 @@ export function clearAllTripRelatedStorage(tripUuid?: string) {
       localStorage.removeItem(`trippy_trip_created_${tripUuid}`);
       sessionStorage.removeItem(`trippy_trip_created_${tripUuid}`);
     }
+
+    // Clean any dynamic trip keys
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('trippy_trip_created_') || key.startsWith('trippy_booking_'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch {}
+}
+
+/**
+ * Completely purges all session, booking, and trip data from browser storage on logout.
+ */
+export function clearAllSessionAndTripStorage() {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.clear();
+  } catch {}
+  clearAllTripRelatedStorage();
+  try {
+    localStorage.removeItem('trippy_customer_uuid');
+    localStorage.removeItem('tripyy_customer_uuid');
+    localStorage.removeItem('trippy_booking_active_trip');
+    localStorage.removeItem('trippy_active_trip_cache');
+    localStorage.removeItem('trippy_has_active_ride');
   } catch {}
 }
 
