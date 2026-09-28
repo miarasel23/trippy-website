@@ -276,14 +276,34 @@ export function useBiddingActions({
       );
 
       if (res.status) {
+        const driverId = bidToAccept.driver_uuid || bidToAccept.driverUuid || '';
+        const acceptedTrip: any = {
+          uuid: currentTripUuid,
+          trip_status: 'ACCEPTED',
+          status: 'ACCEPTED',
+          accepted_driver: bidToAccept,
+          customer_uuid: effectiveCustomerUuid,
+          pickup_locations: pickupAddress ? [{ address: pickupAddress }] : [],
+          dropoff_locations: dropoffAddress ? [{ address: dropoffAddress }] : [],
+          service_name: internalServiceName,
+          total_amount: bidToAccept.bid_amount || (bidToAccept as any).amount || proposedFare,
+          offer_amount: bidToAccept.bid_amount || (bidToAccept as any).amount || proposedFare,
+          ...(res.data && typeof res.data === 'object' ? res.data : {}),
+        };
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('trippy_has_active_ride', 'true');
+            localStorage.setItem('trippy_active_trip_cache', JSON.stringify(acceptedTrip));
+            sessionStorage.setItem('trippy_active_trip_cache', JSON.stringify(acceptedTrip));
           } catch {}
         }
+        setActiveTripManually(acceptedTrip);
         dismissOverlay();
-        const driverId = bidToAccept.driver_uuid || bidToAccept.driverUuid || '';
-        router.push(`/tracking?trip_uuid=${currentTripUuid}&driver_uuid=${driverId}`);
+        router.push(
+          `/tracking?trip_uuid=${currentTripUuid}&driver_uuid=${driverId}${
+            effectiveCustomerUuid ? `&customer_uuid=${effectiveCustomerUuid}` : ''
+          }`
+        );
       } else {
         setIsAccepting(null);
         setBidToAccept(null);
@@ -294,7 +314,23 @@ export function useBiddingActions({
       setBidToAccept(null);
       alert(err?.message || (isBn ? 'ড্রাইভারের বিড গ্রহণে সমস্যা হয়েছে।' : 'Failed to accept driver bid.'));
     }
-  }, [bidToAccept, currentTripUuid, effectiveCustomerUuid, language, token, isBn, router, dismissOverlay, setIsAccepting, setBidToAccept]);
+  }, [
+    bidToAccept,
+    currentTripUuid,
+    effectiveCustomerUuid,
+    language,
+    token,
+    isBn,
+    router,
+    dismissOverlay,
+    setActiveTripManually,
+    pickupAddress,
+    dropoffAddress,
+    internalServiceName,
+    proposedFare,
+    setIsAccepting,
+    setBidToAccept,
+  ]);
 
   /**
    * Action: Confirm Cancelling Trip Request

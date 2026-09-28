@@ -264,7 +264,24 @@ export const TrackingPortal: React.FC = () => {
     tripUuidParam || contextActiveTrip?.uuid || cachedTripUuid || '';
 
   const [isMounted, setIsMounted] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    if (contextActiveTrip && isValidTripData(contextActiveTrip)) return false;
+    if (typeof window !== 'undefined') {
+      try {
+        const cached =
+          sessionStorage.getItem('trippy_active_trip_cache') ||
+          localStorage.getItem('trippy_active_trip_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && isValidTripData(parsed) && (!tripUuidParam || parsed.uuid === tripUuidParam)) {
+            return false;
+          }
+        }
+      } catch {}
+    }
+    return true;
+  });
+  const [tripFetchCompleted, setTripFetchCompleted] = useState<boolean>(false);
 
   // Component-lifetime mount tracking ref to guard async state updates without cancelling on effect re-runs
   const isComponentMountedRef = useRef<boolean>(true);
@@ -376,13 +393,19 @@ export const TrackingPortal: React.FC = () => {
         return;
       }
 
-      const isDone =
+      const isCompletedSuccessfully =
         status === 'COMPLETED' ||
         status === 'FINISHED' ||
-        status === 'TRIP_COMPLETED' ||
+        status === 'TRIP_COMPLETED';
+
+      const isCancelled =
         status === 'CANCELLED' ||
         status === 'CANCELED' ||
-        status === 'TRIP_CANCELLED';
+        status === 'TRIP_CANCELLED' ||
+        status === 'DELETED' ||
+        status === 'NO_SHOW';
+
+      const isDone = isCompletedSuccessfully || isCancelled;
 
       if (isDone) {
         clearAllTripRelatedStorage(effectiveTripUuid);
@@ -397,7 +420,8 @@ export const TrackingPortal: React.FC = () => {
       // Check if review has been given
       const isReviewed = isTripReviewed(currentTrip, effectiveTripUuid);
 
-      if (isDone && !isReviewed && !hasReviewed) {
+      // ONLY open review modal when trip is COMPLETED successfully, NEVER when cancelled!
+      if (isCompletedSuccessfully && !isReviewed && !hasReviewed) {
         setIsReviewModalOpen(true);
       }
     },
@@ -457,8 +481,8 @@ export const TrackingPortal: React.FC = () => {
 
         if (res.status && res.data && isValidTripData(res.data)) {
           processTripState(res.data);
-        } else {
-          // If backend returns no data or an empty trip list, clear hollow trip state
+        } else if (!trip && !contextActiveTrip) {
+          // If backend returns no data and we have no cached state, clear trip
           setTrip(null);
           if (typeof window !== 'undefined') {
             try {
@@ -472,16 +496,13 @@ export const TrackingPortal: React.FC = () => {
       } finally {
         if (isEffectActive && isComponentMountedRef.current) {
           setIsLoading(false);
+          setTripFetchCompleted(true);
         }
       }
     };
 
-    // Fetch initial trip state on mount if not already loaded in memory
-    if (!trip || trip.uuid !== effectiveTripUuid || !isSocketConnected) {
-      fetchTripData();
-    } else {
-      setIsLoading(false);
-    }
+    // Always fetch authoritative trip details once on mount
+    fetchTripData();
 
     // Zero-polling strategy: When WebSocket is actively connected, all trip
     // updates arrive instantly via Socket.IO with 0ms latency.
@@ -507,7 +528,6 @@ export const TrackingPortal: React.FC = () => {
     token,
     isRideShare,
     isSocketConnected,
-    trip,
     processTripState,
   ]);
 
@@ -612,16 +632,22 @@ export const TrackingPortal: React.FC = () => {
     }
   }, [tripStatusFromApi]);
 
-  // Completed or cancelled trip statuses
-  const isCompleted =
+  // Strictly completed trips (eligible for review)
+  const isCompletedSuccessfully =
     rawStatus === 'COMPLETED' ||
     rawStatus === 'FINISHED' ||
-    rawStatus === 'TRIP_COMPLETED' ||
+    rawStatus === 'TRIP_COMPLETED';
+
+  // Cancelled or deleted trips
+  const isCancelled =
     rawStatus === 'CANCELLED' ||
     rawStatus === 'CANCELED' ||
     rawStatus === 'TRIP_CANCELLED' ||
     rawStatus === 'DELETED' ||
     rawStatus === 'NO_SHOW';
+
+  // Completed or cancelled terminal trip statuses
+  const isCompleted = isCompletedSuccessfully || isCancelled;
 
   const isFirstCompleted =
     rawStatus === 'FIRST_COMPLETED' || rawStatus === 'FIRSTCOMPLETED';
@@ -797,8 +823,6 @@ export const TrackingPortal: React.FC = () => {
     token,
     isActiveTrip,
     isSocketConnected,
-    latestDriverLocation,
-    driverTrackingRecords.length,
   ]);
 
   // Car photos list from driver info (Strictly use real photos; do not fall back to fake demo photos if driver has none)
@@ -950,15 +974,15 @@ export const TrackingPortal: React.FC = () => {
     activeDriver?.review_status === true ||
     hasReviewed;
 
-  // ── Auto-open review popup when trip is completed and review not given ────
+  // ── Auto-open review popup ONLY when trip is completed successfully (never when cancelled) ────
   useEffect(() => {
-    if (isCompleted && !isReviewed && !hasReviewed) {
+    if (isCompletedSuccessfully && !isReviewed && !hasReviewed) {
       const timer = setTimeout(() => {
         setIsReviewModalOpen(true);
       }, 700);
       return () => clearTimeout(timer);
     }
-  }, [isCompleted, isReviewed, hasReviewed]);
+  }, [isCompletedSuccessfully, isReviewed, hasReviewed]);
 
   // Send message handler
   const handleSendMessage = async (textToSend?: string) => {
@@ -1032,6 +1056,7 @@ export const TrackingPortal: React.FC = () => {
   const handleConfirmCancel = async () => {
     if (!effectiveTripUuid) return;
     setIsCancelling(true);
+    setIsReviewModalOpen(false); // Explicitly ensure review modal is NEVER open on cancel
     await customerTripService.cancelTrip(effectiveTripUuid, cancelReason, language);
     setIsCancelling(false);
     setIsCancelModalOpen(false);
@@ -1044,11 +1069,16 @@ export const TrackingPortal: React.FC = () => {
     router.push('/');
   };
 
-  if (!isMounted || isLoading) {
+  const hasTripUuid = Boolean(effectiveTripUuid);
+  const isTripValid = Boolean(trip && isValidTripData(trip));
+
+  // If mounting or actively fetching an existing trip UUID, show skeleton instead of flashing empty state
+  if (!isMounted || (!isTripValid && (isLoading || (hasTripUuid && !tripFetchCompleted)))) {
     return <TrackingSkeleton isBn={isBn} />;
   }
 
-  if ((!trip || !isValidTripData(trip)) && !isLoading) {
+  // Only show empty state if genuinely no active trip to track
+  if (!isTripValid) {
     return <TrackingEmptyState isBn={isBn} />;
   }
 

@@ -262,6 +262,8 @@ export function useBiddingSocketSync({
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('trippy_has_active_ride', 'true');
+            localStorage.setItem('trippy_active_trip_cache', JSON.stringify(trip));
+            sessionStorage.setItem('trippy_active_trip_cache', JSON.stringify(trip));
           } catch {}
         }
         setActiveTripManuallyRef.current(trip);
@@ -271,7 +273,12 @@ export function useBiddingSocketSync({
           (trip as any).driver_uuid ||
           (trip.drivers && trip.drivers[0]?.driver_uuid) ||
           '';
-        router.push(`/tracking?trip_uuid=${targetTripUuid}${driverId ? `&driver_uuid=${driverId}` : ''}`);
+        const effectiveCust = trip.customer_uuid || (trip as any).customerUuid || '';
+        router.push(
+          `/tracking?trip_uuid=${targetTripUuid}${driverId ? `&driver_uuid=${driverId}` : ''}${
+            effectiveCust ? `&customer_uuid=${effectiveCust}` : ''
+          }`
+        );
         return;
       }
 
